@@ -1,6 +1,6 @@
 <idea-plugin url="https://github.com/HarcoChen/dsh-intellij-integration">
     <id>top.harcochen.dsh</id>
-    <name>DeepSeek Harness</name>
+    <name>DeepSeek Harness Integration</name>
     <vendor email="harcourtzzz@outlook.com" url="https://github.com/HarcoChen/dsh-intellij-integration">HarcoChen</vendor>
     <description><![CDATA[
         <p>An independent community integration for using DeepSeek Harness (DSH)
