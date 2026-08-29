@@ -9,6 +9,12 @@
 </p>
 
 <p align="center">
+  <a href="https://plugins.jetbrains.com/plugin/33924-deepseek-harness-integration"><img src="https://img.shields.io/jetbrains/plugin/v/33924.svg" alt="JetBrains Plugin Version"></a>
+  <a href="https://plugins.jetbrains.com/plugin/33924-deepseek-harness-integration"><img src="https://img.shields.io/jetbrains/plugin/d/33924.svg" alt="JetBrains Plugin Downloads"></a>
+  <a href="https://plugins.jetbrains.com/plugin/33924-deepseek-harness-integration/reviews"><img src="https://img.shields.io/jetbrains/plugin/r/rating/33924.svg" alt="JetBrains Plugin Rating"></a>
+</p>
+
+<p align="center">
   <a href="README.md">English</a> | <strong>简体中文</strong>
 </p>
 
