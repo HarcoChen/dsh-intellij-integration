@@ -7,7 +7,11 @@ plugins {
 }
 
 group = "top.harcochen"
-version = providers.gradleProperty("pluginVersion").orElse("0.2.0").get()
+// gradle.properties is the single source of truth for the release version:
+// patchPluginXml writes it into plugin.xml, and the release workflow refuses to
+// publish when it disagrees with the tag. The fallback is a sentinel that can
+// never be mistaken for a release.
+version = providers.gradleProperty("pluginVersion").orElse("0.0.0-dev").get()
 
 dependencies {
     intellijPlatform {
@@ -52,6 +56,21 @@ intellijPlatform {
         """.trimIndent()
     }
     buildSearchableOptions = false
+
+    // signPlugin reads CERTIFICATE_CHAIN / PRIVATE_KEY / PRIVATE_KEY_PASSWORD from
+    // the environment by default and skips itself when they are absent, so an
+    // unsigned local build still works and CI signs whenever the secrets exist.
+    publishing {
+        token = providers.environmentVariable("PUBLISH_TOKEN")
+        // A prerelease must not land on the channel every stable user upgrades
+        // into. Its SemVer identifier names the channel instead: 0.3.0-beta.1
+        // publishes to "beta", which users opt into by adding that repository.
+        channels = providers.provider {
+            val suffix = version.toString().substringAfter('-', "")
+            listOf(if (suffix.isEmpty()) "default" else suffix.substringBefore('.'))
+        }
+    }
+
     pluginVerification {
         ides {
             val target = providers.gradleProperty("platformVersion").orElse("2024.3.6").get()

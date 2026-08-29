@@ -1,0 +1,115 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing release tag to publish"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+# Releases must not overlap: a cancelled publish can leave the Marketplace and
+# the GitHub release disagreeing about what shipped.
+concurrency:
+  group: release-${{ inputs.tag || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    # The `secrets` context cannot be read from a step's `if`, so the publish
+    # credentials are lifted to the job environment and tested through `env`.
+    # signPlugin already reads the certificate variables from the environment.
+    env:
+      PUBLISH_TOKEN: ${{ secrets.PUBLISH_TOKEN }}
+      CERTIFICATE_CHAIN: ${{ secrets.CERTIFICATE_CHAIN }}
+      PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
+      PRIVATE_KEY_PASSWORD: ${{ secrets.PRIVATE_KEY_PASSWORD }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Resolve release metadata
+        id: metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # gradle.properties is the single source of truth; patchPluginXml
+          # writes this value into plugin.xml at build time.
+          VERSION="$(sed -n 's/^pluginVersion=//p' gradle.properties | tr -d '[:space:]')"
+          TAG="${{ inputs.tag || github.ref_name }}"
+
+          if [[ -z "${VERSION}" ]]; then
+            echo "gradle.properties declares no pluginVersion." >&2
+            exit 1
+          fi
+          if [[ "${TAG}" != "v${VERSION}" ]]; then
+            echo "Tag ${TAG} does not match gradle.properties pluginVersion v${VERSION}." >&2
+            exit 1
+          fi
+
+          # A SemVer prerelease (0.3.0-beta.1) is not for the general channel.
+          # It still produces a downloadable artifact and a pre-release GitHub
+          # release; on the Marketplace it goes to the channel its identifier
+          # names, which users opt into rather than upgrade into.
+          PRERELEASE=false
+          if [[ "${VERSION}" == *-* ]]; then
+            PRERELEASE=true
+          fi
+
+          echo "version=${VERSION}" >> "${GITHUB_OUTPUT}"
+          echo "archive=build/distributions/dsh-intellij-integration-${VERSION}.zip" >> "${GITHUB_OUTPUT}"
+          echo "prerelease=${PRERELEASE}" >> "${GITHUB_OUTPUT}"
+
+      - name: Build and verify plugin
+        run: ./gradlew clean buildPlugin verifyPlugin
+
+      - name: Confirm the distribution was produced
+        shell: bash
+        env:
+          ARCHIVE: ${{ steps.metadata.outputs.archive }}
+        run: |
+          set -euo pipefail
+          if [[ ! -f "${ARCHIVE}" ]]; then
+            echo "Expected ${ARCHIVE}, found:" >&2
+            ls -1 build/distributions >&2 || true
+            exit 1
+          fi
+
+      - name: Publish to JetBrains Marketplace
+        # Publishing is irreversible for a given version, so it only runs for a
+        # tag push or an explicit dispatch that carries a token. signPlugin
+        # signs the archive when the certificate secrets exist and skips itself
+        # when they do not, in which case the unsigned archive is published.
+        if: env.PUBLISH_TOKEN != ''
+        run: ./gradlew publishPlugin
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.tag || github.ref_name }}
+          files: ${{ steps.metadata.outputs.archive }}
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          prerelease: ${{ steps.metadata.outputs.prerelease == 'true' }}
