@@ -1,4 +1,5 @@
 import org.jetbrains.intellij.platform.gradle.extensions.intellijPlatform
+import org.jetbrains.intellij.platform.gradle.tasks.VerifyPluginSignatureTask
 
 plugins {
     id("java")
@@ -52,6 +53,8 @@ intellijPlatform {
               <li>Adds diagnostics and folder context attachments, and AppShot capture on macOS.</li>
               <li>Replaces the raw settings, workspace, provider, and agent-preset dialogs with
                   native surfaces.</li>
+              <li>Shares the runtime startup lock with the VS Code integration to prevent duplicate
+                  runtimes.</li>
             </ul>
         """.trimIndent()
     }
@@ -91,4 +94,24 @@ intellijPlatform {
 
 tasks.test {
     useJUnitPlatform()
+}
+
+// Plugin 2.6.0 passes an in-memory certificate to the verifier as if it were a
+// path. Materialize the public certificate in build/tmp and declare the missing
+// sign -> verify task edge so Gradle 9 can validate the release invocation.
+val verificationCertificate = layout.buildDirectory.file("tmp/pluginSigning/chain.crt")
+val prepareVerificationCertificate = tasks.register("preparePluginVerificationCertificate") {
+    outputs.file(verificationCertificate)
+    outputs.upToDateWhen { false }
+    doLast {
+        val output = verificationCertificate.get().asFile
+        output.parentFile.mkdirs()
+        output.writeText(providers.environmentVariable("CERTIFICATE_CHAIN").get())
+    }
+}
+
+tasks.named<VerifyPluginSignatureTask>("verifyPluginSignature") {
+    dependsOn("signPlugin", prepareVerificationCertificate)
+    certificateChain.unsetConvention()
+    certificateChainFile.set(verificationCertificate)
 }

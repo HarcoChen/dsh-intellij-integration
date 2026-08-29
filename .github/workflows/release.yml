@@ -25,9 +25,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
 
-    # The `secrets` context cannot be read from a step's `if`, so the publish
-    # credentials are lifted to the job environment and tested through `env`.
-    # signPlugin already reads the certificate variables from the environment.
+    # Gradle consumes credentials from the environment without writing secret
+    # material to the checkout.
     env:
       PUBLISH_TOKEN: ${{ secrets.PUBLISH_TOKEN }}
       CERTIFICATE_CHAIN: ${{ secrets.CERTIFICATE_CHAIN }}
@@ -81,10 +80,23 @@ jobs:
           echo "version=${VERSION}" >> "${GITHUB_OUTPUT}"
           echo "prerelease=${PRERELEASE}" >> "${GITHUB_OUTPUT}"
 
-      - name: Build, verify, and sign plugin
-        # signPlugin skips itself when the certificate secrets are absent, so
-        # this is the same command with or without signing configured.
-        run: ./gradlew clean buildPlugin verifyPlugin signPlugin
+      - name: Validate publishing secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          missing=()
+          for name in PUBLISH_TOKEN CERTIFICATE_CHAIN PRIVATE_KEY PRIVATE_KEY_PASSWORD; do
+            if [[ -z "${!name:-}" ]]; then
+              missing+=("${name}")
+            fi
+          done
+          if (( ${#missing[@]} > 0 )); then
+            echo "Missing required GitHub Actions secrets: ${missing[*]}" >&2
+            exit 1
+          fi
+
+      - name: Build, verify, sign, and verify signature
+        run: ./gradlew clean buildPlugin verifyPlugin signPlugin verifyPluginSignature
 
       - name: Resolve the distribution to release
         id: artifact
@@ -94,28 +106,21 @@ jobs:
         run: |
           set -euo pipefail
           BASE="build/distributions/dsh-intellij-integration-${VERSION}"
-          # The signed archive is what publishPlugin uploads, so it must also be
-          # what the GitHub release carries — otherwise the two would ship
-          # different bytes under one version.
+          # The signed archive is what publishPlugin uploads and what the GitHub
+          # release carries, so both channels ship identical bytes.
           if [[ -f "${BASE}-signed.zip" ]]; then
             ARCHIVE="${BASE}-signed.zip"
             echo "Signed archive selected."
-          elif [[ -f "${BASE}.zip" ]]; then
-            ARCHIVE="${BASE}.zip"
-            echo "::warning::Publishing an UNSIGNED plugin; set CERTIFICATE_CHAIN, PRIVATE_KEY and PRIVATE_KEY_PASSWORD to sign it."
           else
-            echo "No distribution produced for ${VERSION}, found:" >&2
+            echo "No signed distribution produced for ${VERSION}, found:" >&2
             ls -1 build/distributions >&2 || true
             exit 1
           fi
           echo "archive=${ARCHIVE}" >> "${GITHUB_OUTPUT}"
 
       - name: Publish to JetBrains Marketplace
-        # Publishing is irreversible for a given version, so it only runs for a
-        # tag push or an explicit dispatch that carries a token. signPlugin
-        # signs the archive when the certificate secrets exist and skips itself
-        # when they do not, in which case the unsigned archive is published.
-        if: env.PUBLISH_TOKEN != ''
+        # Marketplace versions cannot be overwritten, so publish only after the
+        # build, compatibility checks, signing, and signature verification pass.
         run: ./gradlew publishPlugin
 
       - name: Create GitHub release
