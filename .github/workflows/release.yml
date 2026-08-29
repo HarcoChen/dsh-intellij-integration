@@ -79,23 +79,36 @@ jobs:
           fi
 
           echo "version=${VERSION}" >> "${GITHUB_OUTPUT}"
-          echo "archive=build/distributions/dsh-intellij-integration-${VERSION}.zip" >> "${GITHUB_OUTPUT}"
           echo "prerelease=${PRERELEASE}" >> "${GITHUB_OUTPUT}"
 
-      - name: Build and verify plugin
-        run: ./gradlew clean buildPlugin verifyPlugin
+      - name: Build, verify, and sign plugin
+        # signPlugin skips itself when the certificate secrets are absent, so
+        # this is the same command with or without signing configured.
+        run: ./gradlew clean buildPlugin verifyPlugin signPlugin
 
-      - name: Confirm the distribution was produced
+      - name: Resolve the distribution to release
+        id: artifact
         shell: bash
         env:
-          ARCHIVE: ${{ steps.metadata.outputs.archive }}
+          VERSION: ${{ steps.metadata.outputs.version }}
         run: |
           set -euo pipefail
-          if [[ ! -f "${ARCHIVE}" ]]; then
-            echo "Expected ${ARCHIVE}, found:" >&2
+          BASE="build/distributions/dsh-intellij-integration-${VERSION}"
+          # The signed archive is what publishPlugin uploads, so it must also be
+          # what the GitHub release carries — otherwise the two would ship
+          # different bytes under one version.
+          if [[ -f "${BASE}-signed.zip" ]]; then
+            ARCHIVE="${BASE}-signed.zip"
+            echo "Signed archive selected."
+          elif [[ -f "${BASE}.zip" ]]; then
+            ARCHIVE="${BASE}.zip"
+            echo "::warning::Publishing an UNSIGNED plugin; set CERTIFICATE_CHAIN, PRIVATE_KEY and PRIVATE_KEY_PASSWORD to sign it."
+          else
+            echo "No distribution produced for ${VERSION}, found:" >&2
             ls -1 build/distributions >&2 || true
             exit 1
           fi
+          echo "archive=${ARCHIVE}" >> "${GITHUB_OUTPUT}"
 
       - name: Publish to JetBrains Marketplace
         # Publishing is irreversible for a given version, so it only runs for a
@@ -109,7 +122,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ inputs.tag || github.ref_name }}
-          files: ${{ steps.metadata.outputs.archive }}
+          files: ${{ steps.artifact.outputs.archive }}
           generate_release_notes: true
           fail_on_unmatched_files: true
           prerelease: ${{ steps.metadata.outputs.prerelease == 'true' }}

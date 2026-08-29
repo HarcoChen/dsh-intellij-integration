@@ -57,9 +57,16 @@ intellijPlatform {
     }
     buildSearchableOptions = false
 
-    // signPlugin reads CERTIFICATE_CHAIN / PRIVATE_KEY / PRIVATE_KEY_PASSWORD from
-    // the environment by default and skips itself when they are absent, so an
-    // unsigned local build still works and CI signs whenever the secrets exist.
+    // The signing inputs come from the environment, and signPlugin skips itself
+    // when they are absent — so the same command signs on CI and stays usable
+    // locally without a certificate. The block has to be declared for the task
+    // to consider itself configured at all.
+    signing {
+        certificateChain = providers.environmentVariable("CERTIFICATE_CHAIN")
+        privateKey = providers.environmentVariable("PRIVATE_KEY")
+        password = providers.environmentVariable("PRIVATE_KEY_PASSWORD")
+    }
+
     publishing {
         token = providers.environmentVariable("PUBLISH_TOKEN")
         // A prerelease must not land on the channel every stable user upgrades
