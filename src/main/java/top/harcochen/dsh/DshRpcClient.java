@@ -14,6 +14,8 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.util.Map;
+import java.util.TreeMap;
 import java.util.UUID;
 import java.util.function.Supplier;
 
@@ -136,10 +138,56 @@ public final class DshRpcClient {
     }
 
     public JsonObject history(String sessionId, int maxMessages) throws DshRpcException {
+        return historyPage(sessionId, null, maxMessages);
+    }
+
+    /** Read the complete bounded event log used by the Trace ledger. */
+    public JsonObject traceHistory(String sessionId) throws DshRpcException {
+        JsonObject tail = historyPage(sessionId, null, 1_000);
+        TreeMap<Long, JsonElement> events = new TreeMap<>();
+        addHistoryEvents(events, tail);
+        JsonObject page = tail;
+        for (int count = 1; bool(page, "hasMore") && count < 100; count++) {
+            Long beforeSeq = events.isEmpty() ? null : events.firstKey();
+            if (beforeSeq == null || beforeSeq <= 0) break;
+            page = historyPage(sessionId, beforeSeq, 1_000);
+            int previousSize = events.size();
+            addHistoryEvents(events, page);
+            if (events.size() == previousSize || events.size() >= 100_000) break;
+        }
+        JsonObject result = tail.deepCopy();
+        JsonArray merged = new JsonArray();
+        for (JsonElement event : events.values()) merged.add(event.deepCopy());
+        result.add("events", merged);
+        result.addProperty("hasMore", bool(page, "hasMore") && events.size() < 100_000);
+        return result;
+    }
+
+    private JsonObject historyPage(String sessionId, Long beforeSeq, int maxMessages) throws DshRpcException {
         JsonObject payload = new JsonObject();
         payload.addProperty("sessionId", sessionId);
+        if (beforeSeq != null) payload.addProperty("beforeSeq", beforeSeq);
         payload.addProperty("maxMessages", Math.max(1, Math.min(maxMessages, 1_000)));
         return objectValue("session.history", payload);
+    }
+
+    private static void addHistoryEvents(Map<Long, JsonElement> target, JsonObject page) {
+        JsonArray source = page.has("events") && page.get("events").isJsonArray()
+                ? page.getAsJsonArray("events") : new JsonArray();
+        for (JsonElement candidate : source) {
+            if (!candidate.isJsonObject()) continue;
+            JsonObject wrapper = candidate.getAsJsonObject();
+            JsonObject event = object(wrapper, "event");
+            if (event == null) event = wrapper;
+            try {
+                if (event.has("seq") && event.get("seq").isJsonPrimitive()) {
+                    long seq = event.get("seq").getAsLong();
+                    if (seq >= 0) target.putIfAbsent(seq, candidate.deepCopy());
+                }
+            } catch (RuntimeException ignored) {
+                // Ignore malformed history entries at this typed boundary.
+            }
+        }
     }
 
     public JsonObject createSession(String cwd, String workspaceId, String agentPreset) throws DshRpcException {
@@ -239,11 +287,15 @@ public final class DshRpcClient {
     }
 
     public JsonArray models(String sessionId) throws DshRpcException {
-        JsonObject payload = new JsonObject();
-        payload.addProperty("sessionId", sessionId);
-        JsonObject value = objectValue("session.models", payload);
+        JsonObject value = modelCatalog(sessionId);
         return value.has("groups") && value.get("groups").isJsonArray()
                 ? value.getAsJsonArray("groups") : new JsonArray();
+    }
+
+    public JsonObject modelCatalog(String sessionId) throws DshRpcException {
+        JsonObject payload = new JsonObject();
+        payload.addProperty("sessionId", sessionId);
+        return objectValue("session.models", payload);
     }
 
     public void selectModel(String sessionId, String provider, String model, String reasoningEffort)
@@ -263,6 +315,209 @@ public final class DshRpcClient {
         payload.addProperty("sessionId", sessionId);
         payload.addProperty("agentPreset", agentPreset);
         call("agentPreset.select", payload);
+    }
+
+    public JsonElement executeCommand(String sessionId, String line) throws DshRpcException {
+        JsonObject args = new JsonObject();
+        args.addProperty("agentId", sessionId);
+        args.addProperty("line", line);
+        args.add("images", new JsonArray());
+        JsonObject payload = new JsonObject();
+        payload.add("args", args);
+        return call("commands/execute", payload);
+    }
+
+    /** Every configurable provider merged with the live route registry. */
+    public JsonObject providers() throws DshRpcException {
+        return objectValue("llm.providers", new JsonObject());
+    }
+
+    /** Every registered settings namespace, with redacted layered values. */
+    public JsonObject describeSettings() throws DshRpcException {
+        return objectValue("settings.describe", new JsonObject());
+    }
+
+    /**
+     * Ask the Host to hand its local settings document to the platform opener.
+     * The request carries no path, so the client cannot choose an arbitrary
+     * Host filesystem target.
+     */
+    public void openSettingsDocument() throws DshRpcException {
+        call("settings.openDocument", new JsonObject());
+    }
+
+    /** Apply path-addressed edits to one namespace's user layer under a CAS revision. */
+    public JsonObject mutateSettings(String ns, JsonArray ops, long expectedRevision) throws DshRpcException {
+        JsonObject payload = new JsonObject();
+        payload.addProperty("ns", ns);
+        payload.add("ops", ops.deepCopy());
+        payload.addProperty("expectedRevision", expectedRevision);
+        return objectValue("settings.mutate", payload);
+    }
+
+    /** Every workspace in the registry's durable display order. */
+    public JsonObject workspaces() throws DshRpcException {
+        return objectValue("workspace.list", new JsonObject());
+    }
+
+    /** Registers (or idempotently resolves) a workspace over an existing directory. */
+    public JsonObject createWorkspace(String path) throws DshRpcException {
+        JsonObject payload = new JsonObject();
+        payload.addProperty("path", path);
+        return objectValue("workspace.create", payload);
+    }
+
+    public JsonObject renameWorkspace(String workspaceId, String title) throws DshRpcException {
+        JsonObject payload = new JsonObject();
+        payload.addProperty("workspaceId", workspaceId);
+        payload.addProperty("title", title);
+        return objectValue("workspace.rename", payload);
+    }
+
+    /**
+     * Removes one workspace registration. The directory, every user file, and
+     * every session log remain untouched.
+     */
+    public void deleteWorkspace(String workspaceId) throws DshRpcException {
+        JsonObject payload = new JsonObject();
+        payload.addProperty("workspaceId", workspaceId);
+        call("workspace.delete", payload);
+    }
+
+    /** The preset roster plus whether this deployment allows authoring at all. */
+    public JsonObject agentPresetCatalog() throws DshRpcException {
+        return objectValue("agentPreset.list", new JsonObject());
+    }
+
+    /**
+     * Create a locally authored preset by copying an existing one whole. No
+     * composition text and no path crosses the wire: both ids are resolved by
+     * the Host against its own roots.
+     */
+    public void copyAgentPreset(String from, String agentPreset, String name) throws DshRpcException {
+        JsonObject payload = new JsonObject();
+        payload.addProperty("from", from);
+        payload.addProperty("agentPreset", agentPreset);
+        if (name != null && !name.isBlank()) payload.addProperty("name", name);
+        call("agentPreset.copy", payload);
+    }
+
+    /** Delete a locally authored preset. Shipped presets are refused by the Host. */
+    public void removeAgentPreset(String agentPreset) throws DshRpcException {
+        JsonObject payload = new JsonObject();
+        payload.addProperty("agentPreset", agentPreset);
+        call("agentPreset.remove", payload);
+    }
+
+    /** One agent preset's stored document. */
+    public JsonObject readAgentPreset(String agentPreset) throws DshRpcException {
+        JsonObject payload = new JsonObject();
+        payload.addProperty("agentPreset", agentPreset);
+        return objectValue("agentPreset.read", payload);
+    }
+
+    public void openAgentPresetDocument(String agentPreset) throws DshRpcException {
+        JsonObject payload = new JsonObject();
+        payload.addProperty("agentPreset", agentPreset);
+        call("agentPreset.openDocument", payload);
+    }
+
+    /**
+     * Creates and arms a goal. The read side is the `goal` projection, so the
+     * response is only the new CAS ref; it never feeds client state.
+     */
+    public JsonObject createGoal(String sessionId, String objective, Integer maxGoalRounds) throws DshRpcException {
+        JsonObject payload = new JsonObject();
+        payload.addProperty("sessionId", sessionId);
+        payload.addProperty("objective", objective);
+        if (maxGoalRounds != null) payload.addProperty("maxGoalRounds", maxGoalRounds);
+        return objectValue("goal.create", payload);
+    }
+
+    public JsonObject editGoal(String sessionId, JsonObject ref, String objective, Integer maxGoalRounds)
+            throws DshRpcException {
+        JsonObject payload = new JsonObject();
+        payload.addProperty("sessionId", sessionId);
+        payload.add("ref", ref.deepCopy());
+        if (objective != null) payload.addProperty("objective", objective);
+        if (maxGoalRounds != null) payload.addProperty("maxGoalRounds", maxGoalRounds);
+        return objectValue("goal.edit", payload);
+    }
+
+    /** One CAS-guarded phase verb: goal.pause, goal.resume, goal.complete, or goal.clear. */
+    public JsonObject mutateGoal(String method, String sessionId, JsonObject ref) throws DshRpcException {
+        JsonObject payload = new JsonObject();
+        payload.addProperty("sessionId", sessionId);
+        payload.add("ref", ref.deepCopy());
+        return objectValue(method, payload);
+    }
+
+    /** Direct session-backed children of one parent, without loading either side. */
+    public JsonObject subagents(String parentSessionId) throws DshRpcException {
+        JsonObject payload = new JsonObject();
+        payload.addProperty("parentSessionId", parentSessionId);
+        return objectValue("subagent.list", payload);
+    }
+
+    /** One healthy catalog child's transcript; reading never activates an Agent. */
+    public JsonObject subagentHistory(String parentSessionId, String childSessionId, String mode, int maxMessages)
+            throws DshRpcException {
+        JsonObject payload = new JsonObject();
+        payload.addProperty("parentSessionId", parentSessionId);
+        payload.addProperty("childSessionId", childSessionId);
+        payload.addProperty("mode", mode);
+        payload.addProperty("maxMessages", Math.max(1, Math.min(maxMessages, 1_000)));
+        return objectValue("subagent.history", payload);
+    }
+
+    /** Delivers human content to a continuable child through the live direct parent. */
+    public JsonObject promptSubagent(String parentSessionId, String childSessionId, String text)
+            throws DshRpcException {
+        JsonObject payload = new JsonObject();
+        payload.addProperty("parentSessionId", parentSessionId);
+        payload.addProperty("childSessionId", childSessionId);
+        payload.addProperty("mode", "continuable");
+        JsonArray content = new JsonArray();
+        JsonObject part = new JsonObject();
+        part.addProperty("type", "text");
+        part.addProperty("text", text);
+        content.add(part);
+        payload.add("content", content);
+        return objectValue("subagent.prompt", payload);
+    }
+
+    /**
+     * Interrupts a live continuable child. Fire-and-return: acceptance
+     * acknowledges the admitted cancel signal, not target quiescence.
+     */
+    public void interruptSubagent(String parentSessionId, String childSessionId) throws DshRpcException {
+        JsonObject payload = new JsonObject();
+        payload.addProperty("parentSessionId", parentSessionId);
+        payload.addProperty("childSessionId", childSessionId);
+        payload.addProperty("mode", "continuable");
+        call("subagent.interrupt", payload);
+    }
+
+    /**
+     * Host-registered slash commands for one session. Typert Remote endpoints
+     * take the single `args` object; a Runtime composing no command registry
+     * answers 404, which the caller reads as capability absence.
+     */
+    public JsonArray listCommands(String sessionId) throws DshRpcException {
+        JsonObject args = new JsonObject();
+        args.addProperty("agentId", sessionId);
+        JsonObject payload = new JsonObject();
+        payload.add("args", args);
+        JsonElement value = call("commands/list", payload);
+        return value != null && value.isJsonArray() ? value.getAsJsonArray() : new JsonArray();
+    }
+
+    public JsonArray listSkills(String sessionId) throws DshRpcException {
+        JsonObject payload = new JsonObject();
+        payload.addProperty("sessionId", sessionId);
+        JsonObject value = objectValue("skill.list", payload);
+        return value.has("skills") && value.get("skills").isJsonArray()
+                ? value.getAsJsonArray("skills") : new JsonArray();
     }
 
     public JsonArray agentPresets() throws DshRpcException {
@@ -400,6 +655,14 @@ public final class DshRpcClient {
     static String stringOr(JsonObject parent, String name, String fallback) {
         String value = string(parent, name);
         return value == null ? fallback : value;
+    }
+
+    static boolean bool(JsonObject parent, String name) {
+        try {
+            return parent.has(name) && parent.get(name).isJsonPrimitive() && parent.get(name).getAsBoolean();
+        } catch (RuntimeException ignored) {
+            return false;
+        }
     }
 
     public static final class DshRpcException extends Exception {
