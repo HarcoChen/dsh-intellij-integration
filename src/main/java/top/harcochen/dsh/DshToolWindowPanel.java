@@ -68,6 +68,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
     private final AtomicBoolean refreshInFlight = new AtomicBoolean();
     private final Consumer<DshRuntimeService.RuntimeStatus> statusListener;
     private DshBridge bridge;
+    private JPanel fallbackPanel;
     private JLabel fallbackLabel;
     private volatile boolean disposed;
     private volatile boolean webviewReady;
@@ -110,23 +111,40 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
     }
 
     private void createWebview() {
+        if (!SwingUtilities.isEventDispatchThread()) {
+            ApplicationManager.getApplication().invokeLater(this::createWebview);
+            return;
+        }
+        if (disposed || bridge != null) return;
         if (!DshBridge.isAvailable()) {
             LOG.warn("JCEF is not available; showing the DSH fallback panel");
             createFallback("JCEF (embedded Chromium browser) is not available in this IDE environment.");
             return;
         }
+        DshBridge candidate = null;
         try {
-            bridge = new DshBridge(this::receiveAction);
-            add(bridge.getComponent(), BorderLayout.CENTER);
-            bridge.load();
+            candidate = new DshBridge(this::receiveAction);
+            candidate.load();
+            if (fallbackPanel != null) {
+                remove(fallbackPanel);
+                fallbackPanel = null;
+                fallbackLabel = null;
+            }
+            bridge = candidate;
+            add(candidate.getComponent(), BorderLayout.CENTER);
+            revalidate();
+            repaint();
         } catch (Throwable error) {
+            if (candidate != null) candidate.dispose();
             LOG.warn("JCEF failed to initialize; showing the DSH fallback panel", error);
             createFallback("JCEF initialization failed: " + error.getMessage());
         }
     }
 
     private void createFallback(String reason) {
+        if (fallbackPanel != null) remove(fallbackPanel);
         JPanel fallback = new JPanel(new BorderLayout(8, 8));
+        fallbackPanel = fallback;
         fallback.setBorder(BorderFactory.createEmptyBorder(16, 16, 16, 16));
 
         JPanel info = new JPanel();
@@ -155,12 +173,17 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
         settings.addActionListener(event -> DshActions.openSettings(project));
         JButton diagnose = new JButton("诊断");
         diagnose.addActionListener(event -> showTextDialog("DSH Environment", runtime.diagnoseEnvironment()));
+        JButton retryJcef = new JButton("重试内嵌界面");
+        retryJcef.addActionListener(event -> createWebview());
         actions.add(start);
         actions.add(openBrowser);
+        actions.add(retryJcef);
         actions.add(settings);
         actions.add(diagnose);
         fallback.add(actions, BorderLayout.CENTER);
         add(fallback, BorderLayout.CENTER);
+        revalidate();
+        repaint();
     }
 
     private void receiveAction(JsonElement value) {

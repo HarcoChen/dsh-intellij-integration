@@ -42,8 +42,13 @@ public final class DshBridge implements Disposable {
     /** Check JCEF availability before constructing a DshBridge. */
     public static boolean isAvailable() {
         try {
-            return JBCefApp.isSupported();
-        } catch (Throwable ignored) {
+            if (!JBCefApp.isSupported()) return false;
+            // Explicitly initialize JCEF before constructing browser/query
+            // objects. On recent IDEs the JCEF module is loaded separately.
+            JBCefApp.getInstance();
+            return true;
+        } catch (Throwable error) {
+            LOG.debug("JCEF availability check failed", error);
             return false;
         }
     }

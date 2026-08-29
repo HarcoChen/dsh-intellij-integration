@@ -23,6 +23,12 @@
     <idea-version since-build="243" />
     <depends>com.intellij.modules.platform</depends>
     <depends>com.intellij.modules.lang</depends>
+    <!--
+      Since 2026.2 JCEF is delivered as a bundled modular plugin. Keeping this
+      dependency optional preserves 2024.3 compatibility while ensuring that,
+      when present, JCEF finishes loading before this plugin can query it.
+    -->
+    <depends optional="true" config-file="top.harcochen.dsh-withJcef.xml">com.intellij.modules.jcef</depends>
     <extensions defaultExtensionNs="com.intellij">
         <toolWindow id="DSH" anchor="right" icon="/icons/dsh.svg"
                     factoryClass="top.harcochen.dsh.DshToolWindowFactory"
