@@ -50,6 +50,8 @@ public final class DshRuntimeService implements Disposable {
     private final CopyOnWriteArrayList<Consumer<RuntimeStatus>> listeners = new CopyOnWriteArrayList<>();
     private final StringBuilder output = new StringBuilder();
     private final Object lifecycleLock = new Object();
+    /** Machine-wide start lock, shared with the VS Code extension. */
+    private final DshRuntimeLock runtimeLock = new DshRuntimeLock();
     private volatile Process process;
     private volatile String baseUrl;
     private volatile RuntimeStatus status = new RuntimeStatus(RuntimeState.STOPPED, null, null);
@@ -149,33 +151,89 @@ public final class DshRuntimeService implements Disposable {
         }
 
         int configuredPort = settings.serverPort;
+        String existing = findExistingRuntime(configuredPort);
+        if (existing != null) {
+            baseUrl = existing;
+            setStatus(new RuntimeStatus(RuntimeState.RUNNING, existing, "Connected to existing Harness server"));
+            return existing;
+        }
+
+        // The start lock is shared with the VS Code extension, so at most one
+        // editor on this machine spawns a Runtime. Losing the race is the
+        // normal path when both start together: wait for the winner's URL
+        // rather than racing it to a second Runtime.
+        if (!runtimeLock.acquire()) {
+            String peer = awaitPeerRuntime(configuredPort, settings.startupTimeoutMs);
+            if (peer != null) {
+                baseUrl = peer;
+                setStatus(new RuntimeStatus(RuntimeState.RUNNING, peer, "Connected to a Harness server started by another editor"));
+                return peer;
+            }
+            throw new IllegalStateException(
+                    "Another dsh Runtime is starting, but it did not become available.");
+        }
+
+        int outputOffset = outputLength();
+        Process child;
+        String detected;
+        try {
+            child = launch(settings);
+            process = child;
+            streamOutput(child);
+            try {
+                detected = waitForServer(child, settings, outputOffset);
+            } catch (RuntimeException error) {
+                process = null;
+                if (child.isAlive()) child.destroyForcibly();
+                throw error;
+            }
+        } catch (RuntimeException | Error error) {
+            // Never leave the lock behind on a failed start: a peer would wait
+            // out its whole startup timeout for a Runtime that will never come.
+            runtimeLock.release();
+            throw error;
+        }
+        // Publish only after the server answers, so the advertised URL is
+        // always one a peer can attach to immediately.
+        runtimeLock.publishUrl(detected);
+        baseUrl = detected;
+        setStatus(new RuntimeStatus(RuntimeState.RUNNING, detected, "DSH Runtime running"));
+        return detected;
+    }
+
+    /**
+     * A Runtime already serving this machine: the URL the shared lock
+     * advertises first, then the conventional ports. The lock is what finds a
+     * Runtime listening on an ephemeral port, which no port probe can.
+     */
+    private String findExistingRuntime(int configuredPort) {
+        String advertised = runtimeLock.readAdvertisedUrl();
+        if (advertised != null && client.isHarnessHealthy(advertised)) return advertised;
         List<Integer> ports = new ArrayList<>();
         if (configuredPort > 0) ports.add(configuredPort);
         if (configuredPort != DEFAULT_PORT) ports.add(DEFAULT_PORT);
         for (Integer port : ports) {
             String candidate = "http://127.0.0.1:" + port;
-            if (client.isHarnessHealthy(candidate)) {
-                baseUrl = candidate;
-                setStatus(new RuntimeStatus(RuntimeState.RUNNING, candidate, "Connected to existing Harness server"));
-                return candidate;
+            if (client.isHarnessHealthy(candidate)) return candidate;
+        }
+        return null;
+    }
+
+    /** Wait for the editor that won the start lock to advertise its Runtime. */
+    private String awaitPeerRuntime(int configuredPort, int startupTimeoutMs) {
+        long deadline = System.nanoTime()
+                + TimeUnit.MILLISECONDS.toNanos(Math.max(1_000, startupTimeoutMs));
+        while (System.nanoTime() < deadline && !stopping) {
+            String url = findExistingRuntime(configuredPort);
+            if (url != null) return url;
+            try {
+                Thread.sleep(250);
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+                return null;
             }
         }
-
-        int outputOffset = outputLength();
-        Process child = launch(settings);
-        process = child;
-        streamOutput(child);
-        String detected;
-        try {
-            detected = waitForServer(child, settings, outputOffset);
-        } catch (RuntimeException error) {
-            process = null;
-            if (child.isAlive()) child.destroyForcibly();
-            throw error;
-        }
-        baseUrl = detected;
-        setStatus(new RuntimeStatus(RuntimeState.RUNNING, detected, "DSH Runtime running"));
-        return detected;
+        return null;
     }
 
     private Process launch(DshSettingsState settings) {
@@ -323,6 +381,9 @@ public final class DshRuntimeService implements Disposable {
         Process child = process;
         process = null;
         baseUrl = null;
+        // Released before the child is reaped: a peer polling the lock should
+        // stop seeing a URL the moment this Runtime is on its way down.
+        runtimeLock.release();
         if (child != null && child.isAlive()) {
             child.destroy();
             try {
@@ -356,6 +417,12 @@ public final class DshRuntimeService implements Disposable {
         String key = settings.apiKeyEnv == null ? "" : settings.apiKeyEnv.trim();
         report.append("API key environment variable present: ").append(!key.isEmpty() && System.getenv(key) != null ? "yes" : "no").append('\n');
         if (baseUrl != null) report.append("Runtime health: ").append(client.isHealthy(baseUrl) ? "healthy" : "unreachable").append('\n');
+        // The shared lock is the first thing to look at whenever two editors
+        // each spawned their own Runtime: a path mismatch is the usual cause.
+        report.append("Shared runtime lock: ").append(runtimeLock.getPath()).append('\n');
+        report.append("Shared runtime lock held by this IDE: ").append(runtimeLock.isHeld() ? "yes" : "no").append('\n');
+        String advertised = runtimeLock.readAdvertisedUrl();
+        report.append("Shared runtime lock advertises: ").append(advertised == null ? "<nothing>" : advertised).append('\n');
         return report.toString();
     }
 
