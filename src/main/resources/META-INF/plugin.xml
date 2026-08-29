@@ -1,0 +1,84 @@
+<idea-plugin url="https://github.com/HarcoChen/dsh-intellij-integration">
+    <id>top.harcochen.dsh</id>
+    <name>DeepSeek Harness</name>
+    <vendor email="harcourtzzz@outlook.com" url="https://github.com/HarcoChen/dsh-intellij-integration">HarcoChen</vendor>
+    <description><![CDATA[
+        <p>An independent community integration for using DeepSeek Harness (DSH)
+        inside IntelliJ Platform IDEs.</p>
+        <ul>
+            <li>Embedded chat, sessions, history, tool cards, and runtime status</li>
+            <li>Editor-aware explain, fix, review, and documentation prompts</li>
+            <li>Local DSH Runtime lifecycle management and diagnostics</li>
+            <li>API keys stored with IntelliJ Password Safe</li>
+        </ul>
+        <p><b>Requirements:</b> a JetBrains IDE with bundled JCEF, plus Node.js
+        with pnpm or npm/npx available when the plugin launches the Runtime.</p>
+        <p><b>Data use:</b> the plugin does not collect telemetry. Prompts and
+        explicitly attached editor selections are sent through the local DSH
+        Runtime to the model provider configured by the user.</p>
+        <p>This is an unofficial community plugin and is not endorsed or
+        maintained by DeepSeek or JetBrains.</p>
+    ]]></description>
+    <version>0.1.0</version>
+    <idea-version since-build="243" />
+    <depends>com.intellij.modules.platform</depends>
+    <depends>com.intellij.modules.lang</depends>
+    <extensions defaultExtensionNs="com.intellij">
+        <toolWindow id="DSH" anchor="right" icon="/icons/dsh.svg"
+                    factoryClass="top.harcochen.dsh.DshToolWindowFactory"
+                    canCloseContent="false"/>
+        <projectService serviceImplementation="top.harcochen.dsh.DshRuntimeService"/>
+        <projectService serviceImplementation="top.harcochen.dsh.DshSettingsState"/>
+        <projectConfigurable parentId="tools" id="top.harcochen.dsh.settings"
+                             displayName="DeepSeek Harness"
+                             instance="top.harcochen.dsh.DshSettingsConfigurable"/>
+        <notificationGroup id="DeepSeek Harness" displayType="BALLOON" />
+    </extensions>
+    <actions>
+        <action id="Dsh.Open" class="top.harcochen.dsh.action.DshOpenAction"
+                text="DSH: Open Chat" description="Open the DeepSeek Harness chat tool window"
+                icon="/icons/dsh.svg">
+            <add-to-group group-id="ToolsMenu" anchor="last" />
+            <keyboard-shortcut keymap="$default" first-keystroke="ctrl shift alt D" />
+        </action>
+        <action id="Dsh.Start" class="top.harcochen.dsh.action.DshStartAction"
+                text="DSH: Start Runtime" description="Start the DeepSeek Harness Web runtime" />
+        <action id="Dsh.Stop" class="top.harcochen.dsh.action.DshStopAction"
+                text="DSH: Stop Runtime" description="Stop the DeepSeek Harness Web runtime" />
+        <action id="Dsh.Restart" class="top.harcochen.dsh.action.DshRestartAction"
+                text="DSH: Restart Runtime" description="Restart the DeepSeek Harness Web runtime" />
+        <action id="Dsh.NewSession" class="top.harcochen.dsh.action.DshNewSessionAction"
+                text="DSH: New Session" description="Create a new DSH session" />
+        <action id="Dsh.OpenBrowser" class="top.harcochen.dsh.action.DshCommandAction"
+                text="DSH: Open Web UI" description="Open the connected DSH Web UI in a browser" />
+        <action id="Dsh.OpenLogs" class="top.harcochen.dsh.action.DshCommandAction"
+                text="DSH: Open Runtime Logs" description="Show DSH Runtime logs" />
+        <action id="Dsh.ConfigureApiKey" class="top.harcochen.dsh.action.DshCommandAction"
+                text="DSH: Configure API Key" description="Store the DSH API key securely" />
+        <action id="Dsh.ManageProviders" class="top.harcochen.dsh.action.DshCommandAction"
+                text="DSH: Manage Providers" description="Inspect Harness providers" />
+        <action id="Dsh.ManageAgentPresets" class="top.harcochen.dsh.action.DshCommandAction"
+                text="DSH: Manage Agent Presets" description="Inspect Harness agent presets" />
+        <action id="Dsh.Diagnose" class="top.harcochen.dsh.action.DshCommandAction"
+                text="DSH: Diagnose Environment" description="Show the DSH Runtime environment report" />
+        <action id="Dsh.AskAboutSelection" class="top.harcochen.dsh.action.DshAskAboutSelectionAction"
+                text="DSH: Ask About Selection" description="Ask DSH about the selected editor text">
+            <add-to-group group-id="EditorPopupMenu" anchor="last" />
+        </action>
+        <action id="Dsh.Explain" class="top.harcochen.dsh.action.DshQuickTaskAction"
+                text="DSH: Explain Selection" description="Explain the selected code" />
+        <action id="Dsh.Fix" class="top.harcochen.dsh.action.DshQuickTaskAction"
+                text="DSH: Fix Selection" description="Suggest a fix for the selected code" />
+        <action id="Dsh.Review" class="top.harcochen.dsh.action.DshQuickTaskAction"
+                text="DSH: Review Selection" description="Review the selected code" />
+        <action id="Dsh.Docs" class="top.harcochen.dsh.action.DshQuickTaskAction"
+                text="DSH: Document Selection" description="Write documentation for the selected code" />
+        <group id="Dsh.EditorTasks" text="DSH" popup="true">
+            <add-to-group group-id="EditorPopupMenu" anchor="last" />
+            <reference ref="Dsh.Explain" />
+            <reference ref="Dsh.Fix" />
+            <reference ref="Dsh.Review" />
+            <reference ref="Dsh.Docs" />
+        </group>
+    </actions>
+</idea-plugin>

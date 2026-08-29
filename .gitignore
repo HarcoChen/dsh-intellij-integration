@@ -1,0 +1,36 @@
+# Gradle
+.gradle/
+build/
+out/
+
+# IntelliJ Platform Gradle Plugin
+.intellijPlatform/
+
+# IntelliJ IDEA / PyCharm project files
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# Local machine configuration
+local.properties
+
+# Locally extracted plugin archive contents
+/META-INF/
+
+# JVM crash reports and heap dumps
+hs_err_pid*
+replay_pid*
+*.hprof
+
+# Logs and temporary editor files
+*.log
+*.tmp
+*.swp
+*.swo
+*~
+
+# Operating system files
+.DS_Store
+Thumbs.db
+Desktop.ini
