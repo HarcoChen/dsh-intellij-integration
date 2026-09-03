@@ -218,14 +218,14 @@ final class DshChangeReviewStore {
                 }
             }
             if (file == null || review.git == null || !"ready".equals(review.state)) {
-                throw new IllegalStateException("This change is no longer available.");
+                throw new IllegalStateException(DshBundle.message("dsh.change.review.change.unavailable"));
             }
         }
         byte[] before = readBlob(review.git, file.oldBlob);
         byte[] after = readBlob(review.git, file.newBlob);
         String title = "renamed".equals(file.status)
-                ? "Turn " + turn + ": " + file.oldPath + " → " + file.path
-                : "Turn " + turn + ": " + file.path;
+                ? DshBundle.message("dsh.change.review.turn.prefix", turn) + file.oldPath + " → " + file.path
+                : DshBundle.message("dsh.change.review.turn.prefix", turn) + file.path;
         if (hasNul(before) || hasNul(after)) return new FileSides(null, null, title, true);
         return new FileSides(new String(before, StandardCharsets.UTF_8),
                 new String(after, StandardCharsets.UTF_8), title, false);
@@ -260,7 +260,7 @@ final class DshChangeReviewStore {
         ChangeReview review;
         synchronized (this) {
             review = review(sessionId, turn);
-            if (!isRestorable(sessionId, turn)) throw new IllegalStateException("This turn cannot be restored.");
+            if (!isRestorable(sessionId, turn)) throw new IllegalStateException(DshBundle.message("dsh.change.review.cannot.restore"));
         }
         List<String> conflicts = conflicts(review);
         if (!conflicts.isEmpty()) throw new IllegalStateException(conflictMessage(conflicts));
@@ -362,19 +362,19 @@ final class DshChangeReviewStore {
             String header = fields[index++];
             if (header == null || header.isEmpty()) continue;
             Matcher match = RAW_HEADER.matcher(header);
-            if (!match.matches()) throw new IllegalStateException("Git returned an unsupported change record.");
+            if (!match.matches()) throw new IllegalStateException(DshBundle.message("dsh.change.review.unsupported.record"));
             String oldMode = match.group(1);
             String newMode = match.group(2);
             String oldBlob = match.group(3);
             String newBlob = match.group(4);
             String kind = match.group(5);
-            if (index >= fields.length) throw new IllegalStateException("Git returned a change without a path.");
+            if (index >= fields.length) throw new IllegalStateException(DshBundle.message("dsh.change.review.no.path"));
             String firstPath = fields[index++];
-            if (firstPath.isEmpty()) throw new IllegalStateException("Git returned a change without a path.");
+            if (firstPath.isEmpty()) throw new IllegalStateException(DshBundle.message("dsh.change.review.no.path"));
             String secondPath = null;
             if ("R".equals(kind)) {
                 if (index >= fields.length || fields[index].isEmpty()) {
-                    throw new IllegalStateException("Git returned an invalid rename record.");
+                    throw new IllegalStateException(DshBundle.message("dsh.change.review.invalid.rename"));
                 }
                 secondPath = fields[index++];
             }
@@ -383,7 +383,7 @@ final class DshChangeReviewStore {
                 case "M", "T" -> "modified";
                 case "D" -> "deleted";
                 case "R" -> "renamed";
-                default -> throw new IllegalStateException("Git returned an unsupported change type: " + kind);
+                default -> throw new IllegalStateException(DshBundle.message("dsh.change.review.unsupported.type", kind));
             };
             ChangeFile file = new ChangeFile();
             file.status = status;
@@ -434,7 +434,7 @@ final class DshChangeReviewStore {
         synchronized (this) {
             if (disposed) {
                 deleteRecursively(tempRoot);
-                throw new IllegalStateException("This change review is no longer available.");
+                throw new IllegalStateException(DshBundle.message("dsh.change.review.review.unavailable"));
             }
             tempRoots.add(tempRoot);
         }
@@ -454,7 +454,7 @@ final class DshChangeReviewStore {
             ChangeReview review = session == null ? null : session.reviews.get(turn);
             if (review == null) return;
             review.state = "error";
-            review.error = "Unable to capture file changes: " + message(error);
+            review.error = DshBundle.message("dsh.change.review.capture.failed", message(error));
         }
         LOG.debug("DSH change capture failed for turn " + turn, error);
         onUpdate.run();
@@ -463,17 +463,17 @@ final class DshChangeReviewStore {
     private ChangeReview review(String sessionId, int turn) {
         SessionReviews session = sessionId == null ? null : sessions.get(sessionId);
         ChangeReview review = session == null ? null : session.reviews.get(turn);
-        if (review == null) throw new IllegalStateException("This change review is no longer available.");
+        if (review == null) throw new IllegalStateException(DshBundle.message("dsh.change.review.review.unavailable"));
         return review;
     }
 
     private Path resolvePath(ChangeReview review, String relativePath) {
         if (review.git == null || Path.of(relativePath).isAbsolute()) {
-            throw new IllegalStateException("The change path is invalid.");
+            throw new IllegalStateException(DshBundle.message("dsh.change.review.invalid.path"));
         }
         Path candidate = review.git.cwd.resolve(relativePath).normalize();
         if (!candidate.startsWith(review.git.cwd)) {
-            throw new IllegalStateException("The change path is outside the session workspace.");
+            throw new IllegalStateException(DshBundle.message("dsh.change.review.outside.workspace"));
         }
         return candidate;
     }
@@ -489,7 +489,7 @@ final class DshChangeReviewStore {
         while (current != null && !current.equals(review.git.cwd)) {
             if (Files.exists(current, LinkOption.NOFOLLOW_LINKS)) {
                 if (Files.isSymbolicLink(current) || !Files.isDirectory(current, LinkOption.NOFOLLOW_LINKS)) {
-                    throw new IllegalStateException("A parent path is not a real directory: " + relativePath);
+                    throw new IllegalStateException(DshBundle.message("dsh.change.review.not.real.directory", relativePath));
                 }
             }
             current = current.getParent();
@@ -540,21 +540,21 @@ final class DshChangeReviewStore {
      * review rather than half of it.
      */
     private void captureWorkingHashes(ChangeReview review) throws Exception {
-        if (review.git == null) throw new IllegalStateException("This change review is no longer available.");
+        if (review.git == null) throw new IllegalStateException(DshBundle.message("dsh.change.review.review.unavailable"));
         for (ChangeFile file : review.files) {
             if (isNullBlob(file.newBlob) || !REGULAR_MODES.contains(file.newMode)) continue;
             assertSafeParents(review, file.path);
             Path target = resolvePath(review, file.path);
             if (!Files.isRegularFile(target, LinkOption.NOFOLLOW_LINKS) || Files.isSymbolicLink(target)) {
                 throw new IllegalStateException(
-                        "A changed path stopped being a regular file during capture: " + file.path);
+                        DshBundle.message("dsh.change.review.not.regular.file", file.path));
             }
             byte[] content = Files.readAllBytes(target);
             String currentBlob = new String(runGit(review.git,
                     List.of("hash-object", "--path=" + file.path, "--", file.path)), StandardCharsets.UTF_8).trim();
             if (!currentBlob.equals(file.newBlob)) {
                 throw new IllegalStateException(
-                        "The workspace changed while turn " + review.turn + " was being captured.");
+                        DshBundle.message("dsh.change.review.workspace.changed", review.turn));
             }
             file.newWorkingHash = workingHash(content);
         }
@@ -563,7 +563,7 @@ final class DshChangeReviewStore {
     private static String conflictMessage(List<String> conflicts) {
         List<String> shown = conflicts.subList(0, Math.min(5, conflicts.size()));
         String remaining = conflicts.size() > 5 ? " and " + (conflicts.size() - 5) + " more" : "";
-        return "Restore stopped because these paths changed after the task: "
+        return DshBundle.message("dsh.change.review.restore.conflict")
                 + String.join(", ", shown) + remaining;
     }
 
@@ -599,7 +599,7 @@ final class DshChangeReviewStore {
 
     private void writeOldFile(ChangeReview review, String relativePath, ChangeFile file, byte[] content)
             throws Exception {
-        if (content == null) throw new IllegalStateException("The restore content is no longer available.");
+        if (content == null) throw new IllegalStateException(DshBundle.message("dsh.change.review.restore.unavailable"));
         assertSafeParents(review, relativePath);
         Path target = resolvePath(review, relativePath);
         Files.createDirectories(target.getParent());

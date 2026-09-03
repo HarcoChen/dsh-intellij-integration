@@ -1,6 +1,7 @@
 package top.harcochen.dsh.action;
 
 import top.harcochen.dsh.DshActions;
+import top.harcochen.dsh.DshBundle;
 import com.intellij.openapi.actionSystem.ActionUpdateThread;
 import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.editor.Editor;
@@ -10,7 +11,7 @@ public final class DshAskAboutSelectionAction extends DumbAwareAction {
     @Override
     public void actionPerformed(AnActionEvent event) {
         if (event.getProject() == null) return;
-        DshActions.submitSelection(event.getProject(), "请分析当前编辑器中的选中代码。");
+        DshActions.submitSelection(event.getProject(), DshBundle.message("dsh.quick.task.ask.about.selection"));
     }
 
     @Override

@@ -55,10 +55,7 @@ public final class DshBridge implements Disposable {
 
     public DshBridge(@NotNull Consumer<JsonElement> actionConsumer) {
         if (!isAvailable()) {
-            throw new IllegalStateException(
-                    "JCEF is not available in this IDE. "
-                    + "Please use a JetBrains IDE with bundled JCEF (IntelliJ IDEA, PyCharm, etc.), "
-                    + "or check Help → Find Action → 'Choose Boot Java Runtime' to switch to a JRE with JCEF.");
+            throw new IllegalStateException(DshBundle.message("dsh.jcef.not.available"));
         }
         this.actionConsumer = actionConsumer;
         this.browser = new JBCefBrowser();
@@ -91,7 +88,8 @@ public final class DshBridge implements Disposable {
         String adapterCss = readResource("/webview/intellij.css");
         String script = readResource("/webview/main.js");
         String injectedPost = actionQuery.inject("JSON.stringify(message)");
-        String html = "<!doctype html><html lang=\"zh-CN\"><head><meta charset=\"UTF-8\">"
+        String languageTag = com.intellij.DynamicBundle.getLocale().toLanguageTag();
+        String html = "<!doctype html><html lang=\"" + languageTag + "\"><head><meta charset=\"UTF-8\">"
                 + "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">"
                 + "<title>DSH</title><style>" + css + adapterCss + "</style>"
                 + "<style id=\"dsh-jetbrains-theme\">" + themeCss() + "</style>"

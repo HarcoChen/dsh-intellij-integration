@@ -1,6 +1,7 @@
 package top.harcochen.dsh.action;
 
 import top.harcochen.dsh.DshActions;
+import top.harcochen.dsh.DshBundle;
 import com.intellij.openapi.actionSystem.ActionManager;
 import com.intellij.openapi.actionSystem.ActionUpdateThread;
 import com.intellij.openapi.actionSystem.AnActionEvent;
@@ -15,10 +16,10 @@ public final class DshQuickTaskAction extends DumbAwareAction {
         if (event.getProject() == null) return;
         String id = ActionManager.getInstance().getId(this);
         String task = id == null ? "analyze" : switch (id) {
-            case "Dsh.Fix" -> "修复当前选中的代码，并解释修改原因。";
-            case "Dsh.Review" -> "审查当前选中的代码，指出潜在问题和改进建议。";
-            case "Dsh.Docs" -> "为当前选中的代码编写清晰的文档或注释。";
-            default -> "解释当前选中的代码，并说明关键设计。";
+            case "Dsh.Fix" -> DshBundle.message("dsh.quick.task.fix");
+            case "Dsh.Review" -> DshBundle.message("dsh.quick.task.review");
+            case "Dsh.Docs" -> DshBundle.message("dsh.quick.task.docs");
+            default -> DshBundle.message("dsh.quick.task.explain");
         };
         DshActions.submitSelection(event.getProject(), task);
     }
