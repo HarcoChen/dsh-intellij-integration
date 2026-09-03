@@ -10,8 +10,9 @@
 
 <p align="center">
   <a href="https://plugins.jetbrains.com/plugin/33924-deepseek-harness-integration"><img src="https://img.shields.io/jetbrains/plugin/v/33924.svg" alt="JetBrains Plugin Version"></a>
-  <a href="https://plugins.jetbrains.com/plugin/33924-deepseek-harness-integration"><img src="https://img.shields.io/jetbrains/plugin/d/33924.svg" alt="JetBrains Plugin Downloads"></a>
-  <a href="https://plugins.jetbrains.com/plugin/33924-deepseek-harness-integration/reviews"><img src="https://img.shields.io/jetbrains/plugin/r/rating/33924.svg" alt="JetBrains Plugin Rating"></a>
+  <a href="https://github.com/HarcoChen/dsh-intellij-integration/blob/main/LICENSE"><img src="https://img.shields.io/github/license/HarcoChen/dsh-intellij-integration.svg" alt="License"></a>
+  <img src="https://img.shields.io/badge/IntelliJ%20Platform-2024.3%2B-blue.svg" alt="IntelliJ Platform 2024.3+">
+
 </p>
 
 <p align="center">
