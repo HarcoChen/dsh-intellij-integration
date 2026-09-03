@@ -39,24 +39,8 @@ intellijPlatform {
         ideaVersion {
             sinceBuild = "243"
         }
-        changeNotes = """
-            <p>Brings the IntelliJ Platform port to parity with the VS Code integration.</p>
-            <ul>
-              <li>Projects the runtime prompt queue, background jobs, slash commands, skills,
-                  token usage, session statistics, and TODOs; registered slash commands now run
-                  through the command registry instead of reaching the model.</li>
-              <li>Adds the Goal panel and the Subagent tree, with preview, follow-up, and interrupt.</li>
-              <li>Rebuilds tool-call diffs from the recorded hunks and adds Git-backed turn change
-                  reviews with a guarded restore.</li>
-              <li>Applying a code block now picks its target, previews the change as a diff, and
-                  re-validates the file before writing.</li>
-              <li>Adds diagnostics and folder context attachments, and AppShot capture on macOS.</li>
-              <li>Replaces the raw settings, workspace, provider, and agent-preset dialogs with
-                  native surfaces.</li>
-              <li>Shares the runtime startup lock with the VS Code integration to prevent duplicate
-                  runtimes.</li>
-            </ul>
-        """.trimIndent()
+        changeNotes = providers.environmentVariable("PLUGIN_CHANGE_NOTES")
+            .orElse("<p>See the <a href=\"https://github.com/HarcoChen/dsh-intellij-integration/releases\">GitHub Releases</a> page for the full changelog.</p>")
     }
     buildSearchableOptions = false
 
