@@ -2955,7 +2955,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
                 return;
             }
         } catch (Exception error) {
-            notify("The target file changed while the preview was open. No changes were applied.");
+            notify(DshBundle.message("dsh.code.apply.file.changed"));
             return;
         }
         WriteCommandAction.runWriteCommandAction(project, DshBundle.message("dsh.code.apply.command.name"), null,
@@ -3166,13 +3166,13 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
             String replacement = Messages.showInputDialog(project, DshBundle.message("dsh.workspace.rename.message"),
                     DshBundle.message("dsh.workspace.rename.title"), Messages.getQuestionIcon(), title, null);
             if (replacement == null || replacement.isBlank()) return;
-            runWorkspaceOperation("renamed", () -> client.renameWorkspace(id, replacement.trim()));
+            runWorkspaceOperation("dsh.workspace.operation.renamed", () -> client.renameWorkspace(id, replacement.trim()));
         } else if (action == 1) {
             int confirmed = Messages.showYesNoDialog(project,
                     DshBundle.message("dsh.workspace.remove.confirm.message", title),
                     DshBundle.message("dsh.workspace.remove.confirm.title"), Messages.getWarningIcon());
             if (confirmed != Messages.YES) return;
-            runWorkspaceOperation("removed", () -> {
+            runWorkspaceOperation("dsh.workspace.operation.removed", () -> {
                 client.deleteWorkspace(id);
                 return null;
             });
@@ -3185,18 +3185,18 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
             notify(DshBundle.message("dsh.workspace.no.project"));
             return;
         }
-        runWorkspaceOperation("registered", () -> client.createWorkspace(base));
+        runWorkspaceOperation("dsh.workspace.operation.registered", () -> client.createWorkspace(base));
     }
 
     private interface WorkspaceOperation {
         JsonObject run() throws Exception;
     }
 
-    private void runWorkspaceOperation(String verb, WorkspaceOperation operation) {
+    private void runWorkspaceOperation(String successKey, WorkspaceOperation operation) {
         operations.execute(() -> {
             try {
                 operation.run();
-                notify(DshBundle.message("dsh.workspace.operation.success", verb));
+                notify(DshBundle.message(successKey));
                 refreshState();
             } catch (Exception error) {
                 lastError = message(error);

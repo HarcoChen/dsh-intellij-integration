@@ -224,8 +224,8 @@ final class DshChangeReviewStore {
         byte[] before = readBlob(review.git, file.oldBlob);
         byte[] after = readBlob(review.git, file.newBlob);
         String title = "renamed".equals(file.status)
-                ? DshBundle.message("dsh.change.review.turn.prefix", turn) + file.oldPath + " → " + file.path
-                : DshBundle.message("dsh.change.review.turn.prefix", turn) + file.path;
+                ? DshBundle.message("dsh.change.review.turn.prefix", turn) + " " + file.oldPath + " → " + file.path
+                : DshBundle.message("dsh.change.review.turn.prefix", turn) + " " + file.path;
         if (hasNul(before) || hasNul(after)) return new FileSides(null, null, title, true);
         return new FileSides(new String(before, StandardCharsets.UTF_8),
                 new String(after, StandardCharsets.UTF_8), title, false);
@@ -564,7 +564,7 @@ final class DshChangeReviewStore {
         List<String> shown = conflicts.subList(0, Math.min(5, conflicts.size()));
         String remaining = conflicts.size() > 5 ? " and " + (conflicts.size() - 5) + " more" : "";
         return DshBundle.message("dsh.change.review.restore.conflict")
-                + String.join(", ", shown) + remaining;
+                + " " + String.join(", ", shown) + remaining;
     }
 
     private Map<String, byte[]> prepareRestore(ChangeReview review) throws Exception {

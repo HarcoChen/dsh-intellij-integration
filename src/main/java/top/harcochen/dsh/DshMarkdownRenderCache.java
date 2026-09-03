@@ -118,7 +118,7 @@ final class DshMarkdownRenderCache {
                 + "\" data-code-action=\"" + type + "\" data-code-block-id=\"" + id + "\""
                 + (copy ? " data-copy-code-id=\"" + id + "\"" : "")
                 + (language == null ? "" : " data-code-language=\"" + escape(language) + "\"")
-                + ">" + label + "</button>";
+                + ">" + escape(label) + "</button>";
     }
 
     private void discard(Entry entry) {
