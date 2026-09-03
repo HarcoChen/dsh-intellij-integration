@@ -1,5 +1,6 @@
 package top.harcochen.dsh;
 
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.wm.StatusBar;
@@ -24,9 +25,10 @@ public final class DshBalanceWidget implements StatusBarWidget, StatusBarWidget.
         this.project = project;
         this.service = new DshBalanceService(project);
         Disposer.register(this, service);
-        service.addListener(snapshot -> {
-            if (statusBar != null) statusBar.updateWidget(ID);
-        });
+        service.addListener(snapshot ->
+                ApplicationManager.getApplication().invokeLater(() -> {
+                    if (statusBar != null) statusBar.updateWidget(ID);
+                }));
         service.start();
     }
 
@@ -63,7 +65,7 @@ public final class DshBalanceWidget implements StatusBarWidget, StatusBarWidget.
             if (s != null && s.state() == DshBalanceService.State.NO_KEY) {
                 DshActions.configureApiKey(project);
             } else {
-                service.refresh();
+                ApplicationManager.getApplication().executeOnPooledThread(service::refresh);
             }
         };
     }

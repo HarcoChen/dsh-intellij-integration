@@ -100,10 +100,18 @@ final class DshBalanceService implements Disposable {
                 return;
             }
 
+            if (!body.has("balance_infos") || !body.get("balance_infos").isJsonArray()) {
+                publish(new Snapshot(State.ERROR, DshBundle.message("dsh.balance.error"),
+                        DshBundle.message("dsh.balance.error.invalid"), DshDeepSeekPricing.current()));
+                return;
+            }
             JsonArray infos = body.getAsJsonArray("balance_infos");
             List<BalanceInfo> balances = new ArrayList<>();
             for (JsonElement e : infos) {
+                if (!e.isJsonObject()) continue;
                 JsonObject info = e.getAsJsonObject();
+                if (!info.has("currency") || !info.has("total_balance")
+                        || !info.has("granted_balance") || !info.has("topped_up_balance")) continue;
                 balances.add(new BalanceInfo(
                         info.get("currency").getAsString(),
                         Double.parseDouble(info.get("total_balance").getAsString()),
@@ -182,7 +190,7 @@ final class DshBalanceService implements Disposable {
         List<Consumer<Snapshot>> copy;
         synchronized (listeners) { copy = new ArrayList<>(listeners); }
         for (Consumer<Snapshot> listener : copy) {
-            try { listener.accept(snapshot); } catch (Exception ignored) {}
+            try { listener.accept(snapshot); } catch (Exception error) { LOG.debug("Balance listener failed", error); }
         }
     }
 
