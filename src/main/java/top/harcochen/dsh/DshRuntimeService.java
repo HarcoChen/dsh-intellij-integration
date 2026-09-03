@@ -107,7 +107,7 @@ public final class DshRuntimeService implements Disposable {
                 return CompletableFuture.completedFuture(baseUrl);
             }
             stopping = false;
-            setStatus(new RuntimeStatus(RuntimeState.STARTING, baseUrl, "Starting DSH Runtime…"));
+            setStatus(new RuntimeStatus(RuntimeState.STARTING, baseUrl, DshBundle.message("dsh.runtime.starting")));
             startFuture = CompletableFuture.supplyAsync(this::startBlocking, executor)
                     .whenComplete((url, error) -> {
                         synchronized (lifecycleLock) {
@@ -137,7 +137,7 @@ public final class DshRuntimeService implements Disposable {
         // The next explicit Start/Restart uses the new settings; the panel is
         // refreshed so its status and error message remain truthful.
         if (status.state == RuntimeState.RUNNING && baseUrl != null) {
-            setStatus(new RuntimeStatus(RuntimeState.RUNNING, baseUrl, "Settings changed; restart to apply"));
+            setStatus(new RuntimeStatus(RuntimeState.RUNNING, baseUrl, DshBundle.message("dsh.runtime.settings.changed")));
         }
     }
 
@@ -146,7 +146,7 @@ public final class DshRuntimeService implements Disposable {
         String configuredUrl = DshRpcClient.normalizeUrl(settings.serverUrl);
         if (configuredUrl != null && client.isWebHealthy(configuredUrl)) {
             baseUrl = configuredUrl;
-            setStatus(new RuntimeStatus(RuntimeState.RUNNING, configuredUrl, "Connected to configured Harness server"));
+            setStatus(new RuntimeStatus(RuntimeState.RUNNING, configuredUrl, DshBundle.message("dsh.runtime.connected.configured")));
             return configuredUrl;
         }
 
@@ -154,7 +154,7 @@ public final class DshRuntimeService implements Disposable {
         String existing = findExistingRuntime(configuredPort);
         if (existing != null) {
             baseUrl = existing;
-            setStatus(new RuntimeStatus(RuntimeState.RUNNING, existing, "Connected to existing Harness server"));
+            setStatus(new RuntimeStatus(RuntimeState.RUNNING, existing, DshBundle.message("dsh.runtime.connected.existing")));
             return existing;
         }
 
@@ -166,11 +166,11 @@ public final class DshRuntimeService implements Disposable {
             String peer = awaitPeerRuntime(configuredPort, settings.startupTimeoutMs);
             if (peer != null) {
                 baseUrl = peer;
-                setStatus(new RuntimeStatus(RuntimeState.RUNNING, peer, "Connected to a Harness server started by another editor"));
+                setStatus(new RuntimeStatus(RuntimeState.RUNNING, peer, DshBundle.message("dsh.runtime.connected.peer")));
                 return peer;
             }
             throw new IllegalStateException(
-                    "Another dsh Runtime is starting, but it did not become available.");
+                    DshBundle.message("dsh.runtime.peer.start.failed"));
         }
 
         int outputOffset = outputLength();
@@ -197,7 +197,7 @@ public final class DshRuntimeService implements Disposable {
         // always one a peer can attach to immediately.
         runtimeLock.publishUrl(detected);
         baseUrl = detected;
-        setStatus(new RuntimeStatus(RuntimeState.RUNNING, detected, "DSH Runtime running"));
+        setStatus(new RuntimeStatus(RuntimeState.RUNNING, detected, DshBundle.message("dsh.runtime.running")));
         return detected;
     }
 
@@ -261,14 +261,14 @@ public final class DshRuntimeService implements Disposable {
                     builder.environment().put(apiKeyName, apiKey);
                 }
                 Process child = builder.start();
-                appendLog("Started PID " + child.pid());
+                appendLog(DshBundle.message("dsh.runtime.log.started.pid", child.pid()));
                 return child;
             } catch (IOException error) {
                 last = error;
-                appendLog("Unable to start " + command.get(0) + ": " + error.getMessage());
+                appendLog(DshBundle.message("dsh.runtime.log.unable.to.start", command.get(0), error.getMessage()));
             }
         }
-        String message = "Unable to start DSH Runtime. Configure an installed dsh, pnpm, or npx in Settings | Tools | DeepSeek Harness.";
+        String message = DshBundle.message("dsh.runtime.launch.failed");
         if (last != null && last.getMessage() != null) message += "\n" + last.getMessage();
         throw new IllegalStateException(message, last);
     }
@@ -333,14 +333,14 @@ public final class DshRuntimeService implements Disposable {
                     LOG.info("[dsh] " + line);
                 }
             } catch (IOException error) {
-                if (!stopping) appendLog("Runtime output ended: " + error.getMessage());
+                if (!stopping) appendLog(DshBundle.message("dsh.runtime.log.output.ended", error.getMessage()));
             }
         });
         executor.execute(() -> {
             try {
                 int exitCode = child.waitFor();
                 if (!stopping && status.state == RuntimeState.RUNNING) {
-                    setStatus(new RuntimeStatus(RuntimeState.ERROR, null, "dsh web exited with code " + exitCode));
+                    setStatus(new RuntimeStatus(RuntimeState.ERROR, null, DshBundle.message("dsh.runtime.exited.with.code", exitCode)));
                 }
             } catch (InterruptedException error) {
                 Thread.currentThread().interrupt();
@@ -351,10 +351,10 @@ public final class DshRuntimeService implements Disposable {
     private String waitForServer(Process child, DshSettingsState settings, int outputOffset) {
         long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(Math.max(1_000, settings.startupTimeoutMs));
         while (System.nanoTime() < deadline) {
-            if (stopping) throw new IllegalStateException("Startup cancelled");
+            if (stopping) throw new IllegalStateException(DshBundle.message("dsh.runtime.startup.cancelled"));
             if (!child.isAlive()) {
                 String tail = tailLogs(40);
-                throw new IllegalStateException("dsh web exited before becoming ready." + (tail.isBlank() ? "" : "\n\n" + tail));
+                throw new IllegalStateException(DshBundle.message("dsh.runtime.exited.before.ready") + (tail.isBlank() ? "" : "\n\n" + tail));
             }
             String outputUrl = findUrl(logsSince(outputOffset));
             List<String> candidates = new ArrayList<>();
@@ -367,11 +367,11 @@ public final class DshRuntimeService implements Disposable {
                 Thread.sleep(250);
             } catch (InterruptedException error) {
                 Thread.currentThread().interrupt();
-                throw new IllegalStateException("Startup interrupted", error);
+                throw new IllegalStateException(DshBundle.message("dsh.runtime.startup.interrupted"), error);
             }
         }
         String tail = tailLogs(40);
-        throw new IllegalStateException("Timed out waiting for dsh web." + (tail.isBlank() ? "" : "\n\n" + tail));
+        throw new IllegalStateException(DshBundle.message("dsh.runtime.startup.timeout") + (tail.isBlank() ? "" : "\n\n" + tail));
     }
 
     private void stopBlocking() {
@@ -393,13 +393,13 @@ public final class DshRuntimeService implements Disposable {
                 child.destroyForcibly();
             }
         }
-        setStatus(new RuntimeStatus(RuntimeState.STOPPED, null, "DSH Runtime stopped"));
+        setStatus(new RuntimeStatus(RuntimeState.STOPPED, null, DshBundle.message("dsh.runtime.stopped")));
     }
 
     public String diagnoseEnvironment() {
         DshSettingsState settings = DshSettingsState.getInstance(project);
         StringBuilder report = new StringBuilder();
-        report.append("DSH environment report\n");
+        report.append(DshBundle.message("dsh.diagnose.title")).append("\n");
         report.append("Generated: ").append(Instant.now()).append('\n');
         report.append("IDE: IntelliJ Platform product\n");
         report.append("Project: ").append(project.getBasePath() == null ? "<none>" : project.getBasePath()).append('\n');

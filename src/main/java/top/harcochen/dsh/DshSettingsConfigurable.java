@@ -42,7 +42,7 @@ public final class DshSettingsConfigurable implements Configurable {
 
     @Override
     public @Nls String getDisplayName() {
-        return "DeepSeek Harness";
+        return DshBundle.message("dsh.settings.displayName");
     }
 
     @Override
@@ -68,28 +68,28 @@ public final class DshSettingsConfigurable implements Configurable {
         maxContextBytes = new JBTextField();
         npmRegistry = new JBTextField();
         apiKeyEnv = new JBTextField();
-        autoStart = new JBCheckBox("Start the DSH Runtime when the project opens");
-        installWhenMissing = new JBCheckBox("Allow package-manager startup when dsh is not installed");
+        autoStart = new JBCheckBox(DshBundle.message("dsh.settings.auto.start.label"));
+        installWhenMissing = new JBCheckBox(DshBundle.message("dsh.settings.install.when.missing.label"));
 
-        addRow("Runtime command", command, "Executable used to start dsh web (for example pnpm, npx, or dsh).");
-        addRow("Command arguments", commandArgs, "Whitespace-separated arguments. Quote a value containing spaces.");
-        addRow("Server URL", serverUrl, "Optional existing Harness server, for example http://127.0.0.1:3080.");
-        addRow("Server port", serverPort, "Optional port to probe/start; 0 lets dsh choose.");
-        addRow("Runtime version", runtimeVersion, "Package version used by the npx fallback (for example 0.1.1-rc.2).");
-        addRow("Startup timeout (ms)", startupTimeout, "How long to wait for dsh web to become healthy.");
-        addRow("Request timeout (ms)", requestTimeout, "Timeout for Harness RPC calls.");
-        addRow("Refresh interval (ms)", pollInterval, "History/catalog refresh interval used while the chat is open.");
-        addRow("Maximum context bytes", maxContextBytes, "UTF-8 byte limit for the active editor selection attached to a prompt.");
-        addRow("npm registry", npmRegistry, "Registry used when the command is pnpm or npx.");
-        addRow("API key environment variable", apiKeyEnv, "Only the variable name is stored; the secret is never persisted here.");
+        addRow(DshBundle.message("dsh.settings.command.label"), command, DshBundle.message("dsh.settings.command.tooltip"));
+        addRow(DshBundle.message("dsh.settings.command.args.label"), commandArgs, DshBundle.message("dsh.settings.command.args.tooltip"));
+        addRow(DshBundle.message("dsh.settings.server.url.label"), serverUrl, DshBundle.message("dsh.settings.server.url.tooltip"));
+        addRow(DshBundle.message("dsh.settings.server.port.label"), serverPort, DshBundle.message("dsh.settings.server.port.tooltip"));
+        addRow(DshBundle.message("dsh.settings.runtime.version.label"), runtimeVersion, DshBundle.message("dsh.settings.runtime.version.tooltip"));
+        addRow(DshBundle.message("dsh.settings.startup.timeout.label"), startupTimeout, DshBundle.message("dsh.settings.startup.timeout.tooltip"));
+        addRow(DshBundle.message("dsh.settings.request.timeout.label"), requestTimeout, DshBundle.message("dsh.settings.request.timeout.tooltip"));
+        addRow(DshBundle.message("dsh.settings.poll.interval.label"), pollInterval, DshBundle.message("dsh.settings.poll.interval.tooltip"));
+        addRow(DshBundle.message("dsh.settings.max.context.bytes.label"), maxContextBytes, DshBundle.message("dsh.settings.max.context.bytes.tooltip"));
+        addRow(DshBundle.message("dsh.settings.npm.registry.label"), npmRegistry, DshBundle.message("dsh.settings.npm.registry.tooltip"));
+        addRow(DshBundle.message("dsh.settings.api.key.env.label"), apiKeyEnv, DshBundle.message("dsh.settings.api.key.env.tooltip"));
         addCheckbox(autoStart);
         addCheckbox(installWhenMissing);
 
         JPanel note = new JPanel();
         note.setLayout(new BoxLayout(note, BoxLayout.Y_AXIS));
-        note.add(new JBLabel("The protocol and defaults follow dsh-ide's Harness Web integration."));
+        note.add(new JBLabel(DshBundle.message("dsh.settings.note.protocol")));
         note.add(Box.createVerticalStrut(4));
-        note.add(new JBLabel("Credentials are managed by the operating-system credential store when configured from the chat menu."));
+        note.add(new JBLabel(DshBundle.message("dsh.settings.note.credentials")));
         GridBagConstraints constraints = new GridBagConstraints();
         constraints.gridx = 0;
         constraints.gridy = GridBagConstraints.RELATIVE;
@@ -151,20 +151,20 @@ public final class DshSettingsConfigurable implements Configurable {
     @Override
     public void apply() throws ConfigurationException {
         DshSettingsState state = DshSettingsState.getInstance(project);
-        int port = parseRequired(serverPort.getText(), "Server port", 0, 65_535);
+        int port = parseRequired(serverPort.getText(), DshBundle.message("dsh.settings.server.port.label"), 0, 65_535);
         String version = safe(runtimeVersion.getText());
         if (version.isBlank() || !version.matches("[A-Za-z0-9.-]+")) {
-            throw new ConfigurationException("Runtime version must contain only letters, numbers, dots, and hyphens.");
+            throw new ConfigurationException(DshBundle.message("dsh.settings.error.runtime.version"));
         }
-        int startup = parseRequired(startupTimeout.getText(), "Startup timeout", 1_000, 600_000);
-        int request = parseRequired(requestTimeout.getText(), "Request timeout", 10_000, 3_600_000);
-        int poll = parseRequired(pollInterval.getText(), "Refresh interval", 100, 60_000);
-        int context = parseRequired(maxContextBytes.getText(), "Maximum context bytes", 1_000, 1_000_000);
+        int startup = parseRequired(startupTimeout.getText(), DshBundle.message("dsh.settings.startup.timeout.label"), 1_000, 600_000);
+        int request = parseRequired(requestTimeout.getText(), DshBundle.message("dsh.settings.request.timeout.label"), 10_000, 3_600_000);
+        int poll = parseRequired(pollInterval.getText(), DshBundle.message("dsh.settings.poll.interval.label"), 100, 60_000);
+        int context = parseRequired(maxContextBytes.getText(), DshBundle.message("dsh.settings.max.context.bytes.label"), 1_000, 1_000_000);
         if (safe(command.getText()).isBlank()) {
-            throw new ConfigurationException("Runtime command must not be empty.");
+            throw new ConfigurationException(DshBundle.message("dsh.settings.error.command.empty"));
         }
         if (!safe(apiKeyEnv.getText()).isBlank() && !safe(apiKeyEnv.getText()).matches("[A-Za-z_][A-Za-z0-9_]*")) {
-            throw new ConfigurationException("API key environment variable must be a valid variable name.");
+            throw new ConfigurationException(DshBundle.message("dsh.settings.error.api.key.env.invalid"));
         }
         state.command = safe(command.getText());
         state.commandArgs = safe(commandArgs.getText());
@@ -208,7 +208,7 @@ public final class DshSettingsConfigurable implements Configurable {
             if (parsed < minimum || parsed > maximum) throw new NumberFormatException();
             return parsed;
         } catch (NumberFormatException error) {
-            throw new ConfigurationException(label + " must be between " + minimum + " and " + maximum + ".");
+            throw new ConfigurationException(DshBundle.message("dsh.settings.error.range", label, minimum, maximum));
         }
     }
 

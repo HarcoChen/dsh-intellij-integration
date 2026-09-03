@@ -101,13 +101,13 @@ final class DshMarkdownRenderCache {
         StringBuilder result = new StringBuilder("<div class=\"markdown-code-block\"><div class=\"markdown-code-head\"><span>")
                 .append(label).append("</span>");
         if (id == null) {
-            result.append("<button type=\"button\" class=\"markdown-code-action markdown-code-copy\" disabled title=\"Code block exceeds the copy limit\">Too large</button>");
+            result.append("<button type=\"button\" class=\"markdown-code-action markdown-code-copy\" disabled title=\"").append(escape(DshBundle.message("dsh.code.block.exceeds.copy.limit"))).append("\">").append(escape(DshBundle.message("dsh.code.block.too.large"))).append("</button>");
         } else {
             result.append("<div class=\"markdown-code-actions\">")
-                    .append(action("copyCode", "Copy", id, language, true))
-                    .append(action("insertCode", "Insert", id, language, false))
-                    .append(action("openCode", "Open", id, language, false))
-                    .append(action("applyCode", "Apply", id, language, false))
+                    .append(action("copyCode", DshBundle.message("dsh.code.block.action.copy"), id, language, true))
+                    .append(action("insertCode", DshBundle.message("dsh.code.block.action.insert"), id, language, false))
+                    .append(action("openCode", DshBundle.message("dsh.code.block.action.open"), id, language, false))
+                    .append(action("applyCode", DshBundle.message("dsh.code.block.action.apply"), id, language, false))
                     .append("</div>");
         }
         return result.append("</div><pre><code>").append(escape(code)).append("</code></pre></div>").toString();
@@ -118,7 +118,7 @@ final class DshMarkdownRenderCache {
                 + "\" data-code-action=\"" + type + "\" data-code-block-id=\"" + id + "\""
                 + (copy ? " data-copy-code-id=\"" + id + "\"" : "")
                 + (language == null ? "" : " data-code-language=\"" + escape(language) + "\"")
-                + ">" + label + "</button>";
+                + ">" + escape(label) + "</button>";
     }
 
     private void discard(Entry entry) {

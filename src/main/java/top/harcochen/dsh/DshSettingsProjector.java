@@ -242,7 +242,7 @@ final class DshSettingsProjector {
         switch (type) {
             case "boolean" -> {
                 if (!"true".equals(raw) && !"false".equals(raw)) {
-                    throw new IllegalArgumentException("Boolean settings must be true or false.");
+                    throw new IllegalArgumentException(DshBundle.message("dsh.settings.coerce.boolean"));
                 }
                 return new JsonPrimitive(Boolean.parseBoolean(raw));
             }
@@ -253,14 +253,14 @@ final class DshSettingsProjector {
                     return new JsonPrimitive(parsed == Math.rint(parsed) && Math.abs(parsed) < 1e15
                             ? (Number) (long) parsed : (Number) parsed);
                 } catch (RuntimeException error) {
-                    throw new IllegalArgumentException("Number settings must contain a finite number.");
+                    throw new IllegalArgumentException(DshBundle.message("dsh.settings.coerce.number"));
                 }
             }
             case "json" -> {
                 try {
                     return JsonParser.parseString(raw);
                 } catch (RuntimeException error) {
-                    throw new IllegalArgumentException("JSON settings must contain valid JSON.");
+                    throw new IllegalArgumentException(DshBundle.message("dsh.settings.coerce.json"));
                 }
             }
             default -> {

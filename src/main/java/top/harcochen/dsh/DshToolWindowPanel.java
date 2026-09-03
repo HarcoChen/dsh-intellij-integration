@@ -161,7 +161,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
         if (disposed || bridge != null) return;
         if (!DshBridge.isAvailable()) {
             LOG.warn("JCEF is not available; showing the DSH fallback panel");
-            createFallback("JCEF (embedded Chromium browser) is not available in this IDE environment.");
+            createFallback(DshBundle.message("dsh.fallback.jcef.unavailable"));
             return;
         }
         DshBridge candidate = null;
@@ -180,7 +180,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
         } catch (Throwable error) {
             if (candidate != null) candidate.dispose();
             LOG.warn("JCEF failed to initialize; showing the DSH fallback panel", error);
-            createFallback("JCEF initialization failed: " + error.getMessage());
+            createFallback(DshBundle.message("dsh.fallback.jcef.init.failed", error.getMessage()));
         }
     }
 
@@ -192,31 +192,27 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
 
         JPanel info = new JPanel();
         info.setLayout(new BoxLayout(info, BoxLayout.Y_AXIS));
-        info.add(new JBLabel("<html><b>DSH Chat 无法加载</b></html>"));
+        info.add(new JBLabel("<html><b>" + DshBundle.message("dsh.fallback.title") + "</b></html>"));
         info.add(Box.createVerticalStrut(8));
         fallbackLabel = new JBLabel("<html>" + reason + "<br><br>"
-                + "可能原因：<br>"
-                + "• IDE 使用的 JRE 不含 JCEF（通过 Help → Find Action → \"Choose Boot Java Runtime\" 切换）<br>"
-                + "• 远程开发模式不支持 JCEF<br>"
-                + "• IDE 版本过低（需要 2024.3+）<br><br>"
-                + "你可以启动 DSH Runtime 后点击 \"在浏览器中打开\" 使用 Web UI。</html>");
+                + DshBundle.message("dsh.fallback.explanation") + "</html>");
         info.add(fallbackLabel);
         fallback.add(info, BorderLayout.NORTH);
 
         JPanel actions = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        JButton start = new JButton("Start Runtime");
+        JButton start = new JButton(DshBundle.message("dsh.fallback.button.start.runtime"));
         start.addActionListener(event -> runAction("start", runtime::startAsync));
-        JButton openBrowser = new JButton("在浏览器中打开");
+        JButton openBrowser = new JButton(DshBundle.message("dsh.fallback.button.open.browser"));
         openBrowser.addActionListener(event -> {
             String url = runtime.getUrl();
             if (url != null) BrowserUtil.browse(url);
-            else notify("DSH Runtime 尚未启动，请先点击 Start Runtime。");
+            else notify(DshBundle.message("dsh.fallback.runtime.not.started"));
         });
-        JButton settings = new JButton("Settings");
+        JButton settings = new JButton(DshBundle.message("dsh.fallback.button.settings"));
         settings.addActionListener(event -> DshActions.openSettings(project));
-        JButton diagnose = new JButton("诊断");
-        diagnose.addActionListener(event -> showTextDialog("DSH Environment", runtime.diagnoseEnvironment()));
-        JButton retryJcef = new JButton("重试内嵌界面");
+        JButton diagnose = new JButton(DshBundle.message("dsh.fallback.button.diagnose"));
+        diagnose.addActionListener(event -> showTextDialog(DshBundle.message("dsh.diagnose.dialog.title"), runtime.diagnoseEnvironment()));
+        JButton retryJcef = new JButton(DshBundle.message("dsh.fallback.button.retry.jcef"));
         retryJcef.addActionListener(event -> createWebview());
         actions.add(start);
         actions.add(openBrowser);
@@ -839,7 +835,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
     private void runHostCommand(String session, String line) throws Exception {
         JsonElement execution = client.executeCommand(session, line);
         if (execution == null || execution.isJsonNull() || !execution.isJsonObject()) {
-            throw new IllegalStateException("The DSH runtime resolved no command for \u201c" + line + "\u201d.");
+            throw new IllegalStateException(DshBundle.message("dsh.command.not.resolved", line));
         }
         JsonObject result = execution.getAsJsonObject().has("result")
                 && execution.getAsJsonObject().get("result").isJsonObject()
@@ -847,7 +843,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
         String text = string(result, "text");
         if ("error".equals(string(result, "kind"))) {
             throw new IllegalStateException(text == null || text.isBlank()
-                    ? "The DSH runtime rejected this command." : text.trim());
+                    ? DshBundle.message("dsh.command.rejected") : text.trim());
         }
         if (text != null && !text.isBlank()) notify(text.trim());
     }
@@ -871,7 +867,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
                     JsonObject history = client.history(sessionId, 250);
                     DshSettingsState settings = DshSettingsState.getInstance(project);
                     String statusLabel = settings.agentStatusLabel == null || settings.agentStatusLabel.isBlank()
-                            ? "Thinking…" : settings.agentStatusLabel.trim();
+                            ? DshBundle.message("dsh.status.thinking") : settings.agentStatusLabel.trim();
                     projection = DshMessageProjector.project(history, statusLabel);
                     messages = markdownRenderCache.render(projection.messages, "session:" + sessionId);
                     seedProjections(sessionId, history);
@@ -1279,7 +1275,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
                     after = rewound.after;
                 }
                 showTextDiff(path + (state.settled ? " (tool edit)" : " (proposed edit)"),
-                        before, after, path, "Before", state.settled ? "After" : "Proposed");
+                        before, after, path, DshBundle.message("dsh.diff.before"), state.settled ? DshBundle.message("dsh.diff.after") : DshBundle.message("dsh.diff.proposed"));
             } catch (Exception error) {
                 lastError = message(error);
                 notify(message(error));
@@ -1295,11 +1291,11 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
             try {
                 DshChangeReviewStore.FileSides sides = changeReviews.sides(current, turn, fileId);
                 if (sides.binary()) {
-                    notify("This change is binary, so it cannot be shown as a text diff.");
+                    notify(DshBundle.message("dsh.diff.binary.change"));
                     return;
                 }
                 showTextDiff(sides.title(), sides.beforeText(), sides.afterText(),
-                        sides.title(), "Before turn " + turn, "After turn " + turn);
+                        sides.title(), DshBundle.message("dsh.diff.before.turn", turn), DshBundle.message("dsh.diff.after.turn", turn));
             } catch (Exception error) {
                 lastError = message(error);
                 notify(message(error));
@@ -1317,27 +1313,27 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
         String current = sessionId;
         if (turn <= 0 || current == null) return;
         if (isSessionRunning(current)) {
-            notify("Wait for the current turn to finish before restoring changes.");
+            notify(DshBundle.message("dsh.restore.wait.for.turn"));
             return;
         }
         if (!changeReviews.isRestorable(current, turn)) {
-            notify("This turn cannot be restored.");
+            notify(DshBundle.message("dsh.restore.cannot.restore"));
             return;
         }
         int count = changeReviews.restorableFileCount(current, turn);
         ApplicationManager.getApplication().invokeLater(() -> {
             int answer = Messages.showYesNoDialog(project,
-                    "Restore all " + count + " file changes from turn " + turn + "?\n\nDSH cannot undo this.",
-                    "Restore DSH Turn Changes", Messages.getWarningIcon());
+                    DshBundle.message("dsh.restore.confirm.message", count, turn),
+                    DshBundle.message("dsh.restore.confirm.title"), Messages.getWarningIcon());
             if (answer != Messages.YES) return;
             operations.execute(() -> {
                 try {
                     if (isSessionRunning(current)) {
-                        throw new IllegalStateException("Wait for the current turn to finish before restoring changes.");
+                        throw new IllegalStateException(DshBundle.message("dsh.restore.wait.for.turn"));
                     }
                     changeReviews.restore(current, turn);
                     com.intellij.openapi.vfs.VirtualFileManager.getInstance().asyncRefresh(null);
-                    notify("Restored changes from turn " + turn + ".");
+                    notify(DshBundle.message("dsh.restore.success", turn));
                 } catch (Exception error) {
                     lastError = message(error);
                     notify(message(error));
@@ -1608,7 +1604,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
             }
         }
         if (node == null) {
-            notify("That subagent is no longer in the catalog. Refresh the tree and try again.");
+            notify(DshBundle.message("dsh.subagent.not.in.catalog"));
             return;
         }
         String parentSessionId = string(node, "parentSessionId");
@@ -1622,7 +1618,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
             try {
                 JsonObject history = client.subagentHistory(parentSessionId, childSessionId, mode, 250);
                 if (subagentPreview != preview) return;
-                DshMessageProjector.Projection projected = DshMessageProjector.project(history, "Thinking\u2026");
+                DshMessageProjector.Projection projected = DshMessageProjector.project(history, DshBundle.message("dsh.status.thinking"));
                 preview.messages = markdownRenderCache.render(projected.messages, "subagent:" + childSessionId);
                 preview.state = "ready";
             } catch (Exception error) {
@@ -1639,7 +1635,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
         SubagentPreview preview = subagentPreview;
         if (preview == null || !preview.childSessionId.equals(childSessionId)) return;
         if (!"continuable".equals(preview.mode)) {
-            notify("A one-shot subagent cannot accept a follow-up.");
+            notify(DshBundle.message("dsh.subagent.one.shot.no.follow.up"));
             return;
         }
         String parentSessionId = subagentParentOf(childSessionId);
@@ -1665,7 +1661,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
         SubagentPreview preview = subagentPreview;
         if (preview == null || !preview.childSessionId.equals(childSessionId)) return;
         if (!"continuable".equals(preview.mode)) {
-            notify("A one-shot subagent cannot be interrupted.");
+            notify(DshBundle.message("dsh.subagent.one.shot.no.interrupt"));
             return;
         }
         String parentSessionId = subagentParentOf(childSessionId);
@@ -1841,7 +1837,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
             Map<String, ProjectionCell> cells = projectionCellsBySession.get(current);
             ProjectionCell cell = cells == null ? null : cells.get("goal");
             if (cell == null) {
-                notify("The connected Harness provides no goal projection, so the Goal panel stays hidden.");
+                notify(DshBundle.message("dsh.goal.no.projection"));
                 return;
             }
             value = cell.value;
@@ -2264,7 +2260,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
         int limit = Math.max(1_000, DshSettingsState.getInstance(project).maxContextBytes);
         byte[] bytes = value.getBytes(StandardCharsets.UTF_8);
         if (bytes.length <= limit) return value;
-        String suffix = "\n\n[... context truncated by dsh-intellij ...]";
+        String suffix = DshBundle.message("dsh.context.truncated");
         int budget = Math.max(0, limit - suffix.getBytes(StandardCharsets.UTF_8).length);
         StringBuilder result = new StringBuilder();
         int used = 0;
@@ -2292,7 +2288,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
                             candidate.addProperty("kind", "file");
                             candidate.addProperty("label", relative);
                             candidate.addProperty("insertText", "@" + relative);
-                            candidate.addProperty("description", "Project file");
+                            candidate.addProperty("description", DshBundle.message("dsh.context.project.file"));
                             result.add(candidate);
                         }
                     });
@@ -2310,26 +2306,26 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
             List<String> labels = new ArrayList<>();
             List<String> actions = new ArrayList<>();
             if (currentSelection(false) != null) {
-                labels.add("Use current selection");
+                labels.add(DshBundle.message("dsh.context.picker.use.selection"));
                 actions.add("selection");
             }
-            labels.add("Choose project file reference…");
+            labels.add(DshBundle.message("dsh.context.picker.choose.project.file"));
             actions.add("project-file");
             if (FileEditorManager.getInstance(project).getSelectedTextEditor() != null) {
-                labels.add("Reference current file");
+                labels.add(DshBundle.message("dsh.context.picker.reference.current"));
                 actions.add("current-file");
             }
             if (FileEditorManager.getInstance(project).getSelectedTextEditor() != null) {
-                labels.add("Attach current file diagnostics once");
+                labels.add(DshBundle.message("dsh.context.picker.attach.diagnostics"));
                 actions.add("diagnostics");
             }
-            labels.add("Attach a folder listing once");
+            labels.add(DshBundle.message("dsh.context.picker.attach.folder"));
             actions.add("folder");
-            labels.add("Attach unstaged Git diff once");
+            labels.add(DshBundle.message("dsh.context.picker.attach.git.diff"));
             actions.add("git-diff");
-            labels.add(selectionEnabled ? "Disable automatic selection context" : "Enable automatic selection context");
+            labels.add(selectionEnabled ? DshBundle.message("dsh.context.picker.disable.selection") : DshBundle.message("dsh.context.picker.enable.selection"));
             actions.add("toggle-selection");
-            int selected = Messages.showChooseDialog(project, "Choose IDE context for the next turn", "DSH Context",
+            int selected = Messages.showChooseDialog(project, DshBundle.message("dsh.context.picker.dialog.message"), DshBundle.message("dsh.context.picker.dialog.title"),
                     Messages.getQuestionIcon(), labels.toArray(new String[0]), labels.get(0));
             if (selected < 0 || selected >= actions.size()) return;
             switch (actions.get(selected)) {
@@ -2363,7 +2359,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
         Editor editor = FileEditorManager.getInstance(project).getSelectedTextEditor();
         VirtualFile file = editor == null ? null : FileDocumentManager.getInstance().getFile(editor.getDocument());
         if (file == null) {
-            notify("There is no current project file to reference.");
+            notify(DshBundle.message("dsh.context.no.current.file"));
             return;
         }
         String reference = "@" + displayPath(file);
@@ -2394,7 +2390,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
         Editor editor = FileEditorManager.getInstance(project).getSelectedTextEditor();
         VirtualFile file = editor == null ? null : FileDocumentManager.getInstance().getFile(editor.getDocument());
         if (editor == null || file == null) {
-            notify("There is no current file with diagnostics to read.");
+            notify(DshBundle.message("dsh.context.no.diagnostics"));
             return;
         }
         String pathLabel = displayPath(file);
@@ -2451,8 +2447,8 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
         VirtualFile root = base == null ? null : LocalFileSystem.getInstance().findFileByPath(base);
         VirtualFile chosen = FileChooser.chooseFile(
                 FileChooserDescriptorFactory.createSingleFolderDescriptor()
-                        .withTitle("Attach DSH Folder Listing")
-                        .withDescription("Only file names and sizes are attached, never file contents."),
+                        .withTitle(DshBundle.message("dsh.context.folder.chooser.title"))
+                        .withDescription(DshBundle.message("dsh.context.folder.chooser.description")),
                 project, root);
         if (chosen == null || !chosen.isDirectory()) return;
         String pathLabel = displayPath(chosen);
@@ -2525,7 +2521,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
      */
     private void captureAppShot() {
         if (!System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("mac")) {
-            notify("AppShot is currently available only when the IDE runs on macOS.");
+            notify(DshBundle.message("dsh.appshot.macos.only"));
             return;
         }
         operations.execute(() -> {
@@ -2539,13 +2535,13 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
                         .redirectErrorStream(true).start();
                 if (!process.waitFor(120, TimeUnit.SECONDS)) {
                     process.destroyForcibly();
-                    throw new IllegalStateException("The AppShot selector timed out.");
+                    throw new IllegalStateException(DshBundle.message("dsh.appshot.timeout"));
                 }
                 // A cancelled selection writes no file; that is not an error.
                 if (!Files.isRegularFile(target) || Files.size(target) == 0) return;
                 byte[] bytes = Files.readAllBytes(target);
                 if (bytes.length > 16 * 1024 * 1024) {
-                    throw new IllegalStateException("The captured AppShot is too large to attach.");
+                    throw new IllegalStateException(DshBundle.message("dsh.appshot.too.large"));
                 }
                 JsonObject image = new JsonObject();
                 image.addProperty("mediaType", "image/png");
@@ -2556,7 +2552,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
                 envelope.add("image", image);
                 postToWebview(envelope);
             } catch (Exception error) {
-                notify("Unable to capture an AppShot: " + message(error));
+                notify(DshBundle.message("dsh.appshot.failed", message(error)));
             } finally {
                 if (target != null) {
                     try {
@@ -2579,7 +2575,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
     private void attachGitDiff() {
         String root = project.getBasePath();
         if (root == null) {
-            notify("Open a project before attaching a Git diff.");
+            notify(DshBundle.message("dsh.context.git.diff.no.project"));
             return;
         }
         operations.execute(() -> {
@@ -2593,7 +2589,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
                 }
                 if (process.exitValue() != 0) throw new IllegalStateException(new String(output, StandardCharsets.UTF_8).trim());
                 String full = new String(output, StandardCharsets.UTF_8);
-                if (full.isBlank()) full = "No unstaged Git diff.";
+                if (full.isBlank()) full = DshBundle.message("dsh.context.git.diff.no.diff");
                 String content = limitContext(full);
                 JsonObject item = new JsonObject();
                 item.addProperty("id", java.util.UUID.randomUUID().toString());
@@ -2613,7 +2609,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
                 contextItems = updated;
                 postStateLater();
             } catch (Exception error) {
-                notify("Unable to attach Git diff: " + message(error));
+                notify(DshBundle.message("dsh.context.git.diff.failed", message(error)));
             }
         });
     }
@@ -2628,18 +2624,18 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
             try {
                 resolved = resolvePath(path);
             } catch (RuntimeException error) {
-                notify("Invalid file path: " + path);
+                notify(DshBundle.message("dsh.file.invalid.path", path));
                 return;
             }
             VirtualFile file = LocalFileSystem.getInstance().findFileByPath(resolved);
             if (file != null) new OpenFileDescriptor(project, file, Math.max(0, line - 1), Math.max(0, column - 1)).navigate(true);
-            else notify("File not found: " + path);
+            else notify(DshBundle.message("dsh.file.not.found", path));
         });
     }
 
     private void searchSessions() {
         ApplicationManager.getApplication().invokeLater(() -> {
-            String query = Messages.showInputDialog(project, "Search DSH sessions", "DSH", Messages.getQuestionIcon());
+            String query = Messages.showInputDialog(project, DshBundle.message("dsh.session.search.message"), DshBundle.message("dsh.session.search.title"), Messages.getQuestionIcon());
             if (query == null) return;
             String normalized = query.trim().toLowerCase(Locale.ROOT);
             List<String> choices = new ArrayList<>();
@@ -2655,10 +2651,10 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
                 }
             }
             if (choices.isEmpty()) {
-                notify("No DSH sessions matched the search.");
+                notify(DshBundle.message("dsh.session.search.no.results"));
                 return;
             }
-            int selected = Messages.showChooseDialog(project, "Select a session", "DSH",
+            int selected = Messages.showChooseDialog(project, DshBundle.message("dsh.session.select.message"), DshBundle.message("dsh.session.select.title"),
                     Messages.getQuestionIcon(), choices.toArray(new String[0]), choices.get(0));
             if (selected >= 0 && selected < ids.size()) {
                 sessionId = ids.get(selected);
@@ -2671,7 +2667,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
         String current = sessionId;
         if (current == null) return;
         ApplicationManager.getApplication().invokeLater(() -> {
-            String title = Messages.showInputDialog(project, "Session title", "Rename DSH Session", Messages.getQuestionIcon());
+            String title = Messages.showInputDialog(project, DshBundle.message("dsh.session.rename.message"), DshBundle.message("dsh.session.rename.title"), Messages.getQuestionIcon());
             if (title == null || title.trim().isEmpty()) return;
             operations.execute(() -> {
                 try {
@@ -2704,7 +2700,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
         String current = sessionId;
         if (current == null) return;
         ApplicationManager.getApplication().invokeLater(() -> {
-            int answer = Messages.showYesNoDialog(project, "Archive the current DSH session?", "Archive Session", Messages.getQuestionIcon());
+            int answer = Messages.showYesNoDialog(project, DshBundle.message("dsh.session.archive.message"), DshBundle.message("dsh.session.archive.title"), Messages.getQuestionIcon());
             if (answer != Messages.YES) return;
             operations.execute(() -> {
                 try {
@@ -2743,11 +2739,11 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
                     }
                 }
                 if (labels.isEmpty()) {
-                    notify("The connected Harness did not expose model choices.");
+                    notify(DshBundle.message("dsh.model.no.choices"));
                     return;
                 }
                 ApplicationManager.getApplication().invokeLater(() -> {
-                    int selected = Messages.showChooseDialog(project, "Select the current session model", "DSH",
+                    int selected = Messages.showChooseDialog(project, DshBundle.message("dsh.model.select.message"), DshBundle.message("dsh.model.select.title"),
                             Messages.getQuestionIcon(), labels.toArray(new String[0]), labels.get(0));
                     if (selected < 0 || selected >= selections.size()) return;
                     String[] choice = selections.get(selected);
@@ -2779,7 +2775,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
         String provider = current == null ? null : string(current, "provider");
         String model = current == null ? null : string(current, "model");
         if (provider == null || model == null) {
-            notify("The connected Harness did not expose the current model.");
+            notify(DshBundle.message("dsh.model.no.current"));
             return;
         }
         operations.execute(() -> {
@@ -2799,7 +2795,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
         JsonObject view = reasoningEffort();
         JsonArray options = view.getAsJsonArray("options");
         if (options == null || options.isEmpty()) {
-            notify("The current model does not expose reasoning-effort options.");
+            notify(DshBundle.message("dsh.model.no.reasoning.effort"));
             return;
         }
         postStateLater();
@@ -2855,10 +2851,10 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
     private void insertCode(String code) {
         Editor editor = FileEditorManager.getInstance(project).getSelectedTextEditor();
         if (editor == null) {
-            notify("Open an editor before inserting code.");
+            notify(DshBundle.message("dsh.code.no.editor.for.insert"));
             return;
         }
-        WriteCommandAction.runWriteCommandAction(project, "Insert DSH Code", null, () -> {
+        WriteCommandAction.runWriteCommandAction(project, DshBundle.message("dsh.code.insert.command.name"), null, () -> {
             int start = editor.getSelectionModel().hasSelection()
                     ? editor.getSelectionModel().getSelectionStart() : editor.getCaretModel().getOffset();
             int end = editor.getSelectionModel().hasSelection()
@@ -2872,7 +2868,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
     private void openCode(String code, String language) {
         String extension = extensionForLanguage(language);
         FileType fileType = FileTypeManager.getInstance().getFileTypeByExtension(extension);
-        LightVirtualFile file = new LightVirtualFile("DSH Code." + extension, fileType, code);
+        LightVirtualFile file = new LightVirtualFile(DshBundle.message("dsh.code.open.file.name") + extension, fileType, code);
         FileEditorManager.getInstance(project).openFile(file, true);
     }
 
@@ -2888,18 +2884,18 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
     private void applyCode(String code, String language) {
         String base = project.getBasePath();
         if (base == null) {
-            notify("Open a project before applying a code block.");
+            notify(DshBundle.message("dsh.code.no.project.for.apply"));
             return;
         }
         VirtualFile root = LocalFileSystem.getInstance().findFileByPath(base);
         VirtualFile chosen = FileChooser.chooseFile(
                 FileChooserDescriptorFactory.createSingleFileDescriptor()
-                        .withTitle("Apply DSH Code Block")
-                        .withDescription("Select the file whose complete contents this code block replaces."),
+                        .withTitle(DshBundle.message("dsh.code.apply.chooser.title"))
+                        .withDescription(DshBundle.message("dsh.code.apply.chooser.description")),
                 project, root);
         if (chosen == null) return;
         if (chosen.isDirectory() || !chosen.isInLocalFileSystem()) {
-            notify("Select a regular file inside the current project.");
+            notify(DshBundle.message("dsh.code.apply.not.regular.file"));
             return;
         }
         Path target;
@@ -2908,20 +2904,20 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
             target = Path.of(chosen.getPath()).toRealPath();
             projectRoot = Path.of(base).toRealPath();
         } catch (Exception error) {
-            notify("The target file could not be resolved: " + message(error));
+            notify(DshBundle.message("dsh.code.apply.resolve.failed", message(error)));
             return;
         }
         if (!target.startsWith(projectRoot)) {
-            notify("The target file is outside the current project.");
+            notify(DshBundle.message("dsh.code.apply.outside.project"));
             return;
         }
         Document document = FileDocumentManager.getInstance().getDocument(chosen);
         if (document == null) {
-            notify("The target file cannot be opened as text.");
+            notify(DshBundle.message("dsh.code.apply.not.text"));
             return;
         }
         if (FileDocumentManager.getInstance().isDocumentUnsaved(document)) {
-            notify("The target file has unsaved changes. Save or discard them before applying code.");
+            notify(DshBundle.message("dsh.code.apply.unsaved.changes"));
             return;
         }
         String beforeText = document.getText();
@@ -2929,7 +2925,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
         try {
             beforeDisk = Files.readAllBytes(target);
         } catch (Exception error) {
-            notify("The target file could not be read: " + message(error));
+            notify(DshBundle.message("dsh.code.apply.read.failed", message(error)));
             return;
         }
         String path = displayPath(chosen);
@@ -2938,15 +2934,14 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
                 : FileTypeManager.getInstance().getFileTypeByFileName("dsh-code." + extensionForLanguage(language));
         com.intellij.diff.DiffContentFactory factory = com.intellij.diff.DiffContentFactory.getInstance();
         com.intellij.diff.requests.SimpleDiffRequest request = new com.intellij.diff.requests.SimpleDiffRequest(
-                "Apply code block to " + path,
+                DshBundle.message("dsh.code.apply.diff.title", path),
                 factory.create(project, beforeText, fileType),
                 factory.create(project, code, fileType),
-                "Current", "Proposed");
+                DshBundle.message("dsh.code.apply.diff.current"), DshBundle.message("dsh.code.apply.diff.proposed"));
         com.intellij.diff.DiffManager.getInstance().showDiff(project, request);
         int answer = Messages.showYesNoDialog(project,
-                "Apply this code block to " + path + "?\n\n"
-                        + "It replaces the complete file contents. The change is undoable in the editor.",
-                "Apply DSH Code Block", Messages.getWarningIcon());
+                DshBundle.message("dsh.code.apply.confirm.message", path),
+                DshBundle.message("dsh.code.apply.confirm.title"), Messages.getWarningIcon());
         if (answer != Messages.YES) return;
         // Re-validate against the state captured before the preview opened.
         try {
@@ -2956,17 +2951,17 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
                     || !java.util.Arrays.equals(latestDisk, beforeDisk)
                     || !document.getText().equals(beforeText)
                     || FileDocumentManager.getInstance().isDocumentUnsaved(document)) {
-                notify("The target file changed while the preview was open. No changes were applied.");
+                notify(DshBundle.message("dsh.code.apply.file.changed"));
                 return;
             }
         } catch (Exception error) {
-            notify("The target file changed while the preview was open. No changes were applied.");
+            notify(DshBundle.message("dsh.code.apply.file.changed"));
             return;
         }
-        WriteCommandAction.runWriteCommandAction(project, "Apply DSH Code Block", null,
+        WriteCommandAction.runWriteCommandAction(project, DshBundle.message("dsh.code.apply.command.name"), null,
                 () -> document.setText(code));
         FileDocumentManager.getInstance().saveDocument(document);
-        notify("Applied the code block to " + path + ".");
+        notify(DshBundle.message("dsh.code.apply.success", path));
     }
 
     private static String extensionForLanguage(String language) {
@@ -2993,10 +2988,10 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
     private void configureApiKey() {
         ApplicationManager.getApplication().invokeLater(() -> {
             String env = DshSettingsState.getInstance(project).apiKeyEnv;
-            String value = Messages.showPasswordDialog("Enter the value for " + env + ". It is used only when starting dsh.", "Configure DSH API Key");
+            String value = Messages.showPasswordDialog(DshBundle.message("dsh.api.key.dialog.message", env), DshBundle.message("dsh.api.key.dialog.title"));
             if (value == null || value.isBlank()) return;
             DshCredentials.store(project, value);
-            notify("API key saved in the IDE password store. Restart DSH Runtime to apply it.");
+            notify(DshBundle.message("dsh.api.key.saved"));
         });
     }
 
@@ -3053,7 +3048,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
         String ns = string(action, "ns");
         long revision = asLong(action.get("revision"), -1);
         if (panel == null || ns == null || !bool(panel, "open", false) || !bool(panel, "writable", false)) {
-            notify("Settings are out of date. Close and reopen the settings cards.");
+            notify(DshBundle.message("dsh.settings.out.of.date"));
             return;
         }
         JsonObject card = null;
@@ -3064,7 +3059,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
             }
         }
         if (card == null || asLong(card.get("revision"), -2) != revision) {
-            notify("Settings are out of date. Close and reopen the settings cards.");
+            notify(DshBundle.message("dsh.settings.out.of.date"));
             return;
         }
         JsonArray ops;
@@ -3140,20 +3135,20 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
                             + "  (" + sessionIds.size() + " sessions)");
                     workspaces.add(workspace);
                 }
-                labels.add("Register the current project directory…");
-                labels.add("Close");
+                labels.add(DshBundle.message("dsh.workspace.register.current"));
+                labels.add(DshBundle.message("dsh.workspace.close"));
                 ApplicationManager.getApplication().invokeLater(() ->
                         chooseWorkspaceAction(labels, workspaces));
             } catch (Exception error) {
                 lastError = message(error);
-                notify("Unable to read the DSH workspaces: " + message(error));
+                notify(DshBundle.message("dsh.workspace.read.failed", message(error)));
                 postStateLater();
             }
         });
     }
 
     private void chooseWorkspaceAction(List<String> labels, List<JsonObject> workspaces) {
-        int selected = Messages.showChooseDialog(project, "DSH workspaces", "DSH Workspaces",
+        int selected = Messages.showChooseDialog(project, DshBundle.message("dsh.workspace.dialog.message"), DshBundle.message("dsh.workspace.dialog.title"),
                 Messages.getQuestionIcon(), labels.toArray(new String[0]), labels.get(0));
         if (selected < 0 || selected >= labels.size() || selected == labels.size() - 1) return;
         if (selected == workspaces.size()) {
@@ -3163,22 +3158,21 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
         JsonObject workspace = workspaces.get(selected);
         String id = string(workspace, "workspaceId");
         String title = stringOr(workspace, "title", id);
-        String[] actions = {"Rename", "Remove registration", "Cancel"};
+        String[] actions = {DshBundle.message("dsh.workspace.action.rename"), DshBundle.message("dsh.workspace.action.remove"), DshBundle.message("dsh.workspace.action.cancel")};
         int action = Messages.showChooseDialog(project,
-                title + "\n" + stringOr(workspace, "path", ""), "DSH Workspace",
+                title + "\n" + stringOr(workspace, "path", ""), DshBundle.message("dsh.workspace.action.title"),
                 Messages.getQuestionIcon(), actions, actions[0]);
         if (action == 0) {
-            String replacement = Messages.showInputDialog(project, "New title for this workspace",
-                    "Rename DSH Workspace", Messages.getQuestionIcon(), title, null);
+            String replacement = Messages.showInputDialog(project, DshBundle.message("dsh.workspace.rename.message"),
+                    DshBundle.message("dsh.workspace.rename.title"), Messages.getQuestionIcon(), title, null);
             if (replacement == null || replacement.isBlank()) return;
-            runWorkspaceOperation("renamed", () -> client.renameWorkspace(id, replacement.trim()));
+            runWorkspaceOperation("dsh.workspace.operation.renamed", () -> client.renameWorkspace(id, replacement.trim()));
         } else if (action == 1) {
             int confirmed = Messages.showYesNoDialog(project,
-                    "Remove the workspace registration for " + title + "?\n\n"
-                            + "The directory, its files, and every session log are left untouched.",
-                    "Remove DSH Workspace", Messages.getWarningIcon());
+                    DshBundle.message("dsh.workspace.remove.confirm.message", title),
+                    DshBundle.message("dsh.workspace.remove.confirm.title"), Messages.getWarningIcon());
             if (confirmed != Messages.YES) return;
-            runWorkspaceOperation("removed", () -> {
+            runWorkspaceOperation("dsh.workspace.operation.removed", () -> {
                 client.deleteWorkspace(id);
                 return null;
             });
@@ -3188,25 +3182,25 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
     private void createWorkspaceForProject() {
         String base = project.getBasePath();
         if (base == null) {
-            notify("Open a project before registering a workspace.");
+            notify(DshBundle.message("dsh.workspace.no.project"));
             return;
         }
-        runWorkspaceOperation("registered", () -> client.createWorkspace(base));
+        runWorkspaceOperation("dsh.workspace.operation.registered", () -> client.createWorkspace(base));
     }
 
     private interface WorkspaceOperation {
         JsonObject run() throws Exception;
     }
 
-    private void runWorkspaceOperation(String verb, WorkspaceOperation operation) {
+    private void runWorkspaceOperation(String successKey, WorkspaceOperation operation) {
         operations.execute(() -> {
             try {
                 operation.run();
-                notify("Workspace " + verb + ".");
+                notify(DshBundle.message(successKey));
                 refreshState();
             } catch (Exception error) {
                 lastError = message(error);
-                notify("Unable to update the workspace: " + message(error));
+                notify(DshBundle.message("dsh.workspace.operation.failed", message(error)));
                 postStateLater();
             }
         });
@@ -3242,13 +3236,13 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
                     rows.add(provider);
                 }
                 if (labels.isEmpty()) {
-                    notify("The connected Harness reports no configurable providers.");
+                    notify(DshBundle.message("dsh.providers.none"));
                     return;
                 }
-                labels.add("Open the DSH Web UI to configure providers…");
+                labels.add(DshBundle.message("dsh.providers.open.web.ui"));
                 ApplicationManager.getApplication().invokeLater(() -> {
                     int selected = Messages.showChooseDialog(project,
-                            "Providers registered by the connected Harness", "DSH Providers",
+                            DshBundle.message("dsh.providers.dialog.message"), DshBundle.message("dsh.providers.dialog.title"),
                             Messages.getInformationIcon(), labels.toArray(new String[0]), labels.get(0));
                     if (selected < 0) return;
                     if (selected == rows.size()) {
@@ -3277,11 +3271,11 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
                         detail.append("Declared by configuration: ")
                                 .append(bool(provider, "declared", false) ? "yes" : "no").append('\n');
                     }
-                    showTextDialog("DSH Provider", detail.toString());
+                    showTextDialog(DshBundle.message("dsh.providers.detail.title"), detail.toString());
                 });
             } catch (Exception error) {
                 lastError = message(error);
-                notify("Unable to read the DSH providers: " + message(error));
+                notify(DshBundle.message("dsh.providers.read.failed", message(error)));
                 postStateLater();
             }
         });
@@ -3316,94 +3310,84 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
                     rows.add(preset);
                 }
                 if (labels.isEmpty()) {
-                    notify("The connected Harness reports no agent presets.");
+                    notify(DshBundle.message("dsh.presets.none"));
                     return;
                 }
                 ApplicationManager.getApplication().invokeLater(() -> choosePresetAction(labels, rows, authorable));
             } catch (Exception error) {
                 lastError = message(error);
-                notify("Unable to read the DSH agent presets: " + message(error));
+                notify(DshBundle.message("dsh.presets.read.failed", message(error)));
                 postStateLater();
             }
         });
     }
 
     private void choosePresetAction(List<String> labels, List<JsonObject> rows, boolean authorable) {
-        int selected = Messages.showChooseDialog(project, "Agent presets offered by the connected Harness",
-                "DSH Agent Presets", Messages.getQuestionIcon(), labels.toArray(new String[0]), labels.get(0));
+        int selected = Messages.showChooseDialog(project, DshBundle.message("dsh.presets.dialog.message"),
+                DshBundle.message("dsh.presets.dialog.title"), Messages.getQuestionIcon(), labels.toArray(new String[0]), labels.get(0));
         if (selected < 0 || selected >= rows.size()) return;
         JsonObject preset = rows.get(selected);
         String id = string(preset, "id");
         boolean shipped = "system".equals(string(preset, "trust"));
-        List<String> actionLabels = new ArrayList<>(List.of("View composition", "Use for the next session"));
-        // Authoring is copy-only, and a shipped preset's install is not the
-        // user's to manage, so only a locally authored one can be edited.
-        if (authorable) actionLabels.add("Copy to a new preset…");
+        List<String> actionLabels = new ArrayList<>();
+        List<String> actionIds = new ArrayList<>();
+        actionLabels.add(DshBundle.message("dsh.presets.action.view.composition")); actionIds.add("view");
+        actionLabels.add(DshBundle.message("dsh.presets.action.use.for.next.session")); actionIds.add("use");
+        if (authorable) { actionLabels.add(DshBundle.message("dsh.presets.action.copy")); actionIds.add("copy"); }
         if (!shipped) {
-            actionLabels.add("Open its directory");
-            actionLabels.add("Delete this preset");
+            actionLabels.add(DshBundle.message("dsh.presets.action.open.directory")); actionIds.add("open-dir");
+            actionLabels.add(DshBundle.message("dsh.presets.action.delete")); actionIds.add("delete");
         }
-        actionLabels.add("Cancel");
-        String[] actions = actionLabels.toArray(new String[0]);
+        actionLabels.add(DshBundle.message("dsh.presets.action.cancel")); actionIds.add("cancel");
+        String[] displayLabels = actionLabels.toArray(new String[0]);
         int chosen = Messages.showChooseDialog(project, stringOr(preset, "name", id) + "\n"
-                        + stringOr(preset, "description", "<no description>"), "DSH Agent Preset",
-                Messages.getQuestionIcon(), actions, actions[0]);
-        if (chosen < 0 || chosen >= actions.length) return;
-        String action = actions[chosen];
-        if ("Copy to a new preset…".equals(action)) {
-            copyAgentPreset(id);
-            return;
-        }
-        if ("Open its directory".equals(action)) {
-            operations.execute(() -> {
+                        + stringOr(preset, "description", DshBundle.message("dsh.presets.no.description")),
+                DshBundle.message("dsh.presets.action.dialog.title"),
+                Messages.getQuestionIcon(), displayLabels, displayLabels[0]);
+        if (chosen < 0 || chosen >= actionIds.size()) return;
+        switch (actionIds.get(chosen)) {
+            case "copy" -> copyAgentPreset(id);
+            case "open-dir" -> operations.execute(() -> {
                 try {
-                    // A deployment with no native opener answers with the
-                    // resolved directory instead, which is what to show.
                     client.openAgentPresetDocument(id);
                 } catch (Exception error) {
-                    notify("Unable to open that agent preset: " + message(error));
+                    notify(DshBundle.message("dsh.presets.open.failed", message(error)));
                 }
             });
-            return;
-        }
-        if ("Delete this preset".equals(action)) {
-            int confirmed = Messages.showYesNoDialog(project,
-                    "Delete the locally authored preset " + stringOr(preset, "name", id) + "?\n\n"
-                            + "This removes its composition files. DSH cannot undo it.",
-                    "Delete DSH Agent Preset", Messages.getWarningIcon());
-            if (confirmed != Messages.YES) return;
-            operations.execute(() -> {
-                try {
-                    client.removeAgentPreset(id);
-                    agentPresetCatalog = new JsonArray();
-                    notify("Deleted the agent preset " + id + ".");
-                    refreshState();
-                } catch (Exception error) {
-                    notify("Unable to delete that agent preset: " + message(error));
-                }
-            });
-            return;
-        }
-        int legacy = "View composition".equals(action) ? 0 : "Use for the next session".equals(action) ? 1 : -1;
-        if (legacy == 0) {
-            operations.execute(() -> {
+            case "delete" -> {
+                int confirmed = Messages.showYesNoDialog(project,
+                        DshBundle.message("dsh.presets.delete.confirm.message", stringOr(preset, "name", id)),
+                        DshBundle.message("dsh.presets.delete.confirm.title"), Messages.getWarningIcon());
+                if (confirmed != Messages.YES) return;
+                operations.execute(() -> {
+                    try {
+                        client.removeAgentPreset(id);
+                        agentPresetCatalog = new JsonArray();
+                        notify(DshBundle.message("dsh.presets.delete.success", id));
+                        refreshState();
+                    } catch (Exception error) {
+                        notify(DshBundle.message("dsh.presets.delete.failed", message(error)));
+                    }
+                });
+            }
+            case "view" -> operations.execute(() -> {
                 try {
                     JsonObject document = client.readAgentPreset(id);
                     StringBuilder text = new StringBuilder();
                     text.append(stringOr(document, "name", id)).append('\n');
-                    text.append("Trust: ").append(stringOr(document, "trust", "user")).append('\n');
+                    text.append(DshBundle.message("dsh.presets.detail.trust")).append(stringOr(document, "trust", "user")).append('\n');
                     String description = string(document, "description");
                     if (description != null && !description.isBlank()) {
-                        text.append("Description: ").append(description).append('\n');
+                        text.append(DshBundle.message("dsh.presets.detail.description")).append(description).append('\n');
                     }
                     text.append('\n').append(stringOr(document, "content", ""));
-                    showTextDialog("DSH Agent Preset: " + id, text.toString());
+                    showTextDialog(DshBundle.message("dsh.presets.detail.title", id), text.toString());
                 } catch (Exception error) {
-                    notify("Unable to read that agent preset: " + message(error));
+                    notify(DshBundle.message("dsh.presets.read.detail.failed", message(error)));
                 }
             });
-        } else if (legacy == 1) {
-            selectAgentPreset(id);
+            case "use" -> selectAgentPreset(id);
+            default -> { }
         }
     }
 
@@ -3414,24 +3398,24 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
      */
     private void copyAgentPreset(String from) {
         String requested = Messages.showInputDialog(project,
-                "Id for the new preset (lowercase letters, digits, dashes)",
-                "Copy DSH Agent Preset", Messages.getQuestionIcon(), from + "-copy", null);
+                DshBundle.message("dsh.presets.copy.id.message"),
+                DshBundle.message("dsh.presets.copy.id.title"), Messages.getQuestionIcon(), from + "-copy", null);
         if (requested == null) return;
         String id = requested.trim();
         if (!id.matches("[a-z0-9][a-z0-9._-]{0,63}")) {
-            notify("A preset id may contain only lowercase letters, digits, dots, dashes, and underscores.");
+            notify(DshBundle.message("dsh.presets.copy.invalid.id"));
             return;
         }
-        String name = Messages.showInputDialog(project, "Display name for the new preset (optional)",
-                "Copy DSH Agent Preset", Messages.getQuestionIcon(), id, null);
+        String name = Messages.showInputDialog(project, DshBundle.message("dsh.presets.copy.name.message"),
+                DshBundle.message("dsh.presets.copy.name.title"), Messages.getQuestionIcon(), id, null);
         operations.execute(() -> {
             try {
                 client.copyAgentPreset(from, id, name == null || name.isBlank() ? null : name.trim());
                 agentPresetCatalog = new JsonArray();
-                notify("Copied " + from + " to " + id + ".");
+                notify(DshBundle.message("dsh.presets.copy.success", from, id));
                 refreshState();
             } catch (Exception error) {
-                notify("Unable to copy that agent preset: " + message(error));
+                notify(DshBundle.message("dsh.presets.copy.failed", message(error)));
             }
         });
     }
@@ -3453,17 +3437,17 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
                     labels.add(stringOr(preset, "name", id) + "  (" + id + ")");
                 }
                 if (labels.isEmpty()) {
-                    notify("The connected Harness did not expose agent presets.");
+                    notify(DshBundle.message("dsh.presets.not.exposed"));
                     return;
                 }
                 String target = requestedPreset == null || requestedPreset.isBlank() ? null : requestedPreset.trim();
                 if (target != null && !ids.contains(target)) {
-                    notify("Agent preset not found: " + target);
+                    notify(DshBundle.message("dsh.presets.not.found", target));
                     return;
                 }
                 if (target == null) {
                     ApplicationManager.getApplication().invokeLater(() -> {
-                        int selected = Messages.showChooseDialog(project, "Select the DSH agent preset", "DSH",
+                        int selected = Messages.showChooseDialog(project, DshBundle.message("dsh.presets.select.message"), DshBundle.message("dsh.presets.select.title"),
                                 Messages.getQuestionIcon(), labels.toArray(new String[0]), labels.get(0));
                         if (selected >= 0 && selected < ids.size()) applyAgentPreset(currentSession, ids.get(selected));
                     });
@@ -3647,7 +3631,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
     private void openBrowser() {
         String url = runtime.getUrl();
         if (url == null) {
-            notify("DSH Runtime is not running.");
+            notify(DshBundle.message("dsh.runtime.not.running"));
             return;
         }
         BrowserUtil.browse(url);
@@ -3656,7 +3640,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
     private void openTrace(JsonObject action) {
         String current = sessionId;
         if (current == null || current.isBlank()) {
-            notify("There is no active DSH session to trace.");
+            notify(DshBundle.message("dsh.trace.no.active.session"));
             return;
         }
         int selectedSeq = integer(action, "seq", -1);
@@ -3695,7 +3679,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
     }
 
     private void showLogs() {
-        showTextDialog("DSH Runtime Logs", runtime.getLogs().isBlank() ? "No runtime output yet." : runtime.getLogs());
+        showTextDialog(DshBundle.message("dsh.logs.dialog.title"), runtime.getLogs().isBlank() ? DshBundle.message("dsh.logs.no.output") : runtime.getLogs());
     }
 
     private void showJsonDialog(String title, JsonElement value) {

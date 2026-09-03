@@ -14,6 +14,7 @@ import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.vfs.LocalFileSystem;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.ui.jcef.JBCefBrowser;
+import com.intellij.ui.jcef.JBCefBrowserBase;
 import com.intellij.ui.jcef.JBCefJSQuery;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -45,7 +46,7 @@ import java.util.regex.Pattern;
 final class DshTraceDialog extends DialogWrapper {
     DshTraceDialog(@NotNull Project project, @NotNull String sessionId, @NotNull String sessionTitle, int selectedSeq) {
         super(project, false);
-        setTitle("DSH Trace: " + abbreviate(sessionTitle, 80));
+        setTitle(DshBundle.message("dsh.trace.dialog.title", abbreviate(sessionTitle, 80)));
         setModal(false);
         setResizable(true);
         TraceBrowser trace = new TraceBrowser(project, sessionId, sessionTitle, selectedSeq);
@@ -109,7 +110,7 @@ final class DshTraceDialog extends DialogWrapper {
             this.client = runtime.getClient();
             this.pendingSeq = selectedSeq < 0 ? null : (long) selectedSeq;
             this.browser = new JBCefBrowser();
-            this.actionQuery = JBCefJSQuery.create(browser);
+            this.actionQuery = JBCefJSQuery.create((JBCefBrowserBase) browser);
             this.actionQuery.addHandler(request -> {
                 try {
                     JsonElement parsed = JsonParser.parseString(request);
@@ -514,7 +515,8 @@ final class DshTraceDialog extends DialogWrapper {
             bootstrap.addProperty("sessionId", sessionId);
             bootstrap.add("strings", strings);
             String bootstrapJson = bootstrap.toString().replace("</", "<\\/");
-            return "<!doctype html><html lang=\"zh-CN\"><head><meta charset=\"UTF-8\">"
+            String languageTag = com.intellij.DynamicBundle.getLocale().toLanguageTag();
+            return "<!doctype html><html lang=\"" + languageTag + "\"><head><meta charset=\"UTF-8\">"
                     + "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1.0\">"
                     + "<style>" + themeCss() + css + "</style></head><body>"
                     + markup(strings) + "<script type=\"application/json\" id=\"trace-bootstrap\">" + bootstrapJson + "</script>"
@@ -527,64 +529,68 @@ final class DshTraceDialog extends DialogWrapper {
 
         private static JsonObject strings() {
             JsonObject value = new JsonObject();
-            value.addProperty("loading", "加载中");
-            value.addProperty("searchPlaceholder", "搜索事件、内容、工具参数或结果…");
-            value.addProperty("older", "更早");
-            value.addProperty("newer", "更新");
-            value.addProperty("followLatest", "跟随最新");
-            value.addProperty("projectionInspector", "Projection Inspector · 只读");
-            value.addProperty("selectRecord", "选择事件或 Projection");
-            value.addProperty("loadingFailed", "加载失败");
-            value.addProperty("sessionError", "会话错误");
-            value.addProperty("waitingForAction", "等待操作");
-            value.addProperty("running", "运行中");
-            value.addProperty("idle", "空闲");
-            value.addProperty("historySyncing", "历史同步中");
-            value.addProperty("noProjections", "当前历史没有 Projection 数据。");
-            value.addProperty("noRows", "没有匹配的 Trace 事件。");
-            value.addProperty("deferredDetail", "选择记录后加载详情，避免一次传输整个日志。");
-            value.addProperty("event", "事件");
-            value.addProperty("turnStep", "Turn / Step");
-            value.addProperty("summary", "摘要");
-            value.addProperty("time", "时间");
-            value.addProperty("rows", "行");
-            value.addProperty("projected", "已投影");
-            value.addProperty("raw", "原始数据");
-            value.addProperty("followLive", "实时跟随");
-            value.addProperty("overview", "运行概览");
-            value.addProperty("timeline", "时间线");
-            value.addProperty("sequence", "顺序");
-            value.addProperty("duration", "耗时");
-            value.addProperty("turns", "Turns");
-            value.addProperty("calls", "调用");
-            value.addProperty("errors", "错误");
-            value.addProperty("inputTokens", "输入 Tokens");
-            value.addProperty("outputTokens", "输出 Tokens");
-            value.addProperty("cacheRead", "缓存读取");
-            value.addProperty("cacheWrite", "缓存写入");
-            value.addProperty("collapse", "折叠");
-            value.addProperty("expand", "展开");
+            value.addProperty("loading", DshBundle.message("dsh.trace.string.loading"));
+            value.addProperty("searchPlaceholder", DshBundle.message("dsh.trace.string.search.placeholder"));
+            value.addProperty("older", DshBundle.message("dsh.trace.string.older"));
+            value.addProperty("newer", DshBundle.message("dsh.trace.string.newer"));
+            value.addProperty("followLatest", DshBundle.message("dsh.trace.string.follow.latest"));
+            value.addProperty("projectionInspector", DshBundle.message("dsh.trace.string.projection.inspector"));
+            value.addProperty("selectRecord", DshBundle.message("dsh.trace.string.select.record"));
+            value.addProperty("loadingFailed", DshBundle.message("dsh.trace.string.loading.failed"));
+            value.addProperty("sessionError", DshBundle.message("dsh.trace.string.session.error"));
+            value.addProperty("waitingForAction", DshBundle.message("dsh.trace.string.waiting.for.action"));
+            value.addProperty("running", DshBundle.message("dsh.trace.string.running"));
+            value.addProperty("idle", DshBundle.message("dsh.trace.string.idle"));
+            value.addProperty("historySyncing", DshBundle.message("dsh.trace.string.history.syncing"));
+            value.addProperty("noProjections", DshBundle.message("dsh.trace.string.no.projections"));
+            value.addProperty("noRows", DshBundle.message("dsh.trace.string.no.rows"));
+            value.addProperty("deferredDetail", DshBundle.message("dsh.trace.string.deferred.detail"));
+            value.addProperty("event", DshBundle.message("dsh.trace.string.event"));
+            value.addProperty("turnStep", DshBundle.message("dsh.trace.string.turn.step"));
+            value.addProperty("summary", DshBundle.message("dsh.trace.string.summary"));
+            value.addProperty("time", DshBundle.message("dsh.trace.string.time"));
+            value.addProperty("rows", DshBundle.message("dsh.trace.string.rows"));
+            value.addProperty("projected", DshBundle.message("dsh.trace.string.projected"));
+            value.addProperty("raw", DshBundle.message("dsh.trace.string.raw"));
+            value.addProperty("followLive", DshBundle.message("dsh.trace.string.follow.live"));
+            value.addProperty("overview", DshBundle.message("dsh.trace.string.overview"));
+            value.addProperty("timeline", DshBundle.message("dsh.trace.string.timeline"));
+            value.addProperty("sequence", DshBundle.message("dsh.trace.string.sequence"));
+            value.addProperty("duration", DshBundle.message("dsh.trace.string.duration"));
+            value.addProperty("turns", DshBundle.message("dsh.trace.string.turns"));
+            value.addProperty("calls", DshBundle.message("dsh.trace.string.calls"));
+            value.addProperty("errors", DshBundle.message("dsh.trace.string.errors"));
+            value.addProperty("inputTokens", DshBundle.message("dsh.trace.string.input.tokens"));
+            value.addProperty("outputTokens", DshBundle.message("dsh.trace.string.output.tokens"));
+            value.addProperty("cacheRead", DshBundle.message("dsh.trace.string.cache.read"));
+            value.addProperty("cacheWrite", DshBundle.message("dsh.trace.string.cache.write"));
+            value.addProperty("collapse", DshBundle.message("dsh.trace.string.collapse"));
+            value.addProperty("expand", DshBundle.message("dsh.trace.string.expand"));
             return value;
         }
 
+        private static String h(String key) {
+            return escapeHtml(DshBundle.message(key));
+        }
+
         private static String markup(JsonObject strings) {
-            return "<div class=\"app\"><header><div id=\"title\" class=\"title\">DSH Trace</div>"
-                    + "<div class=\"status\"><span id=\"dot\" class=\"dot\"></span><span id=\"statusText\">加载中</span></div></header>"
-                    + "<div class=\"toolbar\"><input id=\"search\" placeholder=\"搜索事件、内容、工具参数或结果…\">"
-                    + "<span id=\"counts\" class=\"counts\"></span><button id=\"timelineMode\" class=\"secondary\">顺序</button>"
-                    + "<button id=\"older\" class=\"secondary\">更早</button><button id=\"newer\" class=\"secondary\">更新</button>"
-                    + "<button id=\"latest\" class=\"secondary\">跟随最新</button></div>"
-                    + "<section class=\"overview\">" + metric("Duration", "metricDuration") + metric("Turns", "metricTurns")
-                    + metric("Calls", "metricCalls") + metric("Errors", "metricErrors") + metric("Input Tokens", "metricInput")
-                    + metric("Output Tokens", "metricOutput") + metric("Cache Read", "metricCacheRead") + metric("Cache Write", "metricCacheWrite") + "</section>"
-                    + "<section class=\"timeline\"><div class=\"section-title\">时间线</div><div class=\"timeline-scale\">"
+            return "<div class=\"app\"><header><div id=\"title\" class=\"title\">" + h("dsh.trace.markup.title") + "</div>"
+                    + "<div class=\"status\"><span id=\"dot\" class=\"dot\"></span><span id=\"statusText\">" + h("dsh.trace.string.loading") + "</span></div></header>"
+                    + "<div class=\"toolbar\"><input id=\"search\" placeholder=\"" + h("dsh.trace.string.search.placeholder") + "\">"
+                    + "<span id=\"counts\" class=\"counts\"></span><button id=\"timelineMode\" class=\"secondary\">" + h("dsh.trace.string.sequence") + "</button>"
+                    + "<button id=\"older\" class=\"secondary\">" + h("dsh.trace.string.older") + "</button><button id=\"newer\" class=\"secondary\">" + h("dsh.trace.string.newer") + "</button>"
+                    + "<button id=\"latest\" class=\"secondary\">" + h("dsh.trace.string.follow.latest") + "</button></div>"
+                    + "<section class=\"overview\">" + metric(h("dsh.trace.string.duration"), "metricDuration") + metric(h("dsh.trace.string.turns"), "metricTurns")
+                    + metric(h("dsh.trace.string.calls"), "metricCalls") + metric(h("dsh.trace.string.errors"), "metricErrors") + metric(h("dsh.trace.string.input.tokens"), "metricInput")
+                    + metric(h("dsh.trace.string.output.tokens"), "metricOutput") + metric(h("dsh.trace.string.cache.read"), "metricCacheRead") + metric(h("dsh.trace.string.cache.write"), "metricCacheWrite") + "</section>"
+                    + "<section class=\"timeline\"><div class=\"section-title\">" + h("dsh.trace.string.timeline") + "</div><div class=\"timeline-scale\">"
                     + "<span id=\"timelineStart\">—</span><span id=\"timelineEnd\">—</span></div><div id=\"timelineLanes\" class=\"timeline-lanes\"></div></section>"
                     + "<div class=\"layout\"><div class=\"ledger-shell\"><section class=\"section projection-section\">"
-                    + "<div class=\"section-title\">Projection Inspector · 只读</div><div id=\"projections\" class=\"projections\"></div></section>"
-                    + "<div class=\"ledger-head\"><div># / seq</div><div>事件</div><div>Turn / Step</div><div>摘要</div><div>时间</div></div>"
+                    + "<div class=\"section-title\">" + h("dsh.trace.string.projection.inspector") + "</div><div id=\"projections\" class=\"projections\"></div></section>"
+                    + "<div class=\"ledger-head\"><div># / seq</div><div>" + h("dsh.trace.string.event") + "</div><div>" + h("dsh.trace.string.turn.step") + "</div><div>" + h("dsh.trace.string.summary") + "</div><div>" + h("dsh.trace.string.time") + "</div></div>"
                     + "<div id=\"ledger\" class=\"ledger\"></div></div><aside class=\"inspector\"><div class=\"inspector-head\">"
-                    + "<div id=\"detailKind\" class=\"inspector-kind\">Inspector</div><div id=\"detailTitle\" class=\"inspector-title\">选择事件或 Projection</div></div>"
-                    + "<div class=\"tabs\"><button data-tab=\"summary\" class=\"active\">摘要</button><button data-tab=\"raw\">原始数据</button></div>"
+                    + "<div id=\"detailKind\" class=\"inspector-kind\">" + h("dsh.trace.markup.inspector") + "</div><div id=\"detailTitle\" class=\"inspector-title\">" + h("dsh.trace.string.select.record") + "</div></div>"
+                    + "<div class=\"tabs\"><button data-tab=\"summary\" class=\"active\">" + h("dsh.trace.string.summary") + "</button><button data-tab=\"raw\">" + h("dsh.trace.string.raw") + "</button></div>"
                     + "<div class=\"detail\"><div id=\"summaryDetail\"></div><pre id=\"rawDetail\" class=\"hidden\"></pre></div></aside></div></div>";
         }
 
