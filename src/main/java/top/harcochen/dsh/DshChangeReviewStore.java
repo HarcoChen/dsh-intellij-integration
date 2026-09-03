@@ -562,7 +562,7 @@ final class DshChangeReviewStore {
 
     private static String conflictMessage(List<String> conflicts) {
         List<String> shown = conflicts.subList(0, Math.min(5, conflicts.size()));
-        String remaining = conflicts.size() > 5 ? " and " + (conflicts.size() - 5) + " more" : "";
+        String remaining = conflicts.size() > 5 ? " " + DshBundle.message("dsh.change.review.restore.conflict.more", conflicts.size() - 5) : "";
         return DshBundle.message("dsh.change.review.restore.conflict")
                 + " " + String.join(", ", shown) + remaining;
     }

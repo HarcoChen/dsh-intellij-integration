@@ -151,15 +151,15 @@ public final class DshSettingsConfigurable implements Configurable {
     @Override
     public void apply() throws ConfigurationException {
         DshSettingsState state = DshSettingsState.getInstance(project);
-        int port = parseRequired(serverPort.getText(), "Server port", 0, 65_535);
+        int port = parseRequired(serverPort.getText(), DshBundle.message("dsh.settings.server.port.label"), 0, 65_535);
         String version = safe(runtimeVersion.getText());
         if (version.isBlank() || !version.matches("[A-Za-z0-9.-]+")) {
             throw new ConfigurationException(DshBundle.message("dsh.settings.error.runtime.version"));
         }
-        int startup = parseRequired(startupTimeout.getText(), "Startup timeout", 1_000, 600_000);
-        int request = parseRequired(requestTimeout.getText(), "Request timeout", 10_000, 3_600_000);
-        int poll = parseRequired(pollInterval.getText(), "Refresh interval", 100, 60_000);
-        int context = parseRequired(maxContextBytes.getText(), "Maximum context bytes", 1_000, 1_000_000);
+        int startup = parseRequired(startupTimeout.getText(), DshBundle.message("dsh.settings.startup.timeout.label"), 1_000, 600_000);
+        int request = parseRequired(requestTimeout.getText(), DshBundle.message("dsh.settings.request.timeout.label"), 10_000, 3_600_000);
+        int poll = parseRequired(pollInterval.getText(), DshBundle.message("dsh.settings.poll.interval.label"), 100, 60_000);
+        int context = parseRequired(maxContextBytes.getText(), DshBundle.message("dsh.settings.max.context.bytes.label"), 1_000, 1_000_000);
         if (safe(command.getText()).isBlank()) {
             throw new ConfigurationException(DshBundle.message("dsh.settings.error.command.empty"));
         }
