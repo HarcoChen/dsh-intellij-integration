@@ -3329,65 +3329,56 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
         JsonObject preset = rows.get(selected);
         String id = string(preset, "id");
         boolean shipped = "system".equals(string(preset, "trust"));
-        List<String> actionLabels = new ArrayList<>(List.of(DshBundle.message("dsh.presets.action.view.composition"), DshBundle.message("dsh.presets.action.use.for.next.session")));
-        // Authoring is copy-only, and a shipped preset's install is not the
-        // user's to manage, so only a locally authored one can be edited.
-        if (authorable) actionLabels.add(DshBundle.message("dsh.presets.action.copy"));
+        List<String> actionLabels = new ArrayList<>();
+        List<String> actionIds = new ArrayList<>();
+        actionLabels.add(DshBundle.message("dsh.presets.action.view.composition")); actionIds.add("view");
+        actionLabels.add(DshBundle.message("dsh.presets.action.use.for.next.session")); actionIds.add("use");
+        if (authorable) { actionLabels.add(DshBundle.message("dsh.presets.action.copy")); actionIds.add("copy"); }
         if (!shipped) {
-            actionLabels.add(DshBundle.message("dsh.presets.action.open.directory"));
-            actionLabels.add(DshBundle.message("dsh.presets.action.delete"));
+            actionLabels.add(DshBundle.message("dsh.presets.action.open.directory")); actionIds.add("open-dir");
+            actionLabels.add(DshBundle.message("dsh.presets.action.delete")); actionIds.add("delete");
         }
-        actionLabels.add(DshBundle.message("dsh.presets.action.cancel"));
-        String[] actions = actionLabels.toArray(new String[0]);
+        actionLabels.add(DshBundle.message("dsh.presets.action.cancel")); actionIds.add("cancel");
+        String[] displayLabels = actionLabels.toArray(new String[0]);
         int chosen = Messages.showChooseDialog(project, stringOr(preset, "name", id) + "\n"
-                        + stringOr(preset, "description", "<no description>"), DshBundle.message("dsh.presets.action.dialog.title"),
-                Messages.getQuestionIcon(), actions, actions[0]);
-        if (chosen < 0 || chosen >= actions.length) return;
-        String action = actions[chosen];
-        if (DshBundle.message("dsh.presets.action.copy").equals(action)) {
-            copyAgentPreset(id);
-            return;
-        }
-        if (DshBundle.message("dsh.presets.action.open.directory").equals(action)) {
-            operations.execute(() -> {
+                        + stringOr(preset, "description", DshBundle.message("dsh.presets.no.description")),
+                DshBundle.message("dsh.presets.action.dialog.title"),
+                Messages.getQuestionIcon(), displayLabels, displayLabels[0]);
+        if (chosen < 0 || chosen >= actionIds.size()) return;
+        switch (actionIds.get(chosen)) {
+            case "copy" -> copyAgentPreset(id);
+            case "open-dir" -> operations.execute(() -> {
                 try {
-                    // A deployment with no native opener answers with the
-                    // resolved directory instead, which is what to show.
                     client.openAgentPresetDocument(id);
                 } catch (Exception error) {
                     notify(DshBundle.message("dsh.presets.open.failed", message(error)));
                 }
             });
-            return;
-        }
-        if (DshBundle.message("dsh.presets.action.delete").equals(action)) {
-            int confirmed = Messages.showYesNoDialog(project,
-                    DshBundle.message("dsh.presets.delete.confirm.message", stringOr(preset, "name", id)),
-                    DshBundle.message("dsh.presets.delete.confirm.title"), Messages.getWarningIcon());
-            if (confirmed != Messages.YES) return;
-            operations.execute(() -> {
-                try {
-                    client.removeAgentPreset(id);
-                    agentPresetCatalog = new JsonArray();
-                    notify(DshBundle.message("dsh.presets.delete.success", id));
-                    refreshState();
-                } catch (Exception error) {
-                    notify(DshBundle.message("dsh.presets.delete.failed", message(error)));
-                }
-            });
-            return;
-        }
-        int legacy = DshBundle.message("dsh.presets.action.view.composition").equals(action) ? 0 : DshBundle.message("dsh.presets.action.use.for.next.session").equals(action) ? 1 : -1;
-        if (legacy == 0) {
-            operations.execute(() -> {
+            case "delete" -> {
+                int confirmed = Messages.showYesNoDialog(project,
+                        DshBundle.message("dsh.presets.delete.confirm.message", stringOr(preset, "name", id)),
+                        DshBundle.message("dsh.presets.delete.confirm.title"), Messages.getWarningIcon());
+                if (confirmed != Messages.YES) return;
+                operations.execute(() -> {
+                    try {
+                        client.removeAgentPreset(id);
+                        agentPresetCatalog = new JsonArray();
+                        notify(DshBundle.message("dsh.presets.delete.success", id));
+                        refreshState();
+                    } catch (Exception error) {
+                        notify(DshBundle.message("dsh.presets.delete.failed", message(error)));
+                    }
+                });
+            }
+            case "view" -> operations.execute(() -> {
                 try {
                     JsonObject document = client.readAgentPreset(id);
                     StringBuilder text = new StringBuilder();
                     text.append(stringOr(document, "name", id)).append('\n');
-                    text.append("Trust: ").append(stringOr(document, "trust", "user")).append('\n');
+                    text.append(DshBundle.message("dsh.presets.detail.trust")).append(stringOr(document, "trust", "user")).append('\n');
                     String description = string(document, "description");
                     if (description != null && !description.isBlank()) {
-                        text.append("Description: ").append(description).append('\n');
+                        text.append(DshBundle.message("dsh.presets.detail.description")).append(description).append('\n');
                     }
                     text.append('\n').append(stringOr(document, "content", ""));
                     showTextDialog(DshBundle.message("dsh.presets.detail.title", id), text.toString());
@@ -3395,8 +3386,8 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
                     notify(DshBundle.message("dsh.presets.read.detail.failed", message(error)));
                 }
             });
-        } else if (legacy == 1) {
-            selectAgentPreset(id);
+            case "use" -> selectAgentPreset(id);
+            default -> { }
         }
     }
 

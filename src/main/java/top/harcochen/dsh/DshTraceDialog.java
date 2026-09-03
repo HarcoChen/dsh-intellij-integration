@@ -14,6 +14,7 @@ import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.vfs.LocalFileSystem;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.ui.jcef.JBCefBrowser;
+import com.intellij.ui.jcef.JBCefBrowserBase;
 import com.intellij.ui.jcef.JBCefJSQuery;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -109,7 +110,7 @@ final class DshTraceDialog extends DialogWrapper {
             this.client = runtime.getClient();
             this.pendingSeq = selectedSeq < 0 ? null : (long) selectedSeq;
             this.browser = new JBCefBrowser();
-            this.actionQuery = JBCefJSQuery.create(browser);
+            this.actionQuery = JBCefJSQuery.create((JBCefBrowserBase) browser);
             this.actionQuery.addHandler(request -> {
                 try {
                     JsonElement parsed = JsonParser.parseString(request);
@@ -568,24 +569,28 @@ final class DshTraceDialog extends DialogWrapper {
             return value;
         }
 
+        private static String h(String key) {
+            return escapeHtml(DshBundle.message(key));
+        }
+
         private static String markup(JsonObject strings) {
-            return "<div class=\"app\"><header><div id=\"title\" class=\"title\">" + DshBundle.message("dsh.trace.markup.title") + "</div>"
-                    + "<div class=\"status\"><span id=\"dot\" class=\"dot\"></span><span id=\"statusText\">" + DshBundle.message("dsh.trace.string.loading") + "</span></div></header>"
-                    + "<div class=\"toolbar\"><input id=\"search\" placeholder=\"" + DshBundle.message("dsh.trace.string.search.placeholder") + "\">"
-                    + "<span id=\"counts\" class=\"counts\"></span><button id=\"timelineMode\" class=\"secondary\">" + DshBundle.message("dsh.trace.string.sequence") + "</button>"
-                    + "<button id=\"older\" class=\"secondary\">" + DshBundle.message("dsh.trace.string.older") + "</button><button id=\"newer\" class=\"secondary\">" + DshBundle.message("dsh.trace.string.newer") + "</button>"
-                    + "<button id=\"latest\" class=\"secondary\">" + DshBundle.message("dsh.trace.string.follow.latest") + "</button></div>"
-                    + "<section class=\"overview\">" + metric(DshBundle.message("dsh.trace.string.duration"), "metricDuration") + metric(DshBundle.message("dsh.trace.string.turns"), "metricTurns")
-                    + metric(DshBundle.message("dsh.trace.string.calls"), "metricCalls") + metric(DshBundle.message("dsh.trace.string.errors"), "metricErrors") + metric(DshBundle.message("dsh.trace.string.input.tokens"), "metricInput")
-                    + metric(DshBundle.message("dsh.trace.string.output.tokens"), "metricOutput") + metric(DshBundle.message("dsh.trace.string.cache.read"), "metricCacheRead") + metric(DshBundle.message("dsh.trace.string.cache.write"), "metricCacheWrite") + "</section>"
-                    + "<section class=\"timeline\"><div class=\"section-title\">" + DshBundle.message("dsh.trace.string.timeline") + "</div><div class=\"timeline-scale\">"
+            return "<div class=\"app\"><header><div id=\"title\" class=\"title\">" + h("dsh.trace.markup.title") + "</div>"
+                    + "<div class=\"status\"><span id=\"dot\" class=\"dot\"></span><span id=\"statusText\">" + h("dsh.trace.string.loading") + "</span></div></header>"
+                    + "<div class=\"toolbar\"><input id=\"search\" placeholder=\"" + h("dsh.trace.string.search.placeholder") + "\">"
+                    + "<span id=\"counts\" class=\"counts\"></span><button id=\"timelineMode\" class=\"secondary\">" + h("dsh.trace.string.sequence") + "</button>"
+                    + "<button id=\"older\" class=\"secondary\">" + h("dsh.trace.string.older") + "</button><button id=\"newer\" class=\"secondary\">" + h("dsh.trace.string.newer") + "</button>"
+                    + "<button id=\"latest\" class=\"secondary\">" + h("dsh.trace.string.follow.latest") + "</button></div>"
+                    + "<section class=\"overview\">" + metric(h("dsh.trace.string.duration"), "metricDuration") + metric(h("dsh.trace.string.turns"), "metricTurns")
+                    + metric(h("dsh.trace.string.calls"), "metricCalls") + metric(h("dsh.trace.string.errors"), "metricErrors") + metric(h("dsh.trace.string.input.tokens"), "metricInput")
+                    + metric(h("dsh.trace.string.output.tokens"), "metricOutput") + metric(h("dsh.trace.string.cache.read"), "metricCacheRead") + metric(h("dsh.trace.string.cache.write"), "metricCacheWrite") + "</section>"
+                    + "<section class=\"timeline\"><div class=\"section-title\">" + h("dsh.trace.string.timeline") + "</div><div class=\"timeline-scale\">"
                     + "<span id=\"timelineStart\">—</span><span id=\"timelineEnd\">—</span></div><div id=\"timelineLanes\" class=\"timeline-lanes\"></div></section>"
                     + "<div class=\"layout\"><div class=\"ledger-shell\"><section class=\"section projection-section\">"
-                    + "<div class=\"section-title\">" + DshBundle.message("dsh.trace.string.projection.inspector") + "</div><div id=\"projections\" class=\"projections\"></div></section>"
-                    + "<div class=\"ledger-head\"><div># / seq</div><div>" + DshBundle.message("dsh.trace.string.event") + "</div><div>" + DshBundle.message("dsh.trace.string.turn.step") + "</div><div>" + DshBundle.message("dsh.trace.string.summary") + "</div><div>" + DshBundle.message("dsh.trace.string.time") + "</div></div>"
+                    + "<div class=\"section-title\">" + h("dsh.trace.string.projection.inspector") + "</div><div id=\"projections\" class=\"projections\"></div></section>"
+                    + "<div class=\"ledger-head\"><div># / seq</div><div>" + h("dsh.trace.string.event") + "</div><div>" + h("dsh.trace.string.turn.step") + "</div><div>" + h("dsh.trace.string.summary") + "</div><div>" + h("dsh.trace.string.time") + "</div></div>"
                     + "<div id=\"ledger\" class=\"ledger\"></div></div><aside class=\"inspector\"><div class=\"inspector-head\">"
-                    + "<div id=\"detailKind\" class=\"inspector-kind\">" + DshBundle.message("dsh.trace.markup.inspector") + "</div><div id=\"detailTitle\" class=\"inspector-title\">" + DshBundle.message("dsh.trace.string.select.record") + "</div></div>"
-                    + "<div class=\"tabs\"><button data-tab=\"summary\" class=\"active\">" + DshBundle.message("dsh.trace.string.summary") + "</button><button data-tab=\"raw\">" + DshBundle.message("dsh.trace.string.raw") + "</button></div>"
+                    + "<div id=\"detailKind\" class=\"inspector-kind\">" + h("dsh.trace.markup.inspector") + "</div><div id=\"detailTitle\" class=\"inspector-title\">" + h("dsh.trace.string.select.record") + "</div></div>"
+                    + "<div class=\"tabs\"><button data-tab=\"summary\" class=\"active\">" + h("dsh.trace.string.summary") + "</button><button data-tab=\"raw\">" + h("dsh.trace.string.raw") + "</button></div>"
                     + "<div class=\"detail\"><div id=\"summaryDetail\"></div><pre id=\"rawDetail\" class=\"hidden\"></pre></div></aside></div></div>";
         }
 

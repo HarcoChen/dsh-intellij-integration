@@ -6,15 +6,13 @@ import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.PropertyKey;
 
-public final class DshBundle extends DynamicBundle {
+public final class DshBundle {
 
     @NonNls
     private static final String BUNDLE = "messages.DshBundle";
-    private static final DshBundle INSTANCE = new DshBundle();
+    private static final DynamicBundle INSTANCE = new DynamicBundle(DshBundle.class, BUNDLE);
 
-    private DshBundle() {
-        super(BUNDLE);
-    }
+    private DshBundle() {}
 
     @NotNull
     @Nls

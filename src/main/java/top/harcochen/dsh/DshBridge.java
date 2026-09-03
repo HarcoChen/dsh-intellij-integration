@@ -8,6 +8,7 @@ import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.util.Disposer;
 import com.intellij.ui.jcef.JBCefApp;
 import com.intellij.ui.jcef.JBCefBrowser;
+import com.intellij.ui.jcef.JBCefBrowserBase;
 import com.intellij.ui.jcef.JBCefJSQuery;
 import org.jetbrains.annotations.NotNull;
 
@@ -59,7 +60,7 @@ public final class DshBridge implements Disposable {
         }
         this.actionConsumer = actionConsumer;
         this.browser = new JBCefBrowser();
-        this.actionQuery = JBCefJSQuery.create(browser);
+        this.actionQuery = JBCefJSQuery.create((JBCefBrowserBase) browser);
         this.lookAndFeelListener = ignored -> updateThemeLater();
         UIManager.addPropertyChangeListener(lookAndFeelListener);
         this.actionQuery.addHandler(request -> {
