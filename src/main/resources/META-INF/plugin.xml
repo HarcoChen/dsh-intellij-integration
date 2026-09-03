@@ -39,6 +39,9 @@
                              displayName="DeepSeek Harness"
                              instance="top.harcochen.dsh.DshSettingsConfigurable"/>
         <notificationGroup id="DeepSeek Harness" displayType="BALLOON" />
+        <statusBarWidgetFactory id="DshBalance"
+                                implementation="top.harcochen.dsh.DshBalanceWidget$Factory"
+                                order="after Position"/>
     </extensions>
     <actions>
         <action id="Dsh.Open" class="top.harcochen.dsh.action.DshOpenAction"
