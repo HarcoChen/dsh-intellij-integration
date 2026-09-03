@@ -156,6 +156,14 @@ final class DshTraceProjector {
         return new Projection(rows, projectionItems(history), seqToRowId, entries.size());
     }
 
+    /**
+     * Refresh only the independently changing projection cells while retaining
+     * the event-derived ledger rows and sequence index.
+     */
+    static Projection withProjectionItems(Projection current, JsonObject history) {
+        return new Projection(current.rows(), projectionItems(history), current.seqToRowId(), current.totalEvents());
+    }
+
     private static List<Entry> entries(JsonObject history) {
         JsonArray source = array(history, "events");
         List<Entry> result = new ArrayList<>();

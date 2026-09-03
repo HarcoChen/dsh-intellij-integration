@@ -37,6 +37,17 @@ public final class DshActions {
         });
     }
 
+    public static void configureApiKey(Project project) {
+        openToolWindow(project);
+        ToolWindow window = ToolWindowManager.getInstance(project).getToolWindow("DSH");
+        if (window == null) return;
+        window.show(() -> {
+            if (window.getContentManager().getContentCount() == 0) return;
+            var component = window.getContentManager().getContent(0).getComponent();
+            if (component instanceof DshToolWindowPanel panel) panel.runCommand("configureApiKey");
+        });
+    }
+
     public static void newSession(Project project) {
         openToolWindow(project);
         ToolWindow window = ToolWindowManager.getInstance(project).getToolWindow("DSH");
