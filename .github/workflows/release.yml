@@ -95,6 +95,51 @@ jobs:
             exit 1
           fi
 
+      - name: Generate changelog from PRs
+        id: changelog
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ inputs.tag || github.ref_name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Find the previous tag to scope the release notes.
+          PREV_TAG="$(git tag --sort=-v:refname | grep -v "^${TAG}$" | head -1 || true)"
+
+          # Use the GitHub API to generate categorized release notes (reads .github/release.yml).
+          ARGS=(--repo "${GITHUB_REPOSITORY}" --tag-name "${TAG}")
+          if [[ -n "${PREV_TAG}" ]]; then
+            ARGS+=(--previous-tag-name "${PREV_TAG}")
+          fi
+          BODY="$(gh api repos/${GITHUB_REPOSITORY}/releases/generate-notes \
+            -f tag_name="${TAG}" \
+            ${PREV_TAG:+-f previous_tag_name="${PREV_TAG}"} \
+            --jq '.body' 2>/dev/null || echo "")"
+
+          if [[ -z "${BODY}" ]]; then
+            echo "PLUGIN_CHANGE_NOTES=<p>Release ${TAG}.</p>" >> "${GITHUB_ENV}"
+          else
+            # Convert markdown to minimal HTML for the JetBrains Marketplace.
+            # Keep it simple: headings → <b>, list items → <li>, paragraphs → <p>.
+            HTML="$(echo "${BODY}" \
+              | sed 's/^## \(.*\)/<b>\1<\/b>/' \
+              | sed 's/^\* /<li>/' \
+              | sed '/^$/d' \
+              | tr '\n' ' ' \
+              | sed 's/<b>/<\/ul><b>/g; s/<\/b>/<\/b><ul>/g' \
+              | sed 's|^</ul>||')"
+            # Close the last <ul> if present.
+            if echo "${HTML}" | grep -q '<ul>'; then
+              HTML="${HTML}</ul>"
+            fi
+            # GitHub env vars use a heredoc for multiline values.
+            {
+              echo "PLUGIN_CHANGE_NOTES<<CHANGE_NOTES_EOF"
+              echo "${HTML}"
+              echo "CHANGE_NOTES_EOF"
+            } >> "${GITHUB_ENV}"
+          fi
+
       - name: Build, verify, sign, and verify signature
         run: ./gradlew clean buildPlugin verifyPlugin signPlugin verifyPluginSignature
 

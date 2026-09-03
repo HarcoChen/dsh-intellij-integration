@@ -1,0 +1,76 @@
+name: PR
+
+on:
+  pull_request_target:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  pull-requests: write
+
+jobs:
+  # ── Conventional-commit title gate ──────────────────────────────────
+  lint-title:
+    name: Lint PR title
+    runs-on: ubuntu-latest
+    steps:
+      - uses: amannn/action-semantic-pull-request@v5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          types: |
+            feat
+            fix
+            docs
+            style
+            refactor
+            perf
+            test
+            build
+            ci
+            chore
+            revert
+          requireScope: false
+          subjectPattern: ^.+$
+          subjectPatternError: "PR title must have a non-empty description after the type prefix."
+
+  # ── Auto-label by conventional prefix ───────────────────────────────
+  label:
+    name: Auto-label
+    runs-on: ubuntu-latest
+    steps:
+      - name: Map PR title prefix to label
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          prefix="${PR_TITLE%%:*}"
+          # Strip optional scope: "feat(lock)" → "feat"
+          prefix="${prefix%%(*}"
+
+          case "${prefix}" in
+            feat)     label="feature"       ;;
+            fix)      label="bug"           ;;
+            docs)     label="documentation" ;;
+            perf)     label="performance"   ;;
+            refactor) label="refactor"      ;;
+            test)     label="test"          ;;
+            ci|build) label="ci"            ;;
+            chore)    label="chore"         ;;
+            revert)   label="revert"        ;;
+            style)    label="style"         ;;
+            *)        label=""              ;;
+          esac
+
+          if [[ -z "${label}" ]]; then
+            echo "No conventional prefix matched; skipping label."
+            exit 0
+          fi
+
+          # Create the label if it doesn't exist yet (idempotent).
+          gh label create "${label}" --repo "${REPO}" --force 2>/dev/null || true
+          gh pr edit "${PR_NUMBER}" --repo "${REPO}" --add-label "${label}"
+          echo "Labeled PR #${PR_NUMBER} with '${label}'."
