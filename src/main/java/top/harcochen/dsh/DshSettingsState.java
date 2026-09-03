@@ -32,6 +32,7 @@ public final class DshSettingsState implements PersistentStateComponent<DshSetti
     public String apiKeyEnv = "DEEPSEEK_API_KEY";
     public String agentStatusLabel = "";
     public boolean enableEffortKnob = true;
+    public int balanceRefreshIntervalMs = 30_000;
 
     public static DshSettingsState getInstance(@NotNull Project project) {
         return project.getService(DshSettingsState.class);
@@ -59,6 +60,7 @@ public final class DshSettingsState implements PersistentStateComponent<DshSetti
         apiKeyEnv = state.apiKeyEnv;
         agentStatusLabel = state.agentStatusLabel;
         enableEffortKnob = state.enableEffortKnob;
+        balanceRefreshIntervalMs = state.balanceRefreshIntervalMs;
     }
 
     private static String defaultPackageManagerCommand() {

@@ -76,6 +76,8 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
     private final ScheduledExecutorService poller;
     private final ExecutorService operations;
     private final AtomicBoolean refreshInFlight = new AtomicBoolean();
+    /** Coalesces bursts of mux/status updates into one EDT state publish. */
+    private final AtomicBoolean statePostPending = new AtomicBoolean();
     private final Consumer<DshRuntimeService.RuntimeStatus> statusListener;
     private final DshMarkdownRenderCache markdownRenderCache = new DshMarkdownRenderCache();
     private final DshMuxClient muxClient;
@@ -87,6 +89,8 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
     private final Map<String, JsonArray> jobsBySession = new LinkedHashMap<>();
     /** Live `session/projection` cells per session under the higher-seq-wins rule. */
     private final Map<String, Map<String, ProjectionCell>> projectionCellsBySession = new LinkedHashMap<>();
+    /** Memoized event projection per session; projection cells are intentionally excluded. */
+    private final Map<String, HistoryProjectionCache> historyProjectionCaches = new LinkedHashMap<>();
     private final DshChangeReviewStore changeReviews;
     private final Map<String, JsonObject> settingsNamespaces = new LinkedHashMap<>();
     private final java.util.concurrent.atomic.AtomicLong settingsGeneration = new java.util.concurrent.atomic.AtomicLong();
@@ -812,6 +816,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
             queueBySession.keySet().retainAll(live);
             jobsBySession.keySet().retainAll(live);
             projectionCellsBySession.keySet().retainAll(live);
+            historyProjectionCaches.keySet().retainAll(live);
             commandCatalogs.keySet().retainAll(live);
             skillCatalogs.keySet().retainAll(live);
             interactionsBySession.keySet().retainAll(live);
@@ -893,8 +898,9 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
                     DshSettingsState settings = DshSettingsState.getInstance(project);
                     String statusLabel = settings.agentStatusLabel == null || settings.agentStatusLabel.isBlank()
                             ? DshBundle.message("dsh.status.thinking") : settings.agentStatusLabel.trim();
-                    projection = DshMessageProjector.project(history, statusLabel);
-                    messages = markdownRenderCache.render(projection.messages, "session:" + sessionId);
+                    HistoryProjectionCache cached = projectHistory(sessionId, history, statusLabel);
+                    projection = cached.projection;
+                    messages = cached.messages;
                     seedProjections(sessionId, history);
                     changeReviews.observe(sessionId, project.getBasePath(), history);
                     refreshCommandCatalog(sessionId);
@@ -923,6 +929,32 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
         } finally {
             refreshInFlight.set(false);
             postStateLater();
+        }
+    }
+
+    /**
+     * Project and render only when the event log changed. History responses also
+     * carry live projection cells, so comparing the complete response would
+     * defeat the cache whenever a todo or token counter advances.
+     */
+    private HistoryProjectionCache projectHistory(String session, JsonObject history, String statusLabel) {
+        JsonArray events = history != null && history.has("events") && history.get("events").isJsonArray()
+                ? history.getAsJsonArray("events") : new JsonArray();
+        synchronized (interactionLock) {
+            HistoryProjectionCache cached = historyProjectionCaches.get(session);
+            if (cached != null && cached.matches(events, statusLabel)) return cached;
+        }
+
+        DshMessageProjector.Projection projected = DshMessageProjector.project(history, statusLabel);
+        JsonArray rendered = markdownRenderCache.render(projected.messages, "session:" + session);
+        HistoryProjectionCache fresh = new HistoryProjectionCache(events, statusLabel, projected, rendered);
+        synchronized (interactionLock) {
+            // A second refresh cannot normally race this single-flight poller,
+            // but keep the cache coherent if a session is pruned concurrently.
+            HistoryProjectionCache cached = historyProjectionCaches.get(session);
+            if (cached != null && cached.matches(events, statusLabel)) return cached;
+            historyProjectionCaches.put(session, fresh);
+            return fresh;
         }
     }
 
@@ -1062,8 +1094,11 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
     }
 
     private void postStateLater() {
-        if (disposed) return;
-        SwingUtilities.invokeLater(this::postState);
+        if (disposed || !statePostPending.compareAndSet(false, true)) return;
+        SwingUtilities.invokeLater(() -> {
+            statePostPending.set(false);
+            if (!disposed) postState();
+        });
     }
 
     private void postState() {
@@ -1954,6 +1989,26 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
         private ProjectionCell(JsonElement value, long seq) {
             this.value = value;
             this.seq = seq;
+        }
+    }
+
+    /** Cached result of the event-only part of one session history response. */
+    private static final class HistoryProjectionCache {
+        private final JsonArray events;
+        private final String statusLabel;
+        private final DshMessageProjector.Projection projection;
+        private final JsonArray messages;
+
+        private HistoryProjectionCache(JsonArray events, String statusLabel,
+                                       DshMessageProjector.Projection projection, JsonArray messages) {
+            this.events = events;
+            this.statusLabel = statusLabel;
+            this.projection = projection;
+            this.messages = messages;
+        }
+
+        private boolean matches(JsonArray candidateEvents, String candidateStatusLabel) {
+            return java.util.Objects.equals(statusLabel, candidateStatusLabel) && events.equals(candidateEvents);
         }
     }
 

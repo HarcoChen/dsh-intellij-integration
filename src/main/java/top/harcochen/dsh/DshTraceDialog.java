@@ -149,7 +149,9 @@ final class DshTraceDialog extends DialogWrapper {
                     next = client.traceHistory(sessionId);
                     lastTailHash = next.hashCode();
                 }
-                DshTraceProjector.Projection nextProjection = DshTraceProjector.project(next);
+                DshTraceProjector.Projection nextProjection = !baselineLoaded || !sameEvents(history, next)
+                        ? DshTraceProjector.project(next)
+                        : DshTraceProjector.withProjectionItems(projection, next);
                 history = next;
                 projection = nextProjection;
                 baselineLoaded = true;
@@ -484,6 +486,16 @@ final class DshTraceDialog extends DialogWrapper {
             result.add("events", events);
             result.addProperty("hasMore", false);
             return result;
+        }
+
+        /** Projection cells change independently of the durable event ledger. */
+        private static boolean sameEvents(JsonObject left, JsonObject right) {
+            return historyEvents(left).equals(historyEvents(right));
+        }
+
+        private static JsonArray historyEvents(JsonObject value) {
+            return value != null && value.has("events") && value.get("events").isJsonArray()
+                    ? value.getAsJsonArray("events") : new JsonArray();
         }
 
         private static void addEvents(Map<Long, JsonElement> target, JsonObject page) {
