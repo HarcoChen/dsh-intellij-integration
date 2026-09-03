@@ -5,10 +5,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonNull;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import com.google.gson.JsonPrimitive;
 import com.intellij.openapi.diagnostic.Logger;
-import org.jetbrains.annotations.NotNull;
-
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -18,14 +15,14 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.UUID;
 import java.util.function.Supplier;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * Small, typed-at-the-boundary HTTP client for the Harness Web RPC surface.
  *
- * It deliberately keeps the business value as Gson JSON. Harness owns the
- * evolving schemas; the IntelliJ Platform adapter validates the stable envelope and lets
- * the presentation layer consume extension projections without silently
- * dropping newer fields.
+ * <p>It deliberately keeps the business value as Gson JSON. Harness owns the evolving schemas; the
+ * IntelliJ Platform adapter validates the stable envelope and lets the presentation layer consume
+ * extension projections without silently dropping newer fields.
  */
 public final class DshRpcClient {
     private static final Logger LOG = Logger.getInstance(DshRpcClient.class);
@@ -36,15 +33,17 @@ public final class DshRpcClient {
     public DshRpcClient(@NotNull Supplier<String> baseUrl, @NotNull Supplier<Integer> timeoutMs) {
         this.baseUrl = baseUrl;
         this.timeoutMs = timeoutMs;
-        this.httpClient = HttpClient.newBuilder()
-                .version(HttpClient.Version.HTTP_1_1)
-                .connectTimeout(Duration.ofSeconds(5))
-                .followRedirects(HttpClient.Redirect.NORMAL)
-                .build();
+        this.httpClient =
+                HttpClient.newBuilder()
+                        .version(HttpClient.Version.HTTP_1_1)
+                        .connectTimeout(Duration.ofSeconds(5))
+                        .followRedirects(HttpClient.Redirect.NORMAL)
+                        .build();
     }
 
     /** Execute one Harness RPC and return the value field of its success envelope. */
-    public JsonElement call(@NotNull String method, @NotNull JsonObject payload) throws DshRpcException {
+    public JsonElement call(@NotNull String method, @NotNull JsonObject payload)
+            throws DshRpcException {
         String configured = normalizeUrl(baseUrl.get());
         if (configured == null) {
             throw new DshRpcException(method, "not-connected", "DSH Runtime is not connected");
@@ -57,40 +56,58 @@ public final class DshRpcClient {
         requestBody.addProperty("method", method);
         requestBody.add("payload", payload.deepCopy());
 
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(configured + "/api/" + method))
-                .timeout(Duration.ofMillis(clampedTimeout()))
-                .header("content-type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(requestBody.toString()))
-                .build();
+        HttpRequest request =
+                HttpRequest.newBuilder()
+                        .uri(URI.create(configured + "/api/" + method))
+                        .timeout(Duration.ofMillis(clampedTimeout()))
+                        .header("content-type", "application/json")
+                        .POST(HttpRequest.BodyPublishers.ofString(requestBody.toString()))
+                        .build();
         try {
-            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> response =
+                    httpClient.send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
-                throw new DshRpcException(method, "http-" + response.statusCode(),
+                throw new DshRpcException(
+                        method,
+                        "http-" + response.statusCode(),
                         "Harness RPC returned HTTP " + response.statusCode());
             }
             JsonElement parsed;
             try {
                 parsed = JsonParser.parseString(response.body());
             } catch (RuntimeException error) {
-                throw new DshRpcException(method, "invalid-json", "Harness RPC returned invalid JSON", error);
+                throw new DshRpcException(
+                        method, "invalid-json", "Harness RPC returned invalid JSON", error);
             }
             if (!parsed.isJsonObject()) {
-                throw new DshRpcException(method, "invalid-envelope", "Harness RPC returned a non-object envelope");
+                throw new DshRpcException(
+                        method, "invalid-envelope", "Harness RPC returned a non-object envelope");
             }
             JsonObject envelope = parsed.getAsJsonObject();
             if (!"server-response".equals(string(envelope, "type"))
                     || !rpcId.equals(string(envelope, "rpcId"))) {
-                throw new DshRpcException(method, "invalid-envelope", "Harness RPC response envelope did not match the request");
+                throw new DshRpcException(
+                        method,
+                        "invalid-envelope",
+                        "Harness RPC response envelope did not match the request");
             }
             JsonObject result = object(envelope, "result");
             if (result == null || !result.has("ok") || !result.get("ok").isJsonPrimitive()) {
-                throw new DshRpcException(method, "invalid-result", "Harness RPC returned an invalid result envelope");
+                throw new DshRpcException(
+                        method,
+                        "invalid-result",
+                        "Harness RPC returned an invalid result envelope");
             }
             if (!result.get("ok").getAsBoolean()) {
                 JsonObject rpcError = object(result, "error");
-                String code = rpcError == null ? "remote-error" : stringOr(rpcError, "code", "remote-error");
-                String message = rpcError == null ? "Harness rejected the request" : stringOr(rpcError, "message", "Harness rejected the request");
+                String code =
+                        rpcError == null
+                                ? "remote-error"
+                                : stringOr(rpcError, "code", "remote-error");
+                String message =
+                        rpcError == null
+                                ? "Harness rejected the request"
+                                : stringOr(rpcError, "message", "Harness rejected the request");
                 throw new DshRpcException(method, code, message);
             }
             // commands/execute is allowed to omit value; JsonNull gives callers
@@ -102,7 +119,11 @@ public final class DshRpcClient {
             Thread.currentThread().interrupt();
             throw new DshRpcException(method, "interrupted", "Harness RPC was interrupted", error);
         } catch (Exception error) {
-            throw new DshRpcException(method, "transport-error", error.getMessage() == null ? error.toString() : error.getMessage(), error);
+            throw new DshRpcException(
+                    method,
+                    "transport-error",
+                    error.getMessage() == null ? error.toString() : error.getMessage(),
+                    error);
         }
     }
 
@@ -134,7 +155,8 @@ public final class DshRpcClient {
         payload.addProperty("query", query == null ? "" : query);
         JsonObject value = objectValue("session.search", payload);
         return value.has("items") && value.get("items").isJsonArray()
-                ? value.getAsJsonArray("items") : new JsonArray();
+                ? value.getAsJsonArray("items")
+                : new JsonArray();
     }
 
     public JsonObject history(String sessionId, int maxMessages) throws DshRpcException {
@@ -163,7 +185,8 @@ public final class DshRpcClient {
         return result;
     }
 
-    private JsonObject historyPage(String sessionId, Long beforeSeq, int maxMessages) throws DshRpcException {
+    private JsonObject historyPage(String sessionId, Long beforeSeq, int maxMessages)
+            throws DshRpcException {
         JsonObject payload = new JsonObject();
         payload.addProperty("sessionId", sessionId);
         if (beforeSeq != null) payload.addProperty("beforeSeq", beforeSeq);
@@ -172,8 +195,10 @@ public final class DshRpcClient {
     }
 
     private static void addHistoryEvents(Map<Long, JsonElement> target, JsonObject page) {
-        JsonArray source = page.has("events") && page.get("events").isJsonArray()
-                ? page.getAsJsonArray("events") : new JsonArray();
+        JsonArray source =
+                page.has("events") && page.get("events").isJsonArray()
+                        ? page.getAsJsonArray("events")
+                        : new JsonArray();
         for (JsonElement candidate : source) {
             if (!candidate.isJsonObject()) continue;
             JsonObject wrapper = candidate.getAsJsonObject();
@@ -190,18 +215,21 @@ public final class DshRpcClient {
         }
     }
 
-    public JsonObject createSession(String cwd, String workspaceId, String agentPreset) throws DshRpcException {
+    public JsonObject createSession(String cwd, String workspaceId, String agentPreset)
+            throws DshRpcException {
         JsonObject payload = new JsonObject();
         if (workspaceId == null || workspaceId.isBlank()) {
             if (cwd != null && !cwd.isBlank()) payload.addProperty("cwd", cwd);
         } else {
             payload.addProperty("workspaceId", workspaceId);
         }
-        if (agentPreset != null && !agentPreset.isBlank()) payload.addProperty("agentPreset", agentPreset);
+        if (agentPreset != null && !agentPreset.isBlank())
+            payload.addProperty("agentPreset", agentPreset);
         return objectValue("session.create", payload);
     }
 
-    public void prompt(String sessionId, String text, String mode, JsonArray images) throws DshRpcException {
+    public void prompt(String sessionId, String text, String mode, JsonArray images)
+            throws DshRpcException {
         JsonObject payload = new JsonObject();
         payload.addProperty("sessionId", sessionId);
         payload.addProperty("mode", "steer".equals(mode) ? "steer" : "queue");
@@ -212,9 +240,12 @@ public final class DshRpcClient {
                 part.addProperty("type", "image");
                 if (image.isJsonObject()) {
                     JsonObject imageObject = image.getAsJsonObject();
-                    if (imageObject.has("mediaType")) part.add("mediaType", imageObject.get("mediaType").deepCopy());
-                    if (imageObject.has("data")) part.add("data", imageObject.get("data").deepCopy());
-                    if (imageObject.has("name")) part.add("name", imageObject.get("name").deepCopy());
+                    if (imageObject.has("mediaType"))
+                        part.add("mediaType", imageObject.get("mediaType").deepCopy());
+                    if (imageObject.has("data"))
+                        part.add("data", imageObject.get("data").deepCopy());
+                    if (imageObject.has("name"))
+                        part.add("name", imageObject.get("name").deepCopy());
                 }
                 content.add(part);
             }
@@ -235,7 +266,8 @@ public final class DshRpcClient {
         call("session.cancel", payload);
     }
 
-    public void updateQueue(String sessionId, String itemId, String action, String text) throws DshRpcException {
+    public void updateQueue(String sessionId, String itemId, String action, String text)
+            throws DshRpcException {
         JsonObject queueAction = new JsonObject();
         String normalized = action == null ? "" : action.trim();
         if ("edit".equals(normalized)) {
@@ -249,7 +281,8 @@ public final class DshRpcClient {
         } else if ("remove".equals(normalized) || "steer".equals(normalized)) {
             queueAction.addProperty("kind", normalized);
         } else {
-            throw new DshRpcException("session.updateQueue", "invalid-action", "Unsupported queue action");
+            throw new DshRpcException(
+                    "session.updateQueue", "invalid-action", "Unsupported queue action");
         }
         JsonObject payload = new JsonObject();
         payload.addProperty("sessionId", sessionId);
@@ -289,7 +322,8 @@ public final class DshRpcClient {
     public JsonArray models(String sessionId) throws DshRpcException {
         JsonObject value = modelCatalog(sessionId);
         return value.has("groups") && value.get("groups").isJsonArray()
-                ? value.getAsJsonArray("groups") : new JsonArray();
+                ? value.getAsJsonArray("groups")
+                : new JsonArray();
     }
 
     public JsonObject modelCatalog(String sessionId) throws DshRpcException {
@@ -338,16 +372,16 @@ public final class DshRpcClient {
     }
 
     /**
-     * Ask the Host to hand its local settings document to the platform opener.
-     * The request carries no path, so the client cannot choose an arbitrary
-     * Host filesystem target.
+     * Ask the Host to hand its local settings document to the platform opener. The request carries
+     * no path, so the client cannot choose an arbitrary Host filesystem target.
      */
     public void openSettingsDocument() throws DshRpcException {
         call("settings.openDocument", new JsonObject());
     }
 
     /** Apply path-addressed edits to one namespace's user layer under a CAS revision. */
-    public JsonObject mutateSettings(String ns, JsonArray ops, long expectedRevision) throws DshRpcException {
+    public JsonObject mutateSettings(String ns, JsonArray ops, long expectedRevision)
+            throws DshRpcException {
         JsonObject payload = new JsonObject();
         payload.addProperty("ns", ns);
         payload.add("ops", ops.deepCopy());
@@ -375,8 +409,8 @@ public final class DshRpcClient {
     }
 
     /**
-     * Removes one workspace registration. The directory, every user file, and
-     * every session log remain untouched.
+     * Removes one workspace registration. The directory, every user file, and every session log
+     * remain untouched.
      */
     public void deleteWorkspace(String workspaceId) throws DshRpcException {
         JsonObject payload = new JsonObject();
@@ -390,11 +424,11 @@ public final class DshRpcClient {
     }
 
     /**
-     * Create a locally authored preset by copying an existing one whole. No
-     * composition text and no path crosses the wire: both ids are resolved by
-     * the Host against its own roots.
+     * Create a locally authored preset by copying an existing one whole. No composition text and no
+     * path crosses the wire: both ids are resolved by the Host against its own roots.
      */
-    public void copyAgentPreset(String from, String agentPreset, String name) throws DshRpcException {
+    public void copyAgentPreset(String from, String agentPreset, String name)
+            throws DshRpcException {
         JsonObject payload = new JsonObject();
         payload.addProperty("from", from);
         payload.addProperty("agentPreset", agentPreset);
@@ -423,10 +457,11 @@ public final class DshRpcClient {
     }
 
     /**
-     * Creates and arms a goal. The read side is the `goal` projection, so the
-     * response is only the new CAS ref; it never feeds client state.
+     * Creates and arms a goal. The read side is the `goal` projection, so the response is only the
+     * new CAS ref; it never feeds client state.
      */
-    public JsonObject createGoal(String sessionId, String objective, Integer maxGoalRounds) throws DshRpcException {
+    public JsonObject createGoal(String sessionId, String objective, Integer maxGoalRounds)
+            throws DshRpcException {
         JsonObject payload = new JsonObject();
         payload.addProperty("sessionId", sessionId);
         payload.addProperty("objective", objective);
@@ -434,7 +469,8 @@ public final class DshRpcClient {
         return objectValue("goal.create", payload);
     }
 
-    public JsonObject editGoal(String sessionId, JsonObject ref, String objective, Integer maxGoalRounds)
+    public JsonObject editGoal(
+            String sessionId, JsonObject ref, String objective, Integer maxGoalRounds)
             throws DshRpcException {
         JsonObject payload = new JsonObject();
         payload.addProperty("sessionId", sessionId);
@@ -445,7 +481,8 @@ public final class DshRpcClient {
     }
 
     /** One CAS-guarded phase verb: goal.pause, goal.resume, goal.complete, or goal.clear. */
-    public JsonObject mutateGoal(String method, String sessionId, JsonObject ref) throws DshRpcException {
+    public JsonObject mutateGoal(String method, String sessionId, JsonObject ref)
+            throws DshRpcException {
         JsonObject payload = new JsonObject();
         payload.addProperty("sessionId", sessionId);
         payload.add("ref", ref.deepCopy());
@@ -460,7 +497,8 @@ public final class DshRpcClient {
     }
 
     /** One healthy catalog child's transcript; reading never activates an Agent. */
-    public JsonObject subagentHistory(String parentSessionId, String childSessionId, String mode, int maxMessages)
+    public JsonObject subagentHistory(
+            String parentSessionId, String childSessionId, String mode, int maxMessages)
             throws DshRpcException {
         JsonObject payload = new JsonObject();
         payload.addProperty("parentSessionId", parentSessionId);
@@ -487,10 +525,11 @@ public final class DshRpcClient {
     }
 
     /**
-     * Interrupts a live continuable child. Fire-and-return: acceptance
-     * acknowledges the admitted cancel signal, not target quiescence.
+     * Interrupts a live continuable child. Fire-and-return: acceptance acknowledges the admitted
+     * cancel signal, not target quiescence.
      */
-    public void interruptSubagent(String parentSessionId, String childSessionId) throws DshRpcException {
+    public void interruptSubagent(String parentSessionId, String childSessionId)
+            throws DshRpcException {
         JsonObject payload = new JsonObject();
         payload.addProperty("parentSessionId", parentSessionId);
         payload.addProperty("childSessionId", childSessionId);
@@ -499,9 +538,9 @@ public final class DshRpcClient {
     }
 
     /**
-     * Host-registered slash commands for one session. Typert Remote endpoints
-     * take the single `args` object; a Runtime composing no command registry
-     * answers 404, which the caller reads as capability absence.
+     * Host-registered slash commands for one session. Typert Remote endpoints take the single
+     * `args` object; a Runtime composing no command registry answers 404, which the caller reads as
+     * capability absence.
      */
     public JsonArray listCommands(String sessionId) throws DshRpcException {
         JsonObject args = new JsonObject();
@@ -517,7 +556,8 @@ public final class DshRpcClient {
         payload.addProperty("sessionId", sessionId);
         JsonObject value = objectValue("skill.list", payload);
         return value.has("skills") && value.get("skills").isJsonArray()
-                ? value.getAsJsonArray("skills") : new JsonArray();
+                ? value.getAsJsonArray("skills")
+                : new JsonArray();
     }
 
     public JsonArray agentPresets() throws DshRpcException {
@@ -527,12 +567,14 @@ public final class DshRpcClient {
         }
         // Older Harness builds used the generic `items` field.
         return value.has("items") && value.get("items").isJsonArray()
-                ? value.getAsJsonArray("items") : new JsonArray();
+                ? value.getAsJsonArray("items")
+                : new JsonArray();
     }
 
     public void respond(String rpcId, boolean accepted, JsonElement value) throws DshRpcException {
         String configured = normalizeUrl(baseUrl.get());
-        if (configured == null) throw new DshRpcException("respond", "not-connected", "DSH Runtime is not connected");
+        if (configured == null)
+            throw new DshRpcException("respond", "not-connected", "DSH Runtime is not connected");
         JsonObject result = new JsonObject();
         result.addProperty("ok", accepted);
         if (accepted && value != null) result.add("value", value.deepCopy());
@@ -546,22 +588,28 @@ public final class DshRpcClient {
         body.addProperty("type", "client-response");
         body.addProperty("rpcId", rpcId);
         body.add("result", result);
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(configured + "/api/respond"))
-                .timeout(Duration.ofMillis(clampedTimeout()))
-                .header("content-type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(body.toString()))
-                .build();
+        HttpRequest request =
+                HttpRequest.newBuilder()
+                        .uri(URI.create(configured + "/api/respond"))
+                        .timeout(Duration.ofMillis(clampedTimeout()))
+                        .header("content-type", "application/json")
+                        .POST(HttpRequest.BodyPublishers.ofString(body.toString()))
+                        .build();
         try {
-            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> response =
+                    httpClient.send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
-                throw new DshRpcException("respond", "http-" + response.statusCode(), "Harness respond returned HTTP " + response.statusCode());
+                throw new DshRpcException(
+                        "respond",
+                        "http-" + response.statusCode(),
+                        "Harness respond returned HTTP " + response.statusCode());
             }
         } catch (DshRpcException error) {
             throw error;
         } catch (InterruptedException error) {
             Thread.currentThread().interrupt();
-            throw new DshRpcException("respond", "interrupted", "Harness response was interrupted", error);
+            throw new DshRpcException(
+                    "respond", "interrupted", "Harness response was interrupted", error);
         } catch (Exception error) {
             throw new DshRpcException("respond", "transport-error", error.getMessage(), error);
         }
@@ -571,13 +619,15 @@ public final class DshRpcClient {
     public boolean isWebHealthy(String url) {
         String normalized = normalizeUrl(url);
         if (normalized == null) return false;
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(normalized + "/"))
-                .timeout(Duration.ofMillis(Math.min(clampedTimeout(), 1_500)))
-                .GET()
-                .build();
+        HttpRequest request =
+                HttpRequest.newBuilder()
+                        .uri(URI.create(normalized + "/"))
+                        .timeout(Duration.ofMillis(Math.min(clampedTimeout(), 1_500)))
+                        .GET()
+                        .build();
         try {
-            HttpResponse<Void> response = httpClient.send(request, HttpResponse.BodyHandlers.discarding());
+            HttpResponse<Void> response =
+                    httpClient.send(request, HttpResponse.BodyHandlers.discarding());
             return response.statusCode() >= 200 && response.statusCode() < 300;
         } catch (Exception ignored) {
             return false;
@@ -593,14 +643,16 @@ public final class DshRpcClient {
         body.addProperty("rpcId", "dsh-intellij-probe-" + UUID.randomUUID());
         body.addProperty("method", "host.describe");
         body.add("payload", new JsonObject());
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(normalized + "/api/host.describe"))
-                .timeout(Duration.ofMillis(Math.min(clampedTimeout(), 1_500)))
-                .header("content-type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(body.toString()))
-                .build();
+        HttpRequest request =
+                HttpRequest.newBuilder()
+                        .uri(URI.create(normalized + "/api/host.describe"))
+                        .timeout(Duration.ofMillis(Math.min(clampedTimeout(), 1_500)))
+                        .header("content-type", "application/json")
+                        .POST(HttpRequest.BodyPublishers.ofString(body.toString()))
+                        .build();
         try {
-            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> response =
+                    httpClient.send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() < 200 || response.statusCode() >= 300) return false;
             JsonElement value = JsonParser.parseString(response.body());
             if (!value.isJsonObject()) return false;
@@ -635,9 +687,13 @@ public final class DshRpcClient {
         String candidate = value.trim().replaceAll("/+\\z", "");
         try {
             URI uri = URI.create(candidate);
-            if (!("http".equalsIgnoreCase(uri.getScheme()) || "https".equalsIgnoreCase(uri.getScheme()))
-                    || uri.getUserInfo() != null || uri.getQuery() != null || uri.getFragment() != null
-                    || uri.getHost() == null || uri.getPort() <= 0) return null;
+            if (!("http".equalsIgnoreCase(uri.getScheme())
+                            || "https".equalsIgnoreCase(uri.getScheme()))
+                    || uri.getUserInfo() != null
+                    || uri.getQuery() != null
+                    || uri.getFragment() != null
+                    || uri.getHost() == null
+                    || uri.getPort() <= 0) return null;
             return candidate;
         } catch (IllegalArgumentException ignored) {
             return null;
@@ -645,11 +701,15 @@ public final class DshRpcClient {
     }
 
     static JsonObject object(JsonObject parent, String name) {
-        return parent.has(name) && parent.get(name).isJsonObject() ? parent.getAsJsonObject(name) : null;
+        return parent.has(name) && parent.get(name).isJsonObject()
+                ? parent.getAsJsonObject(name)
+                : null;
     }
 
     static String string(JsonObject parent, String name) {
-        return parent.has(name) && parent.get(name).isJsonPrimitive() ? parent.get(name).getAsString() : null;
+        return parent.has(name) && parent.get(name).isJsonPrimitive()
+                ? parent.get(name).getAsString()
+                : null;
     }
 
     static String stringOr(JsonObject parent, String name, String fallback) {
@@ -659,7 +719,9 @@ public final class DshRpcClient {
 
     static boolean bool(JsonObject parent, String name) {
         try {
-            return parent.has(name) && parent.get(name).isJsonPrimitive() && parent.get(name).getAsBoolean();
+            return parent.has(name)
+                    && parent.get(name).isJsonPrimitive()
+                    && parent.get(name).getAsBoolean();
         } catch (RuntimeException ignored) {
             return false;
         }

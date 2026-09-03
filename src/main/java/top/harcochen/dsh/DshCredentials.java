@@ -9,8 +9,7 @@ import com.intellij.openapi.project.Project;
 public final class DshCredentials {
     private static final String SERVICE = "top.harcochen.dsh.api-key";
 
-    private DshCredentials() {
-    }
+    private DshCredentials() {}
 
     public static void store(Project project, String value) {
         CredentialAttributes attributes = attributes(project);

@@ -82,6 +82,8 @@ graph TD
 ## 从源码构建
 
 ```bash
+./gradlew format         # 应用仓库统一的 Java 格式化规则
+./gradlew lint           # 检查格式并运行 Checkstyle
 ./gradlew verifyPlugin   # 结构与兼容性检查
 ./gradlew buildPlugin    # 生成可安装的 zip
 ```

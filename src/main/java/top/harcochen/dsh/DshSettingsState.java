@@ -10,10 +10,9 @@ import org.jetbrains.annotations.NotNull;
 /**
  * Project-scoped settings for the IntelliJ Platform integration.
  *
- * The defaults intentionally mirror the VS Code extension's defaults. Keeping
- * the command and argument list separate makes it possible to use an installed
- * {@code dsh}, pnpm dlx, npx, or a locally checked-out Harness without changing
- * the plugin code.
+ * <p>The defaults intentionally mirror the VS Code extension's defaults. Keeping the command and
+ * argument list separate makes it possible to use an installed {@code dsh}, pnpm dlx, npx, or a
+ * locally checked-out Harness without changing the plugin code.
  */
 @State(name = "DshSettings", storages = @Storage(StoragePathMacros.WORKSPACE_FILE))
 public final class DshSettingsState implements PersistentStateComponent<DshSettingsState> {
@@ -45,7 +44,8 @@ public final class DshSettingsState implements PersistentStateComponent<DshSetti
 
     @Override
     public void loadState(@NotNull DshSettingsState state) {
-        command = isWindows() && "pnpm".equalsIgnoreCase(state.command) ? "pnpm.cmd" : state.command;
+        command =
+                isWindows() && "pnpm".equalsIgnoreCase(state.command) ? "pnpm.cmd" : state.command;
         commandArgs = state.commandArgs;
         serverUrl = state.serverUrl;
         serverPort = state.serverPort;

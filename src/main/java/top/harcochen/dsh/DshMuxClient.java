@@ -4,7 +4,6 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.intellij.openapi.diagnostic.Logger;
-
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.WebSocket;
@@ -36,16 +35,22 @@ final class DshMuxClient implements AutoCloseable {
         if (closed || configured == null) return;
         if (socket != null && configured.equals(connectedUrl)) return;
         if (!connecting.compareAndSet(false, true)) return;
-        URI uri = URI.create((configured.startsWith("https://") ? "wss://" : "ws://")
-                + configured.substring(configured.indexOf("://") + 3) + "/api/events.mux");
-        http.newWebSocketBuilder().buildAsync(uri, new Listener(configured)).whenComplete((opened, error) -> {
-            connecting.set(false);
-            if (error != null) {
-                LOG.debug("DSH mux connection failed", error);
-                return;
-            }
-            if (closed) opened.sendClose(WebSocket.NORMAL_CLOSURE, "disposed");
-        });
+        URI uri =
+                URI.create(
+                        (configured.startsWith("https://") ? "wss://" : "ws://")
+                                + configured.substring(configured.indexOf("://") + 3)
+                                + "/api/events.mux");
+        http.newWebSocketBuilder()
+                .buildAsync(uri, new Listener(configured))
+                .whenComplete(
+                        (opened, error) -> {
+                            connecting.set(false);
+                            if (error != null) {
+                                LOG.debug("DSH mux connection failed", error);
+                                return;
+                            }
+                            if (closed) opened.sendClose(WebSocket.NORMAL_CLOSURE, "disposed");
+                        });
     }
 
     @Override
@@ -81,7 +86,8 @@ final class DshMuxClient implements AutoCloseable {
                     if (parsed.isJsonObject()) {
                         JsonObject envelope = parsed.getAsJsonObject();
                         if ("server-request".equals(string(envelope, "type"))
-                                && envelope.has("payload") && envelope.get("payload").isJsonObject()) {
+                                && envelope.has("payload")
+                                && envelope.get("payload").isJsonObject()) {
                             JsonObject payload = envelope.getAsJsonObject("payload").deepCopy();
                             String rpcId = string(envelope, "rpcId");
                             if (rpcId != null) payload.addProperty("_rpcId", rpcId);
@@ -117,7 +123,9 @@ final class DshMuxClient implements AutoCloseable {
         }
 
         private String string(JsonObject object, String key) {
-            return object.has(key) && object.get(key).isJsonPrimitive() ? object.get(key).getAsString() : null;
+            return object.has(key) && object.get(key).isJsonPrimitive()
+                    ? object.get(key).getAsString()
+                    : null;
         }
     }
 }

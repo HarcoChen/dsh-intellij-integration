@@ -83,6 +83,8 @@ Open **Settings | Tools | DeepSeek Harness**.
 ## Build from source
 
 ```bash
+./gradlew format         # apply the repository's Java formatting rules
+./gradlew lint           # verify formatting and run Checkstyle
 ./gradlew verifyPlugin   # structure and compatibility checks
 ./gradlew buildPlugin    # produce the installable zip
 ```

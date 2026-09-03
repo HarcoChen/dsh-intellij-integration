@@ -7,7 +7,6 @@ import com.google.gson.JsonParser;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
-
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -32,7 +31,14 @@ final class DshBalanceService implements Disposable {
 
     record BalanceInfo(String currency, double total, double granted, double toppedUp) {}
 
-    enum State { NO_KEY, CHECKING, OK, LOW, ERROR, UNAVAILABLE }
+    enum State {
+        NO_KEY,
+        CHECKING,
+        OK,
+        LOW,
+        ERROR,
+        UNAVAILABLE
+    }
 
     record Snapshot(State state, String text, String tooltip, DshDeepSeekPricing.Period pricing) {}
 
@@ -48,61 +54,107 @@ final class DshBalanceService implements Disposable {
     DshBalanceService(Project project) {
         this.project = project;
         this.http = HttpClient.newBuilder().connectTimeout(TIMEOUT).build();
-        this.scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
-            Thread t = new Thread(r, "dsh-balance-refresh");
-            t.setDaemon(true);
-            return t;
-        });
-        this.latest = new Snapshot(State.NO_KEY, DshBundle.message("dsh.balance.set.key"), DshBundle.message("dsh.balance.set.key.tooltip"), DshDeepSeekPricing.current());
+        this.scheduler =
+                Executors.newSingleThreadScheduledExecutor(
+                        r -> {
+                            Thread t = new Thread(r, "dsh-balance-refresh");
+                            t.setDaemon(true);
+                            return t;
+                        });
+        this.latest =
+                new Snapshot(
+                        State.NO_KEY,
+                        DshBundle.message("dsh.balance.set.key"),
+                        DshBundle.message("dsh.balance.set.key.tooltip"),
+                        DshDeepSeekPricing.current());
     }
 
     void start() {
-        int interval = Math.max(10_000, Math.min(3_600_000, DshSettingsState.getInstance(project).balanceRefreshIntervalMs));
+        int interval =
+                Math.max(
+                        10_000,
+                        Math.min(
+                                3_600_000,
+                                DshSettingsState.getInstance(project).balanceRefreshIntervalMs));
         timer = scheduler.scheduleWithFixedDelay(this::refresh, 0, interval, TimeUnit.MILLISECONDS);
     }
 
-    Snapshot snapshot() { return latest; }
+    Snapshot snapshot() {
+        return latest;
+    }
 
-    void addListener(Consumer<Snapshot> listener) { synchronized (listeners) { listeners.add(listener); } }
-    void removeListener(Consumer<Snapshot> listener) { synchronized (listeners) { listeners.remove(listener); } }
+    void addListener(Consumer<Snapshot> listener) {
+        synchronized (listeners) {
+            listeners.add(listener);
+        }
+    }
+
+    void removeListener(Consumer<Snapshot> listener) {
+        synchronized (listeners) {
+            listeners.remove(listener);
+        }
+    }
 
     void refresh() {
         if (disposed || !refreshing.compareAndSet(false, true)) return;
         try {
             String apiKey = resolveApiKey();
             if (apiKey == null || apiKey.isBlank()) {
-                publish(new Snapshot(State.NO_KEY, DshBundle.message("dsh.balance.set.key"),
-                        DshBundle.message("dsh.balance.set.key.tooltip"), DshDeepSeekPricing.current()));
+                publish(
+                        new Snapshot(
+                                State.NO_KEY,
+                                DshBundle.message("dsh.balance.set.key"),
+                                DshBundle.message("dsh.balance.set.key.tooltip"),
+                                DshDeepSeekPricing.current()));
                 return;
             }
-            publish(new Snapshot(State.CHECKING, DshBundle.message("dsh.balance.checking"),
-                    DshBundle.message("dsh.balance.checking.tooltip"), DshDeepSeekPricing.current()));
+            publish(
+                    new Snapshot(
+                            State.CHECKING,
+                            DshBundle.message("dsh.balance.checking"),
+                            DshBundle.message("dsh.balance.checking.tooltip"),
+                            DshDeepSeekPricing.current()));
 
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(ENDPOINT))
-                    .header("Authorization", "Bearer " + apiKey)
-                    .header("Accept", "application/json")
-                    .timeout(TIMEOUT)
-                    .GET().build();
-            HttpResponse<String> response = http.send(request, HttpResponse.BodyHandlers.ofString());
+            HttpRequest request =
+                    HttpRequest.newBuilder()
+                            .uri(URI.create(ENDPOINT))
+                            .header("Authorization", "Bearer " + apiKey)
+                            .header("Accept", "application/json")
+                            .timeout(TIMEOUT)
+                            .GET()
+                            .build();
+            HttpResponse<String> response =
+                    http.send(request, HttpResponse.BodyHandlers.ofString());
 
             if (response.statusCode() != 200) {
-                publish(new Snapshot(State.ERROR, DshBundle.message("dsh.balance.error"),
-                        DshBundle.message("dsh.balance.error.http", response.statusCode()), DshDeepSeekPricing.current()));
+                publish(
+                        new Snapshot(
+                                State.ERROR,
+                                DshBundle.message("dsh.balance.error"),
+                                DshBundle.message("dsh.balance.error.http", response.statusCode()),
+                                DshDeepSeekPricing.current()));
                 return;
             }
 
             JsonObject body = JsonParser.parseString(response.body()).getAsJsonObject();
             boolean available = body.has("is_available") && body.get("is_available").getAsBoolean();
             if (!available) {
-                publish(new Snapshot(State.UNAVAILABLE, DshBundle.message("dsh.balance.unavailable"),
-                        DshBundle.message("dsh.balance.unavailable.tooltip"), DshDeepSeekPricing.current()));
+                publish(
+                        new Snapshot(
+                                State.UNAVAILABLE,
+                                DshBundle.message("dsh.balance.unavailable"),
+                                DshBundle.message("dsh.balance.unavailable.tooltip"),
+                                DshDeepSeekPricing.current()));
                 return;
             }
 
             if (!body.has("balance_infos") || !body.get("balance_infos").isJsonArray()) {
-                publish(new Snapshot(State.ERROR, DshBundle.message("dsh.balance.error"),
-                        DshBundle.message("dsh.balance.error.invalid"), DshDeepSeekPricing.current()));
+                publish(
+                        new Snapshot(
+                                State.ERROR,
+                                DshBundle.message("dsh.balance.error"),
+                                DshBundle.message("dsh.balance.error.invalid"),
+                                DshDeepSeekPricing.current()));
                 return;
             }
             JsonArray infos = body.getAsJsonArray("balance_infos");
@@ -110,29 +162,44 @@ final class DshBalanceService implements Disposable {
             for (JsonElement e : infos) {
                 if (!e.isJsonObject()) continue;
                 JsonObject info = e.getAsJsonObject();
-                if (!info.has("currency") || !info.has("total_balance")
-                        || !info.has("granted_balance") || !info.has("topped_up_balance")) continue;
-                balances.add(new BalanceInfo(
-                        info.get("currency").getAsString(),
-                        Double.parseDouble(info.get("total_balance").getAsString()),
-                        Double.parseDouble(info.get("granted_balance").getAsString()),
-                        Double.parseDouble(info.get("topped_up_balance").getAsString())));
+                if (!info.has("currency")
+                        || !info.has("total_balance")
+                        || !info.has("granted_balance")
+                        || !info.has("topped_up_balance")) continue;
+                balances.add(
+                        new BalanceInfo(
+                                info.get("currency").getAsString(),
+                                Double.parseDouble(info.get("total_balance").getAsString()),
+                                Double.parseDouble(info.get("granted_balance").getAsString()),
+                                Double.parseDouble(info.get("topped_up_balance").getAsString())));
             }
 
             BalanceInfo preferred = preferredBalance(balances);
             DshDeepSeekPricing.Period pricing = DshDeepSeekPricing.current();
             boolean low = preferred != null && preferred.total < LOW_BALANCE_THRESHOLD;
             String pricingMark = pricing == DshDeepSeekPricing.Period.PEAK ? "↑" : "↓";
-            String text = preferred == null ? DshBundle.message("dsh.balance.unavailable")
-                    : DshBundle.message("dsh.balance.status", formatAmount(preferred.total), preferred.currency, pricingMark);
+            String text =
+                    preferred == null
+                            ? DshBundle.message("dsh.balance.unavailable")
+                            : DshBundle.message(
+                                    "dsh.balance.status",
+                                    formatAmount(preferred.total),
+                                    preferred.currency,
+                                    pricingMark);
 
             StringBuilder tip = new StringBuilder();
             NumberFormat fmt = NumberFormat.getNumberInstance(Locale.getDefault());
             fmt.setMinimumFractionDigits(2);
             fmt.setMaximumFractionDigits(2);
             for (BalanceInfo b : balances) {
-                tip.append(DshBundle.message("dsh.balance.detail",
-                        b.currency, fmt.format(b.total), fmt.format(b.granted), fmt.format(b.toppedUp))).append("\n");
+                tip.append(
+                                DshBundle.message(
+                                        "dsh.balance.detail",
+                                        b.currency,
+                                        fmt.format(b.total),
+                                        fmt.format(b.granted),
+                                        fmt.format(b.toppedUp)))
+                        .append("\n");
             }
             tip.append("\n");
             if (pricing == DshDeepSeekPricing.Period.PEAK) {
@@ -149,8 +216,12 @@ final class DshBalanceService implements Disposable {
             if (error instanceof java.net.http.HttpTimeoutException) {
                 message = DshBundle.message("dsh.balance.error.timeout");
             }
-            publish(new Snapshot(State.ERROR, DshBundle.message("dsh.balance.error"),
-                    message != null ? message : error.toString(), DshDeepSeekPricing.current()));
+            publish(
+                    new Snapshot(
+                            State.ERROR,
+                            DshBundle.message("dsh.balance.error"),
+                            message != null ? message : error.toString(),
+                            DshDeepSeekPricing.current()));
         } finally {
             refreshing.set(false);
         }
@@ -188,9 +259,15 @@ final class DshBalanceService implements Disposable {
     private void publish(Snapshot snapshot) {
         latest = snapshot;
         List<Consumer<Snapshot>> copy;
-        synchronized (listeners) { copy = new ArrayList<>(listeners); }
+        synchronized (listeners) {
+            copy = new ArrayList<>(listeners);
+        }
         for (Consumer<Snapshot> listener : copy) {
-            try { listener.accept(snapshot); } catch (Exception error) { LOG.debug("Balance listener failed", error); }
+            try {
+                listener.accept(snapshot);
+            } catch (Exception error) {
+                LOG.debug("Balance listener failed", error);
+            }
         }
     }
 
