@@ -115,6 +115,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
     private volatile boolean submitting;
     private volatile boolean cancelling;
     private volatile String sessionId;
+    private volatile boolean newSessionDraft;
     private volatile String pendingAgentPreset;
     private volatile JsonArray sessions = new JsonArray();
     private volatile JsonArray messages = new JsonArray();
@@ -250,6 +251,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
             case "updateQueue" -> updateQueue(action);
             case "newSession", "newSessionInCurrentWorkspace" -> {
                 sessionId = null;
+                newSessionDraft = true;
                 pendingAgentPreset = null;
                 lastError = null;
                 subagentPreview = null;
@@ -258,6 +260,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
             }
             case "switchSession" -> {
                 sessionId = string(action, "sessionId");
+                newSessionDraft = false;
                 lastError = null;
                 subagentPreview = null;
                 refreshState();
@@ -580,6 +583,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
     /** Reset the selected session without creating a remote session eagerly. */
     public void newSession() {
         sessionId = null;
+        newSessionDraft = true;
         pendingAgentPreset = null;
         lastError = null;
         projection = DshMessageProjector.Projection.empty();
@@ -601,12 +605,33 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
     private String ensureSession() throws DshRpcClient.DshRpcException {
         if (sessionId != null && !sessionId.isBlank()) return sessionId;
         String cwd = project.getBasePath();
-        JsonObject created = client.createSession(cwd, null, pendingAgentPreset);
+        String workspaceId = resolveWorkspaceId(cwd);
+        JsonObject created = client.createSession(workspaceId != null ? null : cwd, workspaceId, pendingAgentPreset);
         String createdId = string(created, "sessionId");
         if (createdId == null || createdId.isBlank()) throw new DshRpcClient.DshRpcException("session.create", "invalid-result", "Harness did not return a sessionId");
         sessionId = createdId;
+        newSessionDraft = false;
         pendingAgentPreset = null;
         return createdId;
+    }
+
+    private String resolveWorkspaceId(String cwd) {
+        if (cwd == null || cwd.isBlank()) return null;
+        JsonObject registration = currentWorkspaceRegistration;
+        if (registration != null) {
+            String id = string(registration, "workspaceId");
+            if (id != null && !id.isBlank()) return id;
+        }
+        try {
+            JsonObject result = client.createWorkspace(cwd);
+            JsonObject workspace = result.getAsJsonObject("workspace");
+            String id = string(workspace, "workspaceId");
+            currentWorkspaceRegistration = workspace;
+            return id;
+        } catch (Exception error) {
+            LOG.debug("Unable to resolve workspace for session creation", error);
+        }
+        return null;
     }
 
     private void cancelPrompt() {
@@ -975,6 +1000,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
     }
 
     private void chooseSessionIfNecessary() {
+        if (newSessionDraft) return;
         if (sessionId != null && containsSession(sessionId)) return;
         // Do not auto-select a blank session. dsh-ide creates the session only
         // when the first prompt is sent, which keeps an opened tool window quiet.
@@ -1009,6 +1035,15 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
             JsonObject item = new JsonObject();
             item.addProperty("sessionId", id);
             String title = string(source, "title");
+            if (title == null || title.isBlank()) {
+                JsonObject projections = source.has("projections") && source.get("projections").isJsonObject()
+                        ? source.getAsJsonObject("projections") : null;
+                JsonObject values = projections != null && projections.has("values") && projections.get("values").isJsonObject()
+                        ? projections.getAsJsonObject("values") : null;
+                if (values != null && values.has("title") && values.get("title").isJsonPrimitive()) {
+                    title = values.get("title").getAsString();
+                }
+            }
             item.addProperty("title", title == null || title.isBlank() ? id.substring(0, Math.min(12, id.length())) : title);
             item.addProperty("running", bool(source, "running", false));
             // Attention is this host's own pending-interaction state; archive
@@ -1967,6 +2002,23 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
         cells.put(key, new ProjectionCell(value, seq));
     }
 
+    private void applySessionTitle(String session, JsonObject frame) {
+        JsonElement value = frame.has("value") ? frame.get("value") : null;
+        if (value == null || !value.isJsonPrimitive()) return;
+        String title = value.getAsString();
+        if (title.isBlank()) return;
+        JsonArray current = sessions;
+        for (JsonElement candidate : current) {
+            if (!candidate.isJsonObject()) continue;
+            JsonObject item = candidate.getAsJsonObject();
+            if (session.equals(string(item, "sessionId"))) {
+                item.addProperty("title", title);
+                postStateLater();
+                return;
+            }
+        }
+    }
+
     /** The current whole value of one projection unit, or null when the capability is absent. */
     private JsonElement projectionValue(String key) {
         String current = sessionId;
@@ -2662,6 +2714,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
                     Messages.getQuestionIcon(), choices.toArray(new String[0]), choices.get(0));
             if (selected >= 0 && selected < ids.size()) {
                 sessionId = ids.get(selected);
+                newSessionDraft = false;
                 refreshState();
             }
         });
@@ -2691,7 +2744,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
         operations.execute(() -> {
             try {
                 String forked = client.forkSession(current);
-                if (!forked.isBlank()) sessionId = forked;
+                if (!forked.isBlank()) { sessionId = forked; newSessionDraft = false; }
                 refreshState();
             } catch (Exception error) {
                 lastError = message(error);
@@ -3540,6 +3593,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
             }
             if ("session/projection".equals(type)) {
                 acceptProjectionFrame(frameSession, frame);
+                if ("title".equals(string(frame, "key"))) applySessionTitle(frameSession, frame);
                 if (frameSession.equals(sessionId)) postStateLater();
                 return;
             }
