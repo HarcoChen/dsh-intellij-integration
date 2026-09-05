@@ -1,7 +1,6 @@
 package top.harcochen.dsh;
 
 import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.project.Project;
@@ -10,11 +9,13 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Consumer;
+import top.harcochen.dsh.remote.DshRemoteService;
+import top.harcochen.dsh.remote.DshRemoteState;
 
 /** Provides the native management flow for Harness workspace registrations. */
 final class DshWorkspaceController {
     private final Project project;
-    private final DshRpcClient client;
+    private final DshRemoteService remote;
     private final ExecutorService operations;
     private final Runnable refreshState;
     private final Runnable stateChanged;
@@ -23,14 +24,14 @@ final class DshWorkspaceController {
 
     DshWorkspaceController(
             Project project,
-            DshRpcClient client,
+            DshRemoteService remote,
             ExecutorService operations,
             Runnable refreshState,
             Runnable stateChanged,
             Consumer<String> notifier,
             Consumer<String> errorSink) {
         this.project = project;
-        this.client = client;
+        this.remote = remote;
         this.operations = operations;
         this.refreshState = refreshState;
         this.stateChanged = stateChanged;
@@ -39,21 +40,14 @@ final class DshWorkspaceController {
     }
 
     void manage() {
+        // The workspace registry is authoritative from workspace/follow; no unary list exists.
+        DshRemoteState.Snapshot snapshot = remote.snapshot();
         operations.execute(
                 () -> {
                     try {
-                        JsonObject catalog = client.workspaces();
-                        JsonArray items =
-                                catalog.has("items") && catalog.get("items").isJsonArray()
-                                        ? catalog.getAsJsonArray("items")
-                                        : new JsonArray();
                         List<String> labels = new ArrayList<>();
                         List<JsonObject> workspaces = new ArrayList<>();
-                        for (JsonElement candidate : items) {
-                            if (!candidate.isJsonObject()) {
-                                continue;
-                            }
-                            JsonObject workspace = candidate.getAsJsonObject();
+                        for (JsonObject workspace : snapshot.workspaces) {
                             String id = DshJson.string(workspace, "workspaceId");
                             if (id == null) {
                                 continue;
@@ -138,7 +132,7 @@ final class DshWorkspaceController {
         }
         runOperation(
                 "dsh.workspace.operation.renamed",
-                () -> client.renameWorkspace(id, replacement.trim()));
+                () -> remote.renameWorkspace(id, replacement.trim()));
     }
 
     private void remove(String id, String title) {
@@ -154,7 +148,7 @@ final class DshWorkspaceController {
         runOperation(
                 "dsh.workspace.operation.removed",
                 () -> {
-                    client.deleteWorkspace(id);
+                    remote.deleteWorkspace(id);
                     return null;
                 });
     }
@@ -165,7 +159,7 @@ final class DshWorkspaceController {
             notifyUser(DshBundle.message("dsh.workspace.no.project"));
             return;
         }
-        runOperation("dsh.workspace.operation.registered", () -> client.createWorkspace(base));
+        runOperation("dsh.workspace.operation.registered", () -> remote.createWorkspace(base));
     }
 
     private void runOperation(String successKey, WorkspaceOperation operation) {

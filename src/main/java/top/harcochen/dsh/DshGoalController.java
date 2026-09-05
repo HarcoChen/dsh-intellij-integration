@@ -6,7 +6,10 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
+import java.util.function.BiFunction;
 import java.util.function.Consumer;
+import top.harcochen.dsh.remote.DshRemoteService;
+import top.harcochen.dsh.remote.DshRemoteState;
 
 /** Validates, projects, and performs CAS-guarded Goal mutations for a session. */
 final class DshGoalController {
@@ -20,7 +23,8 @@ final class DshGoalController {
     private final Object lock = new Object();
     private final Map<String, GoalMutation> mutations = new LinkedHashMap<>();
     private final DshSessionStateStore sessionState;
-    private final DshRpcClient client;
+    private final BiFunction<String, String, DshRemoteState.ProjectionCell> projections;
+    private final DshRemoteService remote;
     private final ExecutorService operations;
     private final Runnable refreshState;
     private final Runnable stateChanged;
@@ -29,14 +33,16 @@ final class DshGoalController {
 
     DshGoalController(
             DshSessionStateStore sessionState,
-            DshRpcClient client,
+            BiFunction<String, String, DshRemoteState.ProjectionCell> projections,
+            DshRemoteService remote,
             ExecutorService operations,
             Runnable refreshState,
             Runnable stateChanged,
             Consumer<String> notifier,
             Consumer<String> errorSink) {
         this.sessionState = sessionState;
-        this.client = client;
+        this.projections = projections;
+        this.remote = remote;
         this.operations = operations;
         this.refreshState = refreshState;
         this.stateChanged = stateChanged;
@@ -48,12 +54,12 @@ final class DshGoalController {
         if (session == null) {
             return null;
         }
-        DshSessionStateStore.ProjectionSnapshot snapshot = sessionState.projection(session, "goal");
-        if (snapshot == null) {
+        DshRemoteState.ProjectionCell cell = projections.apply(session, "goal");
+        if (cell == null) {
             return null;
         }
-        JsonElement value = snapshot.value();
-        GoalMutation mutation = observeMutation(session, snapshot.seq());
+        JsonElement value = cell.value();
+        GoalMutation mutation = observeMutation(session, cell.seq());
         JsonObject result = new JsonObject();
         String error = projectionError(value);
         if (error != null) {
@@ -88,8 +94,8 @@ final class DshGoalController {
         if (session == null || operation == null) {
             return;
         }
-        DshSessionStateStore.ProjectionSnapshot snapshot = sessionState.projection(session, "goal");
-        if (snapshot == null) {
+        DshRemoteState.ProjectionCell cell = projections.apply(session, "goal");
+        if (cell == null) {
             notifyUser(DshBundle.message("dsh.goal.no.projection"));
             return;
         }
@@ -98,9 +104,9 @@ final class DshGoalController {
             if (current != null && current.pending) {
                 return;
             }
-            mutations.put(session, new GoalMutation(operation, snapshot.seq()));
+            mutations.put(session, new GoalMutation(operation, cell.seq()));
         }
-        JsonElement value = snapshot.value();
+        JsonElement value = cell.value();
         String invalid = projectionError(value);
         if (invalid != null) {
             failMutation(session, invalid);
@@ -142,7 +148,7 @@ final class DshGoalController {
             throw new IllegalStateException(
                     "A replacement Goal can only be created when the current Goal is empty or complete.");
         }
-        client.createGoal(
+        remote.createGoal(
                 session,
                 DshJson.stringOr(action, "objective", ""),
                 action.has("maxGoalRounds") ? action.get("maxGoalRounds").getAsInt() : null);
@@ -169,17 +175,17 @@ final class DshGoalController {
         reference.add("revision", goal.get("revision").deepCopy());
         switch (operation) {
             case "edit" ->
-                    client.editGoal(
+                    remote.editGoal(
                             session,
                             reference,
                             action.has("objective") ? DshJson.string(action, "objective") : null,
                             action.has("maxGoalRounds")
                                     ? action.get("maxGoalRounds").getAsInt()
                                     : null);
-            case "pause" -> client.mutateGoal("goal.pause", session, reference);
-            case "resume" -> client.mutateGoal("goal.resume", session, reference);
-            case "complete" -> client.mutateGoal("goal.complete", session, reference);
-            case "clear" -> client.mutateGoal("goal.clear", session, reference);
+            case "pause" -> remote.mutateGoal("goals/pause", session, reference);
+            case "resume" -> remote.mutateGoal("goals/resume", session, reference);
+            case "complete" -> remote.mutateGoal("goals/complete", session, reference);
+            case "clear" -> remote.mutateGoal("goals/clear", session, reference);
             default -> throw new IllegalStateException("Unsupported Goal action");
         }
     }

@@ -12,13 +12,14 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
+import top.harcochen.dsh.remote.DshRemoteService;
 
 /** Loads, manages, and selects Harness agent presets. */
 final class DshAgentPresetController {
     private static final Logger LOG = Logger.getInstance(DshAgentPresetController.class);
 
     private final Project project;
-    private final DshRpcClient client;
+    private final DshRemoteService remote;
     private final ExecutorService operations;
     private final Supplier<String> sessionId;
     private final Consumer<String> pendingPreset;
@@ -31,7 +32,7 @@ final class DshAgentPresetController {
 
     DshAgentPresetController(
             Project project,
-            DshRpcClient client,
+            DshRemoteService remote,
             ExecutorService operations,
             Supplier<String> sessionId,
             Consumer<String> pendingPreset,
@@ -40,7 +41,7 @@ final class DshAgentPresetController {
             Consumer<String> notifier,
             Consumer<String> errorSink) {
         this.project = project;
-        this.client = client;
+        this.remote = remote;
         this.operations = operations;
         this.sessionId = sessionId;
         this.pendingPreset = pendingPreset;
@@ -55,10 +56,17 @@ final class DshAgentPresetController {
             return;
         }
         try {
-            catalog = client.agentPresets();
+            catalog = agentPresets();
         } catch (Exception error) {
             LOG.debug("The connected Harness did not expose an agent preset catalog", error);
         }
+    }
+
+    private JsonArray agentPresets() throws Exception {
+        JsonObject value = remote.agentPresetCatalog();
+        return value.has("presets") && value.get("presets").isJsonArray()
+                ? value.getAsJsonArray("presets")
+                : new JsonArray();
     }
 
     String label(String presetId) {
@@ -79,7 +87,7 @@ final class DshAgentPresetController {
         operations.execute(
                 () -> {
                     try {
-                        JsonObject value = client.agentPresetCatalog();
+                        JsonObject value = remote.agentPresetCatalog();
                         JsonArray presets =
                                 value.has("presets") && value.get("presets").isJsonArray()
                                         ? value.getAsJsonArray("presets")
@@ -186,7 +194,7 @@ final class DshAgentPresetController {
                     operations.execute(
                             () -> {
                                 try {
-                                    client.openAgentPresetDocument(id);
+                                    remote.openAgentPresetDirectory(id);
                                 } catch (Exception error) {
                                     notifyUser(
                                             DshBundle.message(
@@ -216,7 +224,7 @@ final class DshAgentPresetController {
         operations.execute(
                 () -> {
                     try {
-                        client.removeAgentPreset(id);
+                        remote.removeAgentPreset(id);
                         catalog = new JsonArray();
                         notifyUser(DshBundle.message("dsh.presets.delete.success", id));
                         refreshState.run();
@@ -232,7 +240,7 @@ final class DshAgentPresetController {
         operations.execute(
                 () -> {
                     try {
-                        JsonObject document = client.readAgentPreset(id);
+                        JsonObject document = remote.readAgentPreset(id);
                         StringBuilder text = new StringBuilder();
                         text.append(DshJson.stringOr(document, "name", id)).append('\n');
                         text.append(DshBundle.message("dsh.presets.detail.trust"))
@@ -285,7 +293,7 @@ final class DshAgentPresetController {
         operations.execute(
                 () -> {
                     try {
-                        client.copyAgentPreset(
+                        remote.copyAgentPreset(
                                 from, id, name == null || name.isBlank() ? null : name.trim());
                         catalog = new JsonArray();
                         notifyUser(DshBundle.message("dsh.presets.copy.success", from, id));
@@ -303,7 +311,7 @@ final class DshAgentPresetController {
         operations.execute(
                 () -> {
                     try {
-                        JsonArray presets = client.agentPresets();
+                        JsonArray presets = agentPresets();
                         List<String> labels = new ArrayList<>();
                         List<String> ids = new ArrayList<>();
                         for (JsonElement presetElement : presets) {
@@ -369,7 +377,7 @@ final class DshAgentPresetController {
         operations.execute(
                 () -> {
                     try {
-                        client.selectAgentPreset(currentSession, target);
+                        remote.selectAgentPreset(currentSession, target);
                         refreshState.run();
                     } catch (Exception error) {
                         errorSink.accept(DshJson.message(error));

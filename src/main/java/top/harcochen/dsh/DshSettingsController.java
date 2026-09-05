@@ -14,6 +14,7 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
+import top.harcochen.dsh.remote.DshRemoteService;
 
 /** Manages Runtime settings, credentials, and provider status dialogs. */
 final class DshSettingsController {
@@ -21,7 +22,7 @@ final class DshSettingsController {
 
     private final Project project;
     private final DshRuntimeService runtime;
-    private final DshRpcClient client;
+    private final DshRemoteService remote;
     private final ExecutorService operations;
     private final Runnable stateChanged;
     private final Runnable openBrowser;
@@ -35,7 +36,7 @@ final class DshSettingsController {
     DshSettingsController(
             Project project,
             DshRuntimeService runtime,
-            DshRpcClient client,
+            DshRemoteService remote,
             ExecutorService operations,
             Runnable stateChanged,
             Runnable openBrowser,
@@ -43,7 +44,7 @@ final class DshSettingsController {
             Consumer<String> errorSink) {
         this.project = project;
         this.runtime = runtime;
-        this.client = client;
+        this.remote = remote;
         this.operations = operations;
         this.stateChanged = stateChanged;
         this.openBrowser = openBrowser;
@@ -90,7 +91,7 @@ final class DshSettingsController {
                 () -> {
                     try {
                         runtime.startAsync().join();
-                        JsonObject described = client.describeSettings();
+                        JsonObject described = remote.describeSettings();
                         if (generation.get() != requestedGeneration) {
                             return;
                         }
@@ -185,7 +186,7 @@ final class DshSettingsController {
             boolean writable,
             boolean hasDocument) {
         try {
-            JsonObject updated = client.mutateSettings(namespace, operationsToApply, revision);
+            JsonObject updated = remote.mutateSettings(namespace, operationsToApply, revision);
             JsonObject described = new JsonObject();
             described.addProperty("writable", writable);
             described.addProperty("hasDocument", hasDocument);
@@ -211,7 +212,7 @@ final class DshSettingsController {
         operations.execute(
                 () -> {
                     try {
-                        client.openSettingsDocument();
+                        remote.openSettingsDocument();
                     } catch (Exception error) {
                         LOG.debug(
                                 "DSH settings document is unavailable; opening the browser root",
@@ -225,11 +226,7 @@ final class DshSettingsController {
         operations.execute(
                 () -> {
                     try {
-                        JsonObject value = client.providers();
-                        JsonArray providers =
-                                value.has("providers") && value.get("providers").isJsonArray()
-                                        ? value.getAsJsonArray("providers")
-                                        : new JsonArray();
+                        JsonArray providers = remote.providers();
                         List<String> labels = new ArrayList<>();
                         List<JsonObject> rows = new ArrayList<>();
                         for (JsonElement candidate : providers) {

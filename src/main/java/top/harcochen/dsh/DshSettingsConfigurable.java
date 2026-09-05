@@ -28,7 +28,6 @@ public final class DshSettingsConfigurable implements Configurable {
     private JBTextField runtimeVersion;
     private JBTextField startupTimeout;
     private JBTextField requestTimeout;
-    private JBTextField pollInterval;
     private JBTextField maxContextBytes;
     private JBTextField npmRegistry;
     private JBTextField apiKeyEnv;
@@ -63,7 +62,6 @@ public final class DshSettingsConfigurable implements Configurable {
         runtimeVersion = new JBTextField();
         startupTimeout = new JBTextField();
         requestTimeout = new JBTextField();
-        pollInterval = new JBTextField();
         maxContextBytes = new JBTextField();
         npmRegistry = new JBTextField();
         apiKeyEnv = new JBTextField();
@@ -99,10 +97,6 @@ public final class DshSettingsConfigurable implements Configurable {
                 DshBundle.message("dsh.settings.request.timeout.label"),
                 requestTimeout,
                 DshBundle.message("dsh.settings.request.timeout.tooltip"));
-        addRow(
-                DshBundle.message("dsh.settings.poll.interval.label"),
-                pollInterval,
-                DshBundle.message("dsh.settings.poll.interval.tooltip"));
         addRow(
                 DshBundle.message("dsh.settings.max.context.bytes.label"),
                 maxContextBytes,
@@ -175,7 +169,6 @@ public final class DshSettingsConfigurable implements Configurable {
                         != state.startupTimeoutMs
                 || parseOr(requestTimeout.getText(), state.requestTimeoutMs)
                         != state.requestTimeoutMs
-                || parseOr(pollInterval.getText(), state.pollIntervalMs) != state.pollIntervalMs
                 || parseOr(maxContextBytes.getText(), state.maxContextBytes)
                         != state.maxContextBytes
                 || !safe(npmRegistry.getText()).equals(safe(state.npmRegistry))
@@ -210,12 +203,6 @@ public final class DshSettingsConfigurable implements Configurable {
                         DshBundle.message("dsh.settings.request.timeout.label"),
                         10_000,
                         3_600_000);
-        int poll =
-                parseRequired(
-                        pollInterval.getText(),
-                        DshBundle.message("dsh.settings.poll.interval.label"),
-                        100,
-                        60_000);
         int context =
                 parseRequired(
                         maxContextBytes.getText(),
@@ -237,7 +224,6 @@ public final class DshSettingsConfigurable implements Configurable {
         state.runtimeVersion = version;
         state.startupTimeoutMs = startup;
         state.requestTimeoutMs = request;
-        state.pollIntervalMs = poll;
         state.maxContextBytes = context;
         state.npmRegistry = safe(npmRegistry.getText());
         state.apiKeyEnv = safe(apiKeyEnv.getText());
@@ -257,7 +243,6 @@ public final class DshSettingsConfigurable implements Configurable {
         runtimeVersion.setText(safe(state.runtimeVersion));
         startupTimeout.setText(Integer.toString(state.startupTimeoutMs));
         requestTimeout.setText(Integer.toString(state.requestTimeoutMs));
-        pollInterval.setText(Integer.toString(state.pollIntervalMs));
         maxContextBytes.setText(Integer.toString(state.maxContextBytes));
         npmRegistry.setText(state.npmRegistry);
         apiKeyEnv.setText(state.apiKeyEnv);

@@ -7,13 +7,8 @@ import com.intellij.util.EnvironmentUtil;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
-import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -31,24 +26,22 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import org.jetbrains.annotations.NotNull;
+import top.harcochen.dsh.remote.DshRemoteAuth;
+import top.harcochen.dsh.remote.DshRemoteUnaryClient;
 
 /**
- * Owns the local dsh web process and the connection URL used by the chat panel.
+ * Owns the local dsh web process and the connection URL used by the Remote layer.
  *
  * <p>The lifecycle mirrors {@code DshRuntime} in dsh-ide: a configured server is reused, an
  * existing localhost port is probed before spawning, and the child process is terminated when the
  * project closes. All blocking process and HTTP work runs off the Swing event dispatch thread.
+ * Protocol work (unary RPC, streams, authentication state) lives in {@code
+ * top.harcochen.dsh.remote}; this service only manages the process, the launch/base URLs, the
+ * credential injection, the shared start lock, and the reachability probe.
  */
 public final class DshRuntimeService implements Disposable {
     private static final Logger LOG = Logger.getInstance(DshRuntimeService.class);
     private static final int DEFAULT_PORT = 3080;
-    private static final int AUTH_TIMEOUT_MS = 1_500;
-    private static final HttpClient AUTH_HTTP_CLIENT =
-            HttpClient.newBuilder()
-                    .version(HttpClient.Version.HTTP_1_1)
-                    .connectTimeout(Duration.ofMillis(AUTH_TIMEOUT_MS))
-                    .followRedirects(HttpClient.Redirect.NEVER)
-                    .build();
 
     private final Project project;
     private final ExecutorService executor;
@@ -56,19 +49,19 @@ public final class DshRuntimeService implements Disposable {
             new CopyOnWriteArrayList<>();
     private final StringBuilder output = new StringBuilder();
     private final Object lifecycleLock = new Object();
-    private final Object authLock = new Object();
 
     /** Machine-wide start lock, shared with the VS Code extension. */
     private final DshRuntimeLock runtimeLock = new DshRuntimeLock();
 
+    /** Authority-bound session cookie exchange for the RC Remote API. */
+    private final DshRemoteAuth auth = new DshRemoteAuth(this::getUrl, this::getLaunchUrl);
+
     private volatile Process process;
     private volatile String baseUrl;
     private volatile String launchUrl;
-    private volatile String authCookie;
     private volatile RuntimeStatus status = new RuntimeStatus(RuntimeState.STOPPED, null, null);
     private volatile CompletableFuture<String> startFuture;
     private volatile boolean stopping;
-    private final DshRpcClient client;
 
     public DshRuntimeService(@NotNull Project project) {
         this.project = project;
@@ -79,12 +72,6 @@ public final class DshRuntimeService implements Disposable {
                             thread.setDaemon(true);
                             return thread;
                         });
-        this.client =
-                new DshRpcClient(
-                        () -> baseUrl,
-                        () -> DshSettingsState.getInstance(this.project).requestTimeoutMs,
-                        this::ensureAuthenticated,
-                        this::requestHeaders);
     }
 
     public static DshRuntimeService getInstance(@NotNull Project project) {
@@ -104,27 +91,26 @@ public final class DshRuntimeService implements Disposable {
         return launchUrl != null ? launchUrl : baseUrl;
     }
 
-    /** Headers for authenticated WebSocket upgrades and other non-RPC transports. */
-    Map<String, String> requestHeaders() {
-        String cookie = authCookie;
-        return cookie == null || cookie.isBlank()
-                ? Collections.emptyMap()
-                : Map.of("Cookie", cookie);
+    /** The launch URL backing the one-time token exchange; for diagnostics only. */
+    String getLaunchUrl() {
+        return launchUrl;
     }
 
-    /** Best-effort authentication entry point used by the asynchronous Mux client. */
-    boolean ensureAuthenticatedForTransport() {
-        try {
-            ensureAuthenticated();
-            return true;
-        } catch (DshRpcClient.DshRpcException error) {
-            LOG.debug("DSH Runtime authentication failed", error);
-            return false;
-        }
+    /** The shared authority-bound authentication state. */
+    public DshRemoteAuth auth() {
+        return auth;
     }
 
-    public DshRpcClient getClient() {
-        return client;
+    /** Reachability probe for the RC Remote API (no side effects; authenticates first). */
+    boolean isRemoteHealthy(String url) {
+        if (DshRuntimeEndpoint.normalizeUrl(url) == null) return false;
+        DshRemoteUnaryClient probe =
+                new DshRemoteUnaryClient(
+                        () -> url,
+                        () -> DshSettingsState.getInstance(project).requestTimeoutMs,
+                        auth,
+                        null);
+        return probe.probe();
     }
 
     public String getLogs() {
@@ -204,21 +190,21 @@ public final class DshRuntimeService implements Disposable {
         DshRuntimeEndpoint configuredEndpoint = DshRuntimeEndpoint.parse(settings.serverUrl, false);
         String configuredUrl =
                 configuredEndpoint == null
-                        ? DshRpcClient.normalizeUrl(settings.serverUrl)
+                        ? DshRuntimeEndpoint.normalizeUrl(settings.serverUrl)
                         : configuredEndpoint.baseUrl;
         if (configuredUrl != null) {
             setRuntimeEndpoint(
                     configuredEndpoint == null
                             ? DshRuntimeEndpoint.ofBase(configuredUrl)
                             : configuredEndpoint);
-        }
-        if (configuredUrl != null && client.isWebHealthy(configuredUrl)) {
-            setStatus(
-                    new RuntimeStatus(
-                            RuntimeState.RUNNING,
-                            configuredUrl,
-                            DshBundle.message("dsh.runtime.connected.configured")));
-            return configuredUrl;
+            if (isRemoteHealthy(configuredUrl)) {
+                setStatus(
+                        new RuntimeStatus(
+                                RuntimeState.RUNNING,
+                                configuredUrl,
+                                DshBundle.message("dsh.runtime.connected.configured")));
+                return configuredUrl;
+            }
         }
 
         int configuredPort = settings.serverPort;
@@ -289,7 +275,7 @@ public final class DshRuntimeService implements Disposable {
      * port probe can.
      */
     private DshRuntimeEndpoint findExistingRuntime(int configuredPort) {
-        // Probing has to publish each candidate first: isHarnessHealthy authenticates, and the
+        // Probing has to publish each candidate first: the probe authenticates, and the
         // launch-token exchange reads the endpoint fields. So the endpoint is dirty for the whole
         // probe, and a run that finds nothing must put back what it found on entry -- otherwise
         // baseUrl is left pointing at the last dead candidate and every later RPC goes there.
@@ -300,7 +286,7 @@ public final class DshRuntimeService implements Disposable {
             DshRuntimeEndpoint advertised = runtimeLock.readAdvertisedEndpoint();
             if (advertised != null) {
                 setRuntimeEndpoint(advertised);
-                if (client.isHarnessHealthy(advertised.baseUrl)) {
+                if (isRemoteHealthy(advertised.baseUrl)) {
                     settled = true;
                     return advertised;
                 }
@@ -312,7 +298,7 @@ public final class DshRuntimeService implements Disposable {
                 DshRuntimeEndpoint candidate =
                         DshRuntimeEndpoint.ofBase("http://127.0.0.1:" + port);
                 setRuntimeEndpoint(candidate);
-                if (client.isHarnessHealthy(candidate.baseUrl)) {
+                if (isRemoteHealthy(candidate.baseUrl)) {
                     settled = true;
                     return candidate;
                 }
@@ -496,7 +482,7 @@ public final class DshRuntimeService implements Disposable {
             }
             for (DshRuntimeEndpoint candidate : candidates) {
                 setRuntimeEndpoint(candidate);
-                if (client.isWebHealthy(candidate.baseUrl)) return candidate;
+                if (isRemoteHealthy(candidate.baseUrl)) return candidate;
             }
             try {
                 Thread.sleep(250);
@@ -574,7 +560,7 @@ public final class DshRuntimeService implements Disposable {
                 .append(launchUrl == null ? "not advertised" : "advertised")
                 .append('\n');
         report.append("Runtime auth cookie: ")
-                .append(authCookie == null ? "not established" : "established")
+                .append(auth.isEstablished() ? "established" : "not established")
                 .append('\n');
         report.append("API key environment variable: ").append(settings.apiKeyEnv).append('\n');
         String key = settings.apiKeyEnv == null ? "" : settings.apiKeyEnv.trim();
@@ -582,8 +568,8 @@ public final class DshRuntimeService implements Disposable {
                 .append(!key.isEmpty() && System.getenv(key) != null ? "yes" : "no")
                 .append('\n');
         if (baseUrl != null)
-            report.append("Runtime health: ")
-                    .append(client.isHealthy(baseUrl) ? "healthy" : "unreachable")
+            report.append("Remote health: ")
+                    .append(isRemoteHealthy(baseUrl) ? "healthy" : "unreachable")
                     .append('\n');
         // The shared lock is the first thing to look at whenever two editors
         // each spawned their own Runtime: a path mismatch is the usual cause.
@@ -612,9 +598,7 @@ public final class DshRuntimeService implements Disposable {
     private void clearRuntimeEndpoint() {
         baseUrl = null;
         launchUrl = null;
-        synchronized (authLock) {
-            authCookie = null;
-        }
+        auth.invalidate();
     }
 
     /**
@@ -633,9 +617,7 @@ public final class DshRuntimeService implements Disposable {
         baseUrl = previousBase;
         launchUrl = previousLaunch;
         if (changed) {
-            synchronized (authLock) {
-                authCookie = null;
-            }
+            auth.invalidate();
         }
     }
 
@@ -663,75 +645,7 @@ public final class DshRuntimeService implements Disposable {
         baseUrl = endpoint.baseUrl;
         launchUrl = nextLaunch;
         if (!Objects.equals(previousBase, baseUrl) || !Objects.equals(previousLaunch, launchUrl)) {
-            synchronized (authLock) {
-                authCookie = null;
-            }
-        }
-    }
-
-    /** Exchange the one-time launch URL token for the Runtime-owned session cookie. */
-    private void ensureAuthenticated() throws DshRpcClient.DshRpcException {
-        String launch = launchUrl;
-        if (launch == null || launch.isBlank() || authCookie != null) return;
-        synchronized (authLock) {
-            if (launchUrl == null || launchUrl.isBlank() || authCookie != null) return;
-            launch = launchUrl;
-            HttpRequest request;
-            try {
-                request =
-                        HttpRequest.newBuilder()
-                                .uri(URI.create(launch))
-                                .timeout(Duration.ofMillis(AUTH_TIMEOUT_MS))
-                                .header("accept", "text/plain")
-                                .GET()
-                                .build();
-            } catch (IllegalArgumentException error) {
-                throw new DshRpcClient.DshRpcException(
-                        "runtime.auth",
-                        "invalid-launch-url",
-                        "DSH Runtime launch URL is invalid",
-                        error);
-            }
-            try {
-                HttpResponse<String> response =
-                        AUTH_HTTP_CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
-                if (response.statusCode() == 303) {
-                    String setCookie = response.headers().firstValue("set-cookie").orElse(null);
-                    String cookie = setCookie == null ? null : setCookie.split(";", 2)[0].trim();
-                    if (cookie == null || !cookie.matches("^[^=;\\r\\n]+=[^;\\r\\n]*$")) {
-                        throw new DshRpcClient.DshRpcException(
-                                "runtime.auth",
-                                "missing-cookie",
-                                "DSH Runtime authentication did not return a session cookie");
-                    }
-                    if (Objects.equals(launchUrl, launch)) authCookie = cookie;
-                    return;
-                }
-                // Runtimes before 0.1.2 did not require a launch-token exchange. A successful
-                // response remains a valid compatibility path for custom/older servers.
-                if (response.statusCode() >= 200 && response.statusCode() < 300) return;
-                throw new DshRpcClient.DshRpcException(
-                        "runtime.auth",
-                        "http-" + response.statusCode(),
-                        "DSH Runtime authentication returned HTTP " + response.statusCode());
-            } catch (DshRpcClient.DshRpcException error) {
-                throw error;
-            } catch (InterruptedException error) {
-                Thread.currentThread().interrupt();
-                throw new DshRpcClient.DshRpcException(
-                        "runtime.auth",
-                        "interrupted",
-                        "DSH Runtime authentication was interrupted",
-                        error);
-            } catch (Exception error) {
-                throw new DshRpcClient.DshRpcException(
-                        "runtime.auth",
-                        "transport-error",
-                        error.getMessage() == null
-                                ? "DSH Runtime authentication failed"
-                                : error.getMessage(),
-                        error);
-            }
+            auth.invalidate();
         }
     }
 

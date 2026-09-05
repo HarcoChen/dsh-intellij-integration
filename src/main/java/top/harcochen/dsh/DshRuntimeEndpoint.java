@@ -107,4 +107,26 @@ final class DshRuntimeEndpoint {
         Matcher matcher = OUTPUT_URL.matcher(value);
         return matcher.find() ? parse(matcher.group(), true) : null;
     }
+
+    /**
+     * Normalize a configured base URL: trim trailing slashes and reject anything that is not a
+     * plain http(s) origin with an explicit port.
+     */
+    public static String normalizeUrl(String value) {
+        if (value == null || value.isBlank()) return null;
+        String candidate = value.trim().replaceAll("/+\\z", "");
+        try {
+            URI uri = URI.create(candidate);
+            if (!("http".equalsIgnoreCase(uri.getScheme())
+                            || "https".equalsIgnoreCase(uri.getScheme()))
+                    || uri.getUserInfo() != null
+                    || uri.getQuery() != null
+                    || uri.getFragment() != null
+                    || uri.getHost() == null
+                    || uri.getPort() <= 0) return null;
+            return candidate;
+        } catch (IllegalArgumentException ignored) {
+            return null;
+        }
+    }
 }

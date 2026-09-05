@@ -2,34 +2,31 @@ package top.harcochen.dsh;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
-import com.google.gson.JsonNull;
 import com.google.gson.JsonObject;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
-/** Thread-safe owner of history caches and transient per-session mux projections. */
+/**
+ * UI-side caches for the chat panel: projected message history, command/skill catalogs, and the
+ * authoritative lookup behind checkpoint actions.
+ *
+ * <p>Live domain state (queue, jobs, projections, interactions, the session catalog, and the
+ * followed history itself) comes from the Remote snapshot published by {@code
+ * top.harcochen.dsh.remote.DshRemoteService}; this store only caches derived presentation results
+ * and never sees wire frames.
+ */
 final class DshSessionStateStore {
-    private static final int QUEUE_PREVIEW_CHARS = 200;
-
     private final Object lock = new Object();
-    private final Runnable stateChanged;
     private final DshMarkdownRenderCache markdownRenderCache;
-    private final Map<String, LinkedHashMap<String, JsonObject>> interactionsBySession =
-            new LinkedHashMap<>();
-    private final Map<String, JsonArray> queueBySession = new LinkedHashMap<>();
-    private final Map<String, JsonArray> jobsBySession = new LinkedHashMap<>();
-    private final Map<String, Map<String, ProjectionCell>> projectionCellsBySession =
-            new LinkedHashMap<>();
-    private final Map<String, HistoryProjectionCache> historyCaches = new LinkedHashMap<>();
-    private final Map<String, JsonArray> commandCatalogs = new LinkedHashMap<>();
-    private final Map<String, JsonArray> skillCatalogs = new LinkedHashMap<>();
+    private final Map<String, HistoryProjectionCache> historyCaches =
+            new java.util.LinkedHashMap<>();
+    private final Map<String, JsonArray> commandCatalogs = new java.util.LinkedHashMap<>();
+    private final Map<String, JsonArray> skillCatalogs = new java.util.LinkedHashMap<>();
 
-    DshSessionStateStore(DshMarkdownRenderCache markdownRenderCache, Runnable stateChanged) {
+    DshSessionStateStore(DshMarkdownRenderCache markdownRenderCache) {
         this.markdownRenderCache = markdownRenderCache;
-        this.stateChanged = stateChanged;
     }
 
     HistoryProjection projectHistory(String session, JsonObject history, String statusLabel) {
@@ -59,43 +56,23 @@ final class DshSessionStateStore {
         }
     }
 
-    Set<String> prune(JsonArray sessions, String selectedSession) {
-        Set<String> live = new HashSet<>();
-        for (JsonElement candidate : sessions) {
-            if (!candidate.isJsonObject()) {
-                continue;
-            }
-            String id = DshJson.string(candidate.getAsJsonObject(), "sessionId");
-            if (id != null) {
-                live.add(id);
-            }
-        }
-        if (selectedSession != null) {
-            live.add(selectedSession);
-        }
+    void prune(java.util.Collection<String> liveSessions) {
         synchronized (lock) {
-            queueBySession.keySet().retainAll(live);
-            jobsBySession.keySet().retainAll(live);
-            projectionCellsBySession.keySet().retainAll(live);
-            historyCaches.keySet().retainAll(live);
-            commandCatalogs.keySet().retainAll(live);
-            skillCatalogs.keySet().retainAll(live);
-            interactionsBySession.keySet().retainAll(live);
+            historyCaches.keySet().retainAll(liveSessions);
+            commandCatalogs.keySet().retainAll(liveSessions);
+            skillCatalogs.keySet().retainAll(liveSessions);
         }
-        return live;
     }
 
     boolean hasCommandCatalog(String session) {
-        return hasCatalog(commandCatalogs, session);
+        synchronized (lock) {
+            return commandCatalogs.containsKey(session);
+        }
     }
 
     boolean hasSkillCatalog(String session) {
-        return hasCatalog(skillCatalogs, session);
-    }
-
-    private boolean hasCatalog(Map<String, JsonArray> source, String session) {
         synchronized (lock) {
-            return source.containsKey(session);
+            return skillCatalogs.containsKey(session);
         }
     }
 
@@ -146,57 +123,6 @@ final class DshSessionStateStore {
             JsonArray known = source.get(session);
             return known == null ? new JsonArray() : known.deepCopy();
         }
-    }
-
-    void seedProjections(String session, JsonObject history) {
-        JsonObject block =
-                history != null
-                                && history.has("projections")
-                                && history.get("projections").isJsonObject()
-                        ? history.getAsJsonObject("projections")
-                        : null;
-        JsonObject values =
-                block != null && block.has("values") && block.get("values").isJsonObject()
-                        ? block.getAsJsonObject("values")
-                        : new JsonObject();
-        long asOfSeq =
-                block != null && block.has("asOfSeq") && block.get("asOfSeq").isJsonPrimitive()
-                        ? DshJson.longValue(block.get("asOfSeq"), -1L)
-                        : -1L;
-        synchronized (lock) {
-            Map<String, ProjectionCell> cells =
-                    projectionCellsBySession.computeIfAbsent(
-                            session, ignored -> new LinkedHashMap<>());
-            cells.entrySet()
-                    .removeIf(
-                            entry -> entry.getValue().seq < asOfSeq && !values.has(entry.getKey()));
-            for (Map.Entry<String, JsonElement> entry : values.entrySet()) {
-                ProjectionCell known = cells.get(entry.getKey());
-                if (known == null || known.seq <= asOfSeq) {
-                    cells.put(
-                            entry.getKey(),
-                            new ProjectionCell(entry.getValue().deepCopy(), asOfSeq));
-                }
-            }
-        }
-    }
-
-    ProjectionSnapshot projection(String session, String key) {
-        if (session == null) {
-            return null;
-        }
-        synchronized (lock) {
-            Map<String, ProjectionCell> cells = projectionCellsBySession.get(session);
-            ProjectionCell cell = cells == null ? null : cells.get(key);
-            return cell == null ? null : new ProjectionSnapshot(cell.value, cell.seq);
-        }
-    }
-
-    JsonElement projectionValue(String session, String key) {
-        ProjectionSnapshot snapshot = projection(session, key);
-        return snapshot == null || snapshot.value() == null || snapshot.value().isJsonNull()
-                ? null
-                : snapshot.value();
     }
 
     /**
@@ -284,210 +210,11 @@ final class DshSessionStateStore {
         return number > 0 && number <= Integer.MAX_VALUE ? (int) number : null;
     }
 
-    void receiveMuxFrame(JsonObject frame, String selectedSession) {
-        String type = DshJson.string(frame, "type");
-        String frameSession = DshJson.string(frame, "sessionId");
-        if (type == null || frameSession == null) {
-            return;
-        }
-        boolean changed;
-        synchronized (lock) {
-            changed = acceptMuxFrame(frame, type, frameSession);
-        }
-        boolean titleChanged =
-                changed
-                        && "session/projection".equals(type)
-                        && "title".equals(DshJson.string(frame, "key"));
-        if (changed && (frameSession.equals(selectedSession) || titleChanged)) {
-            stateChanged.run();
-        }
-    }
+    // ---------------------------------------------------------------------------
+    // static projection view builders fed from the Remote snapshot
+    // ---------------------------------------------------------------------------
 
-    private boolean acceptMuxFrame(JsonObject frame, String type, String frameSession) {
-        if ("session/queue".equals(type)) {
-            queueBySession.put(frameSession, queueDockItems(frame.get("items")));
-            return true;
-        }
-        if ("session/jobs".equals(type)) {
-            jobsBySession.put(frameSession, jobCenterItems(frameSession, frame.get("jobs")));
-            return true;
-        }
-        if ("session/projection".equals(type)) {
-            // The title lands in this session's projection cells like any other key. Readers
-            // overlay it onto the catalog via sessionTitle, which keeps the catalog array owned
-            // by its single writer instead of being mutated from the mux thread.
-            return acceptProjectionFrame(frameSession, frame);
-        }
-        LinkedHashMap<String, JsonObject> interactions =
-                interactionsBySession.computeIfAbsent(
-                        frameSession, ignored -> new LinkedHashMap<>());
-        if ("session/subscribed".equals(type)) {
-            interactions.clear();
-            queueBySession.remove(frameSession);
-            jobsBySession.remove(frameSession);
-            return true;
-        }
-        if ("approval/requested".equals(type)) {
-            String rpcId = DshJson.string(frame, "_rpcId");
-            String approvalId = DshJson.string(frame, "approvalId");
-            String toolName = DshJson.string(frame, "toolName");
-            if (rpcId == null || approvalId == null || toolName == null) {
-                return false;
-            }
-            JsonObject item = new JsonObject();
-            item.addProperty("key", "a:" + rpcId);
-            item.addProperty("kind", "approval");
-            item.addProperty("status", "pending");
-            item.addProperty("approvalId", approvalId);
-            item.addProperty("toolName", toolName);
-            DshJson.copyString(frame, item, "reason");
-            DshJson.copyString(frame, item, "callId");
-            interactions.put("a:" + rpcId, item);
-            return true;
-        }
-        if ("approval/resolved".equals(type)) {
-            String approvalId = DshJson.string(frame, "approvalId");
-            if (approvalId != null) {
-                interactions
-                        .entrySet()
-                        .removeIf(
-                                entry ->
-                                        approvalId.equals(
-                                                DshJson.string(entry.getValue(), "approvalId")));
-                return true;
-            }
-            return false;
-        }
-        if ("question/requested".equals(type)) {
-            String rpcId = DshJson.string(frame, "_rpcId");
-            if (rpcId == null || !frame.has("questions") || !frame.get("questions").isJsonArray()) {
-                return false;
-            }
-            JsonObject item = new JsonObject();
-            item.addProperty("key", "q:" + rpcId);
-            item.addProperty("kind", "question");
-            item.addProperty("status", "pending");
-            item.add("questions", frame.getAsJsonArray("questions").deepCopy());
-            interactions.put("q:" + rpcId, item);
-            return true;
-        }
-        if ("question/resolved".equals(type)) {
-            String rpcId = DshJson.string(frame, "questionRpcId");
-            if (rpcId != null) {
-                interactions.remove("q:" + rpcId);
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private boolean acceptProjectionFrame(String session, JsonObject frame) {
-        String key = DshJson.string(frame, "key");
-        if (key == null
-                || key.isBlank()
-                || !frame.has("seq")
-                || !frame.get("seq").isJsonPrimitive()) {
-            return false;
-        }
-        long seq = DshJson.longValue(frame.get("seq"), Long.MIN_VALUE);
-        if (seq == Long.MIN_VALUE) {
-            return false;
-        }
-        Map<String, ProjectionCell> cells =
-                projectionCellsBySession.computeIfAbsent(session, ignored -> new LinkedHashMap<>());
-        ProjectionCell known = cells.get(key);
-        if (known != null && known.seq > seq) {
-            return false;
-        }
-        JsonElement value = frame.has("value") ? frame.get("value").deepCopy() : JsonNull.INSTANCE;
-        cells.put(key, new ProjectionCell(value, seq));
-        return true;
-    }
-
-    /** The live title this session last projected, or null when it has not projected one. */
-    String sessionTitle(String session) {
-        JsonElement value = projectionValue(session, "title");
-        if (value == null || !value.isJsonPrimitive()) {
-            return null;
-        }
-        String title = value.getAsString();
-        return title.isBlank() ? null : title;
-    }
-
-    JsonArray queue(String session) {
-        return transientSnapshot(queueBySession, session);
-    }
-
-    JsonArray jobs(String session) {
-        return transientSnapshot(jobsBySession, session);
-    }
-
-    private JsonArray transientSnapshot(Map<String, JsonArray> source, String session) {
-        if (session == null) {
-            return new JsonArray();
-        }
-        synchronized (lock) {
-            JsonArray known = source.get(session);
-            return known == null ? new JsonArray() : known.deepCopy();
-        }
-    }
-
-    JsonArray interactions(String session) {
-        JsonArray result = new JsonArray();
-        if (session == null) {
-            return result;
-        }
-        synchronized (lock) {
-            Map<String, JsonObject> interactions = interactionsBySession.get(session);
-            if (interactions != null) {
-                for (JsonObject item : interactions.values()) {
-                    result.add(item.deepCopy());
-                }
-            }
-        }
-        return result;
-    }
-
-    boolean hasPendingInteractions(String session) {
-        if (session == null) {
-            return false;
-        }
-        synchronized (lock) {
-            Map<String, JsonObject> interactions = interactionsBySession.get(session);
-            if (interactions == null) {
-                return false;
-            }
-            return interactions.values().stream()
-                    .anyMatch(
-                            item -> {
-                                String status = DshJson.string(item, "status");
-                                return "pending".equals(status) || "submitting".equals(status);
-                            });
-        }
-    }
-
-    void updateInteractionStatus(String session, String key, String status, String error) {
-        if (key == null) {
-            return;
-        }
-        synchronized (lock) {
-            JsonObject item =
-                    interactionsBySession.getOrDefault(session, new LinkedHashMap<>()).get(key);
-            if (item == null) {
-                return;
-            }
-            item.addProperty("status", status);
-            if (error == null) {
-                item.remove("error");
-            } else {
-                item.addProperty("error", error);
-            }
-        }
-        stateChanged.run();
-    }
-
-    JsonArray todos(String session) {
-        JsonElement value = projectionValue(session, "todos");
+    static JsonArray todos(JsonElement value) {
         if (value == null || !value.isJsonArray()) {
             return null;
         }
@@ -520,8 +247,7 @@ final class DshSessionStateStore {
         return result;
     }
 
-    JsonObject imageLimits(String session) {
-        JsonElement value = projectionValue(session, "imageLimits");
+    static JsonObject imageLimits(JsonElement value) {
         if (value == null || !value.isJsonObject()) {
             return null;
         }
@@ -550,8 +276,7 @@ final class DshSessionStateStore {
         return result;
     }
 
-    JsonObject sessionStats(String session) {
-        JsonElement value = projectionValue(session, "sessionStats");
+    static JsonObject sessionStats(JsonElement value) {
         if (value == null || !value.isJsonObject()) {
             return null;
         }
@@ -570,8 +295,7 @@ final class DshSessionStateStore {
     }
 
     /** Validate and expose the optional public plan-mode projection. */
-    JsonObject plan(String session) {
-        JsonElement value = projectionValue(session, "plan");
+    static JsonObject plan(JsonElement value) {
         if (value == null || !value.isJsonObject()) return null;
         JsonObject source = value.getAsJsonObject();
         if (!source.has("active")
@@ -588,21 +312,43 @@ final class DshSessionStateStore {
         return result;
     }
 
-    JsonObject tokenUsage(String session, JsonObject modelCatalog) {
+    /** Merge the session's model-selection projection with the host-wide catalog default. */
+    static JsonObject currentModelRoute(JsonElement modelSelection, JsonObject catalog) {
         JsonObject route = new JsonObject();
-        JsonObject catalog = modelCatalog;
         JsonObject current =
-                catalog != null && catalog.has("current") && catalog.get("current").isJsonObject()
-                        ? catalog.getAsJsonObject("current")
+                catalog != null && catalog.has("default") && catalog.get("default").isJsonObject()
+                        ? catalog.getAsJsonObject("default")
                         : null;
-        if (current != null) {
-            DshJson.copyString(current, route, "provider");
-            DshJson.copyString(current, route, "model");
-            DshJson.copyString(current, route, "reasoningEffort");
+        if (modelSelection != null && modelSelection.isJsonObject()) {
+            JsonObject selection = modelSelection.getAsJsonObject();
+            JsonObject next =
+                    selection.has("next") && selection.get("next").isJsonObject()
+                            ? selection.getAsJsonObject("next")
+                            : null;
+            JsonObject lastUsed =
+                    next == null
+                                    && selection.has("lastUsed")
+                                    && selection.get("lastUsed").isJsonObject()
+                            ? selection.getAsJsonObject("lastUsed")
+                            : null;
+            JsonObject projected = next != null ? next : lastUsed;
+            if (projected != null) current = projected;
         }
-        JsonObject billing = billingProjection(session);
-        JsonObject context = contextPressureProjection(session);
-        JsonObject breakdown = contextBreakdownProjection(session);
+        if (current == null) return route;
+        DshJson.copyString(current, route, "provider");
+        DshJson.copyString(current, route, "model");
+        DshJson.copyString(current, route, "reasoningEffort");
+        return route;
+    }
+
+    static JsonObject tokenUsage(
+            JsonObject route,
+            JsonElement tokenUsageCell,
+            JsonElement contextPressureCell,
+            JsonElement contextBreakdownCell) {
+        JsonObject billing = billingProjection(tokenUsageCell);
+        JsonObject context = contextPressureProjection(contextPressureCell);
+        JsonObject breakdown = contextBreakdownProjection(contextBreakdownCell);
         if (route.isEmpty() && billing == null && context == null && breakdown == null) {
             return null;
         }
@@ -620,8 +366,7 @@ final class DshSessionStateStore {
         return result;
     }
 
-    private JsonObject billingProjection(String session) {
-        JsonElement usage = projectionValue(session, "tokenUsage");
+    private static JsonObject billingProjection(JsonElement usage) {
         if (usage == null || !usage.isJsonObject()) {
             return null;
         }
@@ -640,8 +385,7 @@ final class DshSessionStateStore {
         return billing;
     }
 
-    private JsonObject contextPressureProjection(String session) {
-        JsonElement pressure = projectionValue(session, "contextPressure");
+    private static JsonObject contextPressureProjection(JsonElement pressure) {
         if (pressure == null || !pressure.isJsonObject()) {
             return null;
         }
@@ -659,8 +403,7 @@ final class DshSessionStateStore {
         return result.isEmpty() ? null : result;
     }
 
-    private JsonObject contextBreakdownProjection(String session) {
-        JsonElement composition = projectionValue(session, "contextBreakdown");
+    private static JsonObject contextBreakdownProjection(JsonElement composition) {
         if (composition == null || !composition.isJsonObject()) {
             return null;
         }
@@ -725,131 +468,6 @@ final class DshSessionStateStore {
         return result;
     }
 
-    private static JsonArray queueDockItems(JsonElement items) {
-        JsonArray result = new JsonArray();
-        if (items == null || !items.isJsonArray()) {
-            return result;
-        }
-        for (JsonElement candidate : items.getAsJsonArray()) {
-            if (!candidate.isJsonObject()) {
-                continue;
-            }
-            JsonObject item = candidate.getAsJsonObject();
-            String id = DshJson.string(item, "id");
-            String placement = DshJson.string(item, "placement");
-            if (id == null || id.isBlank()) {
-                continue;
-            }
-            if (!"queued".equals(placement) && !"steering".equals(placement)) {
-                continue;
-            }
-            JsonObject message =
-                    item.has("message") && item.get("message").isJsonObject()
-                            ? item.getAsJsonObject("message")
-                            : new JsonObject();
-            JsonArray content =
-                    message.has("content") && message.get("content").isJsonArray()
-                            ? message.getAsJsonArray("content")
-                            : new JsonArray();
-            StringBuilder flat = new StringBuilder();
-            StringBuilder editable = new StringBuilder();
-            boolean textOnly = true;
-            for (JsonElement blockElement : content) {
-                if (!blockElement.isJsonObject()) {
-                    textOnly = false;
-                    continue;
-                }
-                JsonObject block = blockElement.getAsJsonObject();
-                String blockType = DshJson.string(block, "type");
-                String text = DshJson.string(block, "text");
-                if ("text".equals(blockType) && text != null) {
-                    if (!flat.isEmpty()) {
-                        flat.append(' ');
-                    }
-                    flat.append(text);
-                    editable.append(text);
-                } else {
-                    textOnly = false;
-                    if (!flat.isEmpty()) {
-                        flat.append(' ');
-                    }
-                    flat.append('[').append(blockType == null ? "content" : blockType).append(']');
-                }
-            }
-            JsonObject row = new JsonObject();
-            row.addProperty("id", id);
-            row.addProperty("placement", placement);
-            row.addProperty(
-                    "preview", clampPreview(flat.toString().replaceAll("\\s+", " ").trim()));
-            if (textOnly) {
-                row.addProperty("editableText", editable.toString());
-            }
-            result.add(row);
-        }
-        return result;
-    }
-
-    private static String clampPreview(String preview) {
-        int[] points = preview.codePoints().toArray();
-        if (points.length <= QUEUE_PREVIEW_CHARS) {
-            return preview;
-        }
-        return new String(points, 0, QUEUE_PREVIEW_CHARS) + "\u2026";
-    }
-
-    private static JsonArray jobCenterItems(String ownerSessionId, JsonElement jobs) {
-        JsonArray result = new JsonArray();
-        if (jobs == null || !jobs.isJsonArray()) {
-            return result;
-        }
-        for (JsonElement candidate : jobs.getAsJsonArray()) {
-            if (!candidate.isJsonObject()) {
-                continue;
-            }
-            JsonObject job = candidate.getAsJsonObject();
-            String id = DshJson.string(job, "id");
-            String kind = DshJson.string(job, "kind");
-            String label = DshJson.string(job, "label");
-            String status = DshJson.string(job, "status");
-            if (id == null || kind == null || label == null || status == null) {
-                continue;
-            }
-            if (!"running".equals(status)
-                    && !"stopping".equals(status)
-                    && !"completed".equals(status)
-                    && !"killed".equals(status)
-                    && !"failed".equals(status)) {
-                continue;
-            }
-            if (!job.has("startedAt") || !job.get("startedAt").isJsonPrimitive()) {
-                continue;
-            }
-            long startedAt = DshJson.longValue(job.get("startedAt"), Long.MIN_VALUE);
-            if (startedAt == Long.MIN_VALUE) {
-                continue;
-            }
-            JsonObject row = new JsonObject();
-            row.addProperty("id", id);
-            row.addProperty("kind", kind);
-            row.addProperty("label", label);
-            row.addProperty("ownerSessionId", ownerSessionId);
-            row.addProperty("status", status);
-            String detail = DshJson.string(job, "detail");
-            if (detail != null) {
-                row.addProperty("outputSummary", detail);
-            }
-            row.addProperty("startedAt", startedAt);
-            if (job.has("finishedAt") && job.get("finishedAt").isJsonPrimitive()) {
-                long finishedAt = DshJson.longValue(job.get("finishedAt"), Long.MIN_VALUE);
-                if (finishedAt != Long.MIN_VALUE) {
-                    row.addProperty("finishedAt", finishedAt);
-                }
-            }
-            result.add(row);
-        }
-        return result;
-    }
-
     private static boolean nonNegativeNumber(JsonObject source, String key) {
         if (source == null
                 || !source.has(key)
@@ -877,18 +495,6 @@ final class DshSessionStateStore {
     }
 
     record HistoryProjection(DshMessageProjector.Projection projection, JsonArray messages) {}
-
-    record ProjectionSnapshot(JsonElement value, long seq) {}
-
-    private static final class ProjectionCell {
-        private final JsonElement value;
-        private final long seq;
-
-        private ProjectionCell(JsonElement value, long seq) {
-            this.value = value;
-            this.seq = seq;
-        }
-    }
 
     private static final class HistoryProjectionCache {
         private final JsonArray events;

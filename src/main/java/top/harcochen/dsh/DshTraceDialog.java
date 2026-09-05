@@ -29,9 +29,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -39,6 +38,8 @@ import javax.swing.JComponent;
 import javax.swing.UIManager;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import top.harcochen.dsh.remote.DshRemoteService;
+import top.harcochen.dsh.remote.DshRemoteState;
 
 /** IntelliJ host for the same Trace ledger webview and protocol used by dsh-ide. */
 final class DshTraceDialog extends DialogWrapper {
@@ -85,17 +86,18 @@ final class DshTraceDialog extends DialogWrapper {
         private final String sessionId;
         private final String sessionTitle;
         private final DshRuntimeService runtime;
-        private final DshRpcClient client;
+        private final DshRemoteService remote;
         private final JBCefBrowser browser;
         private final JBCefJSQuery actionQuery;
-        private final ScheduledExecutorService refresher;
+        private final ExecutorService refresher;
         private final AtomicBoolean refreshInFlight = new AtomicBoolean();
+        private final AtomicBoolean refreshQueued = new AtomicBoolean();
+        private volatile long appliedTailCursor = Long.MIN_VALUE;
         private volatile DshTraceProjector.Projection projection =
                 new DshTraceProjector.Projection(List.of(), List.of(), java.util.Map.of(), 0);
         private volatile JsonObject history = new JsonObject();
         private volatile boolean ready;
         private volatile boolean baselineLoaded;
-        private volatile Integer lastTailHash;
         private volatile boolean disposed;
         private String query = "";
         private int offset;
@@ -110,7 +112,7 @@ final class DshTraceDialog extends DialogWrapper {
             this.sessionId = sessionId;
             this.sessionTitle = sessionTitle;
             this.runtime = DshRuntimeService.getInstance(project);
-            this.client = runtime.getClient();
+            this.remote = DshRemoteService.getInstance(project);
             this.pendingSeq = selectedSeq < 0 ? null : (long) selectedSeq;
             this.browser = new JBCefBrowser();
             this.actionQuery = JBCefJSQuery.create((JBCefBrowserBase) browser);
@@ -127,7 +129,7 @@ final class DshTraceDialog extends DialogWrapper {
                         return null;
                     });
             this.refresher =
-                    Executors.newSingleThreadScheduledExecutor(
+                    Executors.newSingleThreadExecutor(
                             runnable -> {
                                 Thread thread = new Thread(runnable, "dsh-intellij-trace-refresh");
                                 thread.setDaemon(true);
@@ -135,7 +137,26 @@ final class DshTraceDialog extends DialogWrapper {
                             });
             browser.getComponent().setPreferredSize(new Dimension(1180, 760));
             browser.loadHTML(html());
-            refresher.scheduleWithFixedDelay(this::refresh, 0, 1, TimeUnit.SECONDS);
+            // Follow the session's live history stream instead of polling it.
+            remote.addListener(this::onSnapshot);
+            remote.retainSession(sessionId);
+            queueRefresh();
+        }
+
+        /** Runs on the Remote connection executor. */
+        private void onSnapshot(DshRemoteState.Snapshot snapshotFrame) {
+            DshRemoteState.FollowView view = snapshotFrame.follows.get("session:" + sessionId);
+            if (view == null || view.cursor == appliedTailCursor) return;
+            queueRefresh();
+        }
+
+        private void queueRefresh() {
+            if (disposed || !refreshQueued.compareAndSet(false, true)) return;
+            refresher.execute(
+                    () -> {
+                        refreshQueued.set(false);
+                        refresh();
+                    });
         }
 
         JComponent component() {
@@ -146,15 +167,13 @@ final class DshTraceDialog extends DialogWrapper {
             if (disposed || !refreshInFlight.compareAndSet(false, true)) return;
             try {
                 JsonObject next;
+                JsonObject tail = currentTail();
                 if (baselineLoaded) {
-                    JsonObject tail = client.history(sessionId, 1_000);
-                    int tailHash = tail.hashCode();
-                    if (lastTailHash != null && lastTailHash == tailHash) return;
-                    lastTailHash = tailHash;
+                    if (tail == null) return;
                     next = mergeHistory(history, tail);
                 } else {
-                    next = client.traceHistory(sessionId);
-                    lastTailHash = next.hashCode();
+                    next = remote.traceHistory(sessionId, 160);
+                    if (tail != null) next = mergeHistory(next, tail);
                 }
                 DshTraceProjector.Projection nextProjection =
                         !baselineLoaded || !sameEvents(history, next)
@@ -163,6 +182,7 @@ final class DshTraceDialog extends DialogWrapper {
                 history = next;
                 projection = nextProjection;
                 baselineLoaded = true;
+                appliedTailCursor = currentCursor();
                 error = null;
                 ApplicationManager.getApplication()
                         .invokeLater(
@@ -177,6 +197,21 @@ final class DshTraceDialog extends DialogWrapper {
             } finally {
                 refreshInFlight.set(false);
             }
+        }
+
+        /** The followed tail for this session, or null while no follow is active. */
+        private JsonObject currentTail() {
+            DshRemoteState.FollowView view = remote.snapshot().follows.get("session:" + sessionId);
+            if (view == null) return null;
+            JsonObject tail = new JsonObject();
+            tail.add("events", view.events);
+            tail.addProperty("hasMore", view.hasMore);
+            return tail;
+        }
+
+        private long currentCursor() {
+            DshRemoteState.FollowView view = remote.snapshot().follows.get("session:" + sessionId);
+            return view == null ? Long.MIN_VALUE : view.cursor;
         }
 
         private void receive(JsonObject action) {
@@ -284,12 +319,15 @@ final class DshTraceDialog extends DialogWrapper {
             state.addProperty("title", sessionTitle());
             JsonObject status = new JsonObject();
             DshRuntimeService.RuntimeStatus runtimeStatus = runtime.getStatus();
-            status.addProperty(
-                    "running", runtimeStatus.state == DshRuntimeService.RuntimeState.RUNNING);
+            boolean runtimeRunning = runtimeStatus.state == DshRuntimeService.RuntimeState.RUNNING;
+            boolean remoteReady = DshRemoteService.PHASE_CONNECTED.equals(remote.snapshot().phase);
+            status.addProperty("running", runtimeRunning && remoteReady);
             status.addProperty("attention", false);
             if (runtimeStatus.state == DshRuntimeService.RuntimeState.ERROR
                     && runtimeStatus.message != null) {
                 status.addProperty("error", runtimeStatus.message);
+            } else if (runtimeRunning && !remoteReady && remote.snapshot().message != null) {
+                status.addProperty("error", remote.snapshot().message);
             }
             state.add("status", status);
             state.addProperty("query", query);
@@ -970,6 +1008,8 @@ final class DshTraceDialog extends DialogWrapper {
         @Override
         public void dispose() {
             disposed = true;
+            remote.removeListener(this::onSnapshot);
+            remote.releaseSession(sessionId);
             refresher.shutdownNow();
             Disposer.dispose(actionQuery);
             Disposer.dispose(browser);

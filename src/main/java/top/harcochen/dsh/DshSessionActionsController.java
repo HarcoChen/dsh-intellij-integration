@@ -13,13 +13,15 @@ import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
+import top.harcochen.dsh.remote.DshRemoteService;
+import top.harcochen.dsh.remote.DshRemoteState;
 
 /** Owns session menu actions and the selected session's model catalog. */
 final class DshSessionActionsController {
     private static final Logger LOG = Logger.getInstance(DshSessionActionsController.class);
 
     private final Project project;
-    private final DshRpcClient client;
+    private final DshRemoteService remote;
     private final ExecutorService operations;
     private final Supplier<String> sessionId;
     private final Supplier<JsonArray> sessions;
@@ -32,10 +34,12 @@ final class DshSessionActionsController {
 
     private volatile JsonObject modelCatalog;
     private volatile String modelCatalogSession;
+    private volatile JsonObject currentRouteCache;
+    private volatile String currentRouteSession;
 
     DshSessionActionsController(
             Project project,
-            DshRpcClient client,
+            DshRemoteService remote,
             ExecutorService operations,
             Supplier<String> sessionId,
             Supplier<JsonArray> sessions,
@@ -46,7 +50,7 @@ final class DshSessionActionsController {
             Consumer<String> notifier,
             Consumer<String> errorSink) {
         this.project = project;
-        this.client = client;
+        this.remote = remote;
         this.operations = operations;
         this.sessionId = sessionId;
         this.sessions = sessions;
@@ -65,7 +69,7 @@ final class DshSessionActionsController {
         try {
             // Claim the session only once the load succeeds, so a transient RPC failure does not
             // permanently pin this session to an empty catalog via the guard above.
-            JsonObject catalog = client.modelCatalog(session);
+            JsonObject catalog = remote.modelCatalog();
             modelCatalog = catalog;
             modelCatalogSession = session;
         } catch (Exception error) {
@@ -77,14 +81,13 @@ final class DshSessionActionsController {
         return session != null && session.equals(modelCatalogSession) ? modelCatalog : null;
     }
 
-    JsonObject reasoningEffort(String session) {
+    JsonObject reasoningEffort(String session, DshRemoteState.SessionView view) {
         JsonObject value = new JsonObject();
         JsonArray options = new JsonArray();
         JsonObject catalog = modelCatalog(session);
-        JsonObject current =
-                catalog != null && catalog.has("current") && catalog.get("current").isJsonObject()
-                        ? catalog.getAsJsonObject("current")
-                        : null;
+        JsonObject current = currentRoute(view, catalog);
+        currentRouteCache = current;
+        currentRouteSession = session;
         if (current != null && current.has("reasoningEffort")) {
             value.addProperty("current", DshJson.stringOr(current, "reasoningEffort", "default"));
         }
@@ -104,6 +107,21 @@ final class DshSessionActionsController {
         }
         value.add("options", options);
         return value;
+    }
+
+    /** Merge the host-wide catalog default with this session's model-selection projection. */
+    private JsonObject currentRoute(DshRemoteState.SessionView view, JsonObject catalog) {
+        if (view == null) {
+            return catalog != null
+                            && catalog.has("default")
+                            && catalog.get("default").isJsonObject()
+                    ? catalog.getAsJsonObject("default")
+                    : null;
+        }
+        DshRemoteState.ProjectionCell cell = view.projections.get("modelSelection");
+        JsonObject route =
+                DshSessionStateStore.currentModelRoute(cell == null ? null : cell.value(), catalog);
+        return route.has("provider") ? route : null;
     }
 
     private static void addModelEfforts(JsonArray options, JsonObject group, String selectedModel) {
@@ -221,7 +239,7 @@ final class DshSessionActionsController {
 
     private void rename(String session, String title) {
         try {
-            client.renameSession(session, title);
+            remote.renameSession(session, title);
             refreshState.run();
         } catch (Exception error) {
             report(error);
@@ -241,7 +259,7 @@ final class DshSessionActionsController {
         operations.execute(
                 () -> {
                     try {
-                        String forked = client.forkSession(current, atSeq);
+                        String forked = remote.forkSession(current, atSeq);
                         if (!forked.isBlank()) {
                             selectSession.accept(forked);
                         }
@@ -274,7 +292,7 @@ final class DshSessionActionsController {
 
     private void archive(String session) {
         try {
-            client.archiveSession(session);
+            remote.archiveSession(session);
             clearSession.run();
             refreshState.run();
         } catch (Exception error) {
@@ -292,7 +310,11 @@ final class DshSessionActionsController {
 
     private void loadModels(String session) {
         try {
-            JsonArray groups = client.models(session);
+            JsonObject catalog = remote.modelCatalog();
+            JsonArray groups =
+                    catalog.has("groups") && catalog.get("groups").isJsonArray()
+                            ? catalog.getAsJsonArray("groups")
+                            : new JsonArray();
             List<String> labels = new ArrayList<>();
             List<ModelChoice> choices = new ArrayList<>();
             for (JsonElement groupElement : groups) {
@@ -355,9 +377,11 @@ final class DshSessionActionsController {
             return;
         }
         JsonObject current =
-                catalog.has("current") && catalog.get("current").isJsonObject()
-                        ? catalog.getAsJsonObject("current")
-                        : null;
+                session.equals(currentRouteSession) && currentRouteCache != null
+                        ? currentRouteCache
+                        : catalog.has("default") && catalog.get("default").isJsonObject()
+                                ? catalog.getAsJsonObject("default")
+                                : null;
         String provider = current == null ? null : DshJson.string(current, "provider");
         String model = current == null ? null : DshJson.string(current, "model");
         if (provider == null || model == null) {
@@ -369,8 +393,8 @@ final class DshSessionActionsController {
 
     private void selectModel(String session, String provider, String model, String effort) {
         try {
-            client.selectModel(session, provider, model, effort);
-            modelCatalog = client.modelCatalog(session);
+            remote.selectModel(session, provider, model, effort);
+            modelCatalog = remote.modelCatalog();
             modelCatalogSession = session;
             refreshState.run();
         } catch (Exception error) {
@@ -379,7 +403,10 @@ final class DshSessionActionsController {
     }
 
     void openReasoningEffort() {
-        JsonArray options = reasoningEffort(sessionId.get()).getAsJsonArray("options");
+        String session = sessionId.get();
+        DshRemoteState.SessionView view = null;
+        JsonObject value = reasoningEffort(session, view);
+        JsonArray options = value.getAsJsonArray("options");
         if (options == null || options.isEmpty()) {
             notifyUser(DshBundle.message("dsh.model.no.reasoning.effort"));
             return;
@@ -396,7 +423,7 @@ final class DshSessionActionsController {
                 () -> {
                     try {
                         JsonElement execution =
-                                client.executeCommand(current, "/permission " + preset);
+                                remote.executeCommand(current, "/permission " + preset);
                         showCommandResult(execution);
                         refreshState.run();
                     } catch (Exception error) {
@@ -413,7 +440,7 @@ final class DshSessionActionsController {
                 () -> {
                     try {
                         JsonElement execution =
-                                client.executeCommand(current, active ? "/plan on" : "/plan off");
+                                remote.executeCommand(current, active ? "/plan on" : "/plan off");
                         showCommandResult(execution);
                         refreshState.run();
                     } catch (Exception error) {

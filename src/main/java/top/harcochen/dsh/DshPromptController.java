@@ -6,20 +6,31 @@ import com.google.gson.JsonObject;
 import com.intellij.openapi.diagnostic.Logger;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import top.harcochen.dsh.remote.DshRemoteException;
+import top.harcochen.dsh.remote.DshRemoteService;
 
-/** Owns prompt submission, cancellation, attachments, and command/skill catalogs. */
+/**
+ * Owns prompt submission, cancellation, attachments, and command/skill catalogs.
+ *
+ * <p>Every submission carries a client-minted {@code requestId} that the Runtime persists on the
+ * exact accepted user message. The request is reused when the user retries the same submission
+ * after a failure or timeout, and retired once the durable echo (a user message whose source
+ * carries that requestId) appears in the followed history; a fresh submission mints a new one. The
+ * carrier never retries a prompt on its own.
+ */
 final class DshPromptController {
     private static final Logger LOG = Logger.getInstance(DshPromptController.class);
     private static final Pattern COMMAND_LINE =
             Pattern.compile("^/([a-z][a-z0-9_-]*)(?:$|[\t\n\r ])");
 
     private final DshRuntimeService runtime;
-    private final DshRpcClient client;
+    private final DshRemoteService remote;
     private final DshIdeContextController ideContext;
     private final DshSessionStateStore sessionState;
     private final ExecutorService operations;
@@ -32,13 +43,20 @@ final class DshPromptController {
     private final Consumer<String> errorSink;
     private final Set<String> catalogRequests = java.util.concurrent.ConcurrentHashMap.newKeySet();
 
+    /** One unretired submission: requestId kept until the durable echo reconciles it. */
+    private record PendingPrompt(String requestId, String text) {}
+
+    private final Object pendingLock = new Object();
+    private final java.util.Map<String, PendingPrompt> pendingBySession =
+            new java.util.LinkedHashMap<>();
+
     private volatile boolean commandRegistryUnavailable;
     private volatile boolean submitting;
     private volatile boolean cancelling;
 
     DshPromptController(
             DshRuntimeService runtime,
-            DshRpcClient client,
+            DshRemoteService remote,
             DshIdeContextController ideContext,
             DshSessionStateStore sessionState,
             ExecutorService operations,
@@ -50,7 +68,7 @@ final class DshPromptController {
             Consumer<String> notifier,
             Consumer<String> errorSink) {
         this.runtime = runtime;
-        this.client = client;
+        this.remote = remote;
         this.ideContext = ideContext;
         this.sessionState = sessionState;
         this.operations = operations;
@@ -109,17 +127,41 @@ final class DshPromptController {
                 }
             }
             String prompt = editorContext.isBlank() ? text : text + "\n\n" + editorContext;
-            client.prompt(current, prompt, mode, normalizeImages(images));
+            String requestId = requestIdFor(current, prompt);
+            remote.prompt(
+                    requestId,
+                    current,
+                    mode,
+                    contentOf(prompt, images),
+                    java.util.TimeZone.getDefault().getID());
             ideContext.removeCapturedContext(capturedContextIds);
             refreshState.run();
         } catch (Exception error) {
-            String message = DshJson.message(error);
-            errorSink.accept(message);
+            String failureMessage = DshJson.message(error);
+            errorSink.accept(failureMessage);
             LOG.warn("DSH prompt failed", error);
         } finally {
             submitting = false;
             cancelling = false;
             stateChanged.run();
+        }
+    }
+
+    /**
+     * Reuse the pending requestId for the same submission text until its durable echo appears; this
+     * makes a timeout recovery or a user retry idempotent at the Runtime.
+     */
+    private String requestIdFor(String session, String text) {
+        synchronized (pendingLock) {
+            PendingPrompt pending = pendingBySession.get(session);
+            if (pending != null
+                    && pending.text().equals(text)
+                    && !remote.hasDurableEcho(session, pending.requestId())) {
+                return pending.requestId();
+            }
+            PendingPrompt fresh = new PendingPrompt(UUID.randomUUID().toString(), text);
+            pendingBySession.put(session, fresh);
+            return fresh.requestId();
         }
     }
 
@@ -133,7 +175,7 @@ final class DshPromptController {
         operations.execute(
                 () -> {
                     try {
-                        client.cancel(current);
+                        remote.cancel(current);
                     } catch (Exception error) {
                         errorSink.accept(DshJson.message(error));
                     } finally {
@@ -153,14 +195,33 @@ final class DshPromptController {
         operations.execute(
                 () -> {
                     try {
-                        client.updateQueue(
-                                current, itemId, queueAction, DshJson.string(action, "text"));
+                        remote.updateQueue(
+                                current,
+                                itemId,
+                                queueActionOf(queueAction, DshJson.string(action, "text")));
                         refreshState.run();
                     } catch (Exception error) {
                         errorSink.accept(DshJson.message(error));
                         stateChanged.run();
                     }
                 });
+    }
+
+    private static JsonObject queueActionOf(String action, String text) {
+        JsonObject queueAction = new JsonObject();
+        String normalized = action == null ? "" : action.trim();
+        if ("edit".equals(normalized)) {
+            queueAction.addProperty("kind", "edit");
+            JsonArray content = new JsonArray();
+            JsonObject part = new JsonObject();
+            part.addProperty("type", "text");
+            part.addProperty("text", text == null ? "" : text);
+            content.add(part);
+            queueAction.add("content", content);
+        } else if ("remove".equals(normalized) || "steer".equals(normalized)) {
+            queueAction.addProperty("kind", normalized);
+        }
+        return queueAction;
     }
 
     void loadImage(String attachmentId) {
@@ -174,7 +235,7 @@ final class DshPromptController {
         operations.execute(
                 () -> {
                     try {
-                        JsonObject value = client.attachment(current, attachmentId);
+                        JsonObject value = remote.attachment(current, attachmentId);
                         JsonObject attachment =
                                 value.has("attachment") && value.get("attachment").isJsonObject()
                                         ? value.getAsJsonObject("attachment")
@@ -279,10 +340,10 @@ final class DshPromptController {
         operations.execute(
                 () -> {
                     try {
-                        sessionState.putCommandCatalog(session, client.listCommands(session));
+                        sessionState.putCommandCatalog(session, remote.listCommands(session));
                         stateChanged.run();
-                    } catch (DshRpcClient.DshRpcException error) {
-                        if ("http-404".equals(error.getCode())) {
+                    } catch (DshRemoteException error) {
+                        if (error.isCapabilityMissing()) {
                             commandRegistryUnavailable = true;
                             LOG.info(
                                     "The connected Harness serves no command registry; using IDE commands only");
@@ -306,7 +367,7 @@ final class DshPromptController {
         operations.execute(
                 () -> {
                     try {
-                        sessionState.putSkillCatalog(session, client.listSkills(session));
+                        sessionState.putSkillCatalog(session, remote.listSkills(session));
                         stateChanged.run();
                     } catch (Exception error) {
                         LOG.debug("DSH skill catalog refresh failed", error);
@@ -339,7 +400,7 @@ final class DshPromptController {
     }
 
     private void runHostCommand(String session, String line) throws Exception {
-        JsonElement execution = client.executeCommand(session, line);
+        JsonElement execution = remote.executeCommand(session, line);
         if (execution == null || execution.isJsonNull() || !execution.isJsonObject()) {
             throw new IllegalStateException(DshBundle.message("dsh.command.not.resolved", line));
         }
@@ -360,28 +421,35 @@ final class DshPromptController {
         }
     }
 
+    private static JsonArray contentOf(String text, JsonArray images) {
+        JsonArray content = new JsonArray();
+        for (JsonElement image : images) {
+            JsonObject part = new JsonObject();
+            part.addProperty("type", "image");
+            if (image.isJsonObject()) {
+                JsonObject imageObject = image.getAsJsonObject();
+                if (imageObject.has("mediaType"))
+                    part.add("mediaType", imageObject.get("mediaType").deepCopy());
+                if (imageObject.has("data")) part.add("data", imageObject.get("data").deepCopy());
+                if (imageObject.has("name")) part.add("name", imageObject.get("name").deepCopy());
+            }
+            content.add(part);
+        }
+        if (text != null && !text.isEmpty()) {
+            JsonObject part = new JsonObject();
+            part.addProperty("type", "text");
+            part.addProperty("text", text);
+            content.add(part);
+        }
+        return content;
+    }
+
     private static String commandName(String text) {
         if (text == null) {
             return null;
         }
         Matcher matcher = COMMAND_LINE.matcher(text);
         return matcher.find() ? matcher.group(1) : null;
-    }
-
-    private static JsonArray normalizeImages(JsonArray raw) {
-        JsonArray result = new JsonArray();
-        for (JsonElement candidate : raw) {
-            if (!candidate.isJsonObject()) {
-                continue;
-            }
-            JsonObject image = candidate.getAsJsonObject();
-            if (DshJson.string(image, "mediaType") == null
-                    || DshJson.string(image, "data") == null) {
-                continue;
-            }
-            result.add(image.deepCopy());
-        }
-        return result;
     }
 
     private static boolean isImageMediaType(String value) {
@@ -393,6 +461,6 @@ final class DshPromptController {
 
     @FunctionalInterface
     interface SessionProvider {
-        String ensure() throws DshRpcClient.DshRpcException;
+        String ensure() throws DshRemoteException;
     }
 }

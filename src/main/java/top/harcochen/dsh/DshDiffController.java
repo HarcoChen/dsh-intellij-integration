@@ -16,11 +16,12 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
+import top.harcochen.dsh.remote.DshRemoteService;
 
 /** Reconstructs tool/turn changes and presents native IntelliJ diff views. */
 final class DshDiffController {
     private final Project project;
-    private final DshRpcClient client;
+    private final DshRemoteService remote;
     private final DshChangeReviewStore changeReviews;
     private final ExecutorService operations;
     private final Supplier<String> sessionId;
@@ -31,7 +32,7 @@ final class DshDiffController {
 
     DshDiffController(
             Project project,
-            DshRpcClient client,
+            DshRemoteService remote,
             DshChangeReviewStore changeReviews,
             ExecutorService operations,
             Supplier<String> sessionId,
@@ -40,7 +41,7 @@ final class DshDiffController {
             Consumer<String> notifier,
             Consumer<String> errorSink) {
         this.project = project;
-        this.client = client;
+        this.remote = remote;
         this.changeReviews = changeReviews;
         this.operations = operations;
         this.sessionId = sessionId;
@@ -58,7 +59,7 @@ final class DshDiffController {
         operations.execute(
                 () -> {
                     try {
-                        JsonObject history = client.traceHistory(current);
+                        JsonObject history = remote.traceHistory(current, 160);
                         DshToolDiff.CallDiffState state =
                                 DshToolDiff.callDiffState(history, callId);
                         if (state == null) {

@@ -10,10 +10,12 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
+import top.harcochen.dsh.remote.DshRemoteContracts;
+import top.harcochen.dsh.remote.DshRemoteService;
 
 /** Loads the durable subagent tree and manages one opened child transcript. */
 final class DshSubagentController {
-    private final DshRpcClient client;
+    private final DshRemoteService remote;
     private final ExecutorService operations;
     private final DshMarkdownRenderCache markdownRenderCache;
     private final java.util.function.Supplier<JsonArray> sessions;
@@ -26,14 +28,14 @@ final class DshSubagentController {
     private volatile SubagentPreview preview;
 
     DshSubagentController(
-            DshRpcClient client,
+            DshRemoteService remote,
             ExecutorService operations,
             DshMarkdownRenderCache markdownRenderCache,
             java.util.function.Supplier<JsonArray> sessions,
             Runnable stateChanged,
             Consumer<String> notifier,
             Consumer<String> errorSink) {
-        this.client = client;
+        this.remote = remote;
         this.operations = operations;
         this.markdownRenderCache = markdownRenderCache;
         this.sessions = sessions;
@@ -95,7 +97,7 @@ final class DshSubagentController {
             if (depth > 8 || !visited.add(parentSessionId)) {
                 continue;
             }
-            JsonObject catalog = client.subagents(parentSessionId);
+            JsonObject catalog = remote.subagents(parentSessionId);
             boolean parentAvailable = DshJson.bool(catalog, "parentAvailable", false);
             JsonArray entries =
                     catalog.has("entries") && catalog.get("entries").isJsonArray()
@@ -236,7 +238,7 @@ final class DshSubagentController {
                 () -> {
                     try {
                         JsonObject history =
-                                client.subagentHistory(parentSessionId, childSessionId, mode, 250);
+                                subagentHistory(parentSessionId, childSessionId, mode, 250);
                         if (preview != requestedPreview) {
                             return;
                         }
@@ -276,6 +278,29 @@ final class DshSubagentController {
                 });
     }
 
+    /**
+     * One-shot addressed history read: open the follow stream, take its opening snapshot, cancel.
+     * The projection cells ride along like any other follow snapshot.
+     */
+    private JsonObject subagentHistory(
+            String parentSessionId, String childSessionId, String mode, int maxMessages)
+            throws Exception {
+        JsonObject address =
+                DshRemoteContracts.subagentAddress(parentSessionId, childSessionId, mode);
+        JsonObject snapshotFrame = remote.followSnapshotOnce(address, maxMessages);
+        JsonObject history = new JsonObject();
+        history.add(
+                "events",
+                snapshotFrame.has("records") && snapshotFrame.get("records").isJsonArray()
+                        ? snapshotFrame.getAsJsonArray("records").deepCopy()
+                        : new JsonArray());
+        history.addProperty("hasMore", false);
+        if (snapshotFrame.has("projections") && snapshotFrame.get("projections").isJsonObject()) {
+            history.add("projections", snapshotFrame.getAsJsonObject("projections").deepCopy());
+        }
+        return history;
+    }
+
     private static JsonObject childNode(SubagentTree tree, String childSessionId) {
         for (JsonElement candidate : tree.nodes) {
             if (candidate.isJsonObject()
@@ -306,7 +331,7 @@ final class DshSubagentController {
         operations.execute(
                 () -> {
                     try {
-                        client.promptSubagent(parentSessionId, childSessionId, text);
+                        remote.promptSubagent(parentSessionId, childSessionId, text);
                         if (preview == currentPreview) {
                             open(childSessionId);
                         }
@@ -344,7 +369,7 @@ final class DshSubagentController {
         operations.execute(
                 () -> {
                     try {
-                        client.interruptSubagent(parentSessionId, childSessionId);
+                        remote.interruptSubagent(parentSessionId, childSessionId);
                     } catch (Exception error) {
                         String message = DshJson.message(error);
                         if (preview == currentPreview) {
