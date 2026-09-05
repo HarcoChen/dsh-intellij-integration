@@ -40,7 +40,7 @@ Select code and right-click: `DSH: Ask About Selection`, or explain / fix / revi
 
 ### Managed local Runtime
 
-The plugin runs `pnpm dlx @deepseek-ai/dsh web --no-open` by default, falls back to an installed `dsh` or `npx`, and probes localhost until the server is ready. Start / stop / restart actions are available from the Tools menu, and `DSH: Open Web UI` opens the same session in a browser.
+The plugin runs `pnpm dlx @deepseek-ai/dsh web --no-open` by default, falls back to an installed `dsh` or `npx`, and probes localhost until the server is ready. Every launch is pinned to the **Runtime version** setting, so an upstream release never reaches you before this plugin supports it; blank or `latest` opts back into tracking the newest release. Start / stop / restart actions are available from the Tools menu, and `DSH: Open Web UI` opens the same session in a browser.
 
 ### Safe credential handling
 
