@@ -25,7 +25,7 @@
 </p>
 
 <p align="center">
-  For VS Code, please see <a href="https://github.com/HarcoChen/dsh-vsc-integration">dsh-vsc-integration</a>.
+  For VS Code, please see <a href="https://github.com/HarcoChen/deepseek-harness-vscode">deepseek-harness-vscode</a>.
 </p>
 
 ## Features

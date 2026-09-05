@@ -24,7 +24,7 @@
 </p>
 
 <p align="center">
-  VS Code 版本请见 <a href="https://github.com/HarcoChen/dsh-vsc-integration">dsh-vsc-integration</a>。
+  VS Code 版本请见 <a href="https://github.com/HarcoChen/deepseek-harness-vscode">deepseek-harness-vscode</a>。
 </p>
 
 ## 核心功能
