@@ -22,11 +22,10 @@ public final class DshSettingsState implements PersistentStateComponent<DshSetti
     public int serverPort = 0;
     public boolean autoStart = true;
     public boolean installWhenMissing = true;
-    public String runtimeVersion = "0.1.1-rc.2";
+    public String runtimeVersion = "0.1.2-rc.1";
     public String npmRegistry = "https://registry.npmmirror.com";
     public int startupTimeoutMs = 30_000;
     public int requestTimeoutMs = 600_000;
-    public int pollIntervalMs = 700;
     public int maxContextBytes = 120_000;
     public String apiKeyEnv = "DEEPSEEK_API_KEY";
     public String agentStatusLabel = "";
@@ -55,7 +54,6 @@ public final class DshSettingsState implements PersistentStateComponent<DshSetti
         npmRegistry = state.npmRegistry;
         startupTimeoutMs = state.startupTimeoutMs;
         requestTimeoutMs = state.requestTimeoutMs;
-        pollIntervalMs = state.pollIntervalMs;
         maxContextBytes = state.maxContextBytes;
         apiKeyEnv = state.apiKeyEnv;
         agentStatusLabel = state.agentStatusLabel;

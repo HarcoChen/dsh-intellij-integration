@@ -30,7 +30,10 @@ IDEA/PyCharm 的 Project、Module 或编辑器工作区。
 
 ## 2. 当前实现审计
 
-当前 IntelliJ 实现不是只差一个 URL，核心协议与状态模型都属于旧代：
+本节以 `refactor/dshaction`（含 `851be02` 鉴权迁移、`53a4a5f` 评审修复）为基线，不是
+`main`。`main` 另外还缺整套 launch-token 交换，若从 `main` 出发需先并入该分支。
+
+除鉴权外，核心协议与状态模型都仍属于旧代：
 
 | 当前实现 | 现状 | `0.1.2-rc.1` 要求 |
 | --- | --- | --- |
@@ -40,7 +43,7 @@ IDEA/PyCharm 的 Project、Module 或编辑器工作区。
 | `DshToolWindowPanel.refreshState()` | 定时轮询 `session.list`、`session.history`、`workspace.list` | opening baseline + stream increment；`session/page` 负责旧历史 |
 | `DshToolWindowPanel` | 同时持有 UI、mux、queue/jobs/projection/workspace 状态 | UI 只订阅 Project Service 发布的领域快照 |
 | `DshRuntimeService` | 管进程、URL、健康检查和 unary client | 继续管进程；Remote connection 作为独立 Project Service |
-| Runtime 鉴权 | 启动 URL 正则丢弃 `?token=`，RPC/WebSocket 不带 Cookie | 根路径交换 launch token，按 authority 保存并发送 session Cookie |
+| Runtime 鉴权 | **已迁移**（`851be02`）：`DshRuntimeEndpoint` 保留 `?token=`，根路径换 Cookie，unary 与 WebSocket 均携带 | 同左；剩余项见 §6.4「仍需完成」 |
 | Runtime 默认值 | `0.1.1-rc.2` | 完成迁移后固定为 `0.1.2-rc.1` |
 
 旧 endpoint 仍包括 `host.describe`、`session.history`、`workspace.list`、
@@ -146,8 +149,8 @@ DshToolWindowPanel / DshTraceDialog / Actions / Projectors / JCEF
   只适配 normalized history/control 输入；
 - `DshTraceDialog` 通过 address 订阅 session/subagent，不再一次性抓取全部旧历史；
 - `DshBridge` 继续严格校验 UI action；只接收领域快照，不接收 Remote frame；
-- `DshRuntimeLock` 对齐共享 schema `{pid,createdAt,url,launchUrl?}`，严格验证 launchUrl
-  是同 authority 的 loopback 根 URL 且只含合法 token query；
+- `DshRuntimeLock` **已对齐**共享 schema `{pid,createdAt,url,launchUrl?}`，并已要求 launchUrl
+  的 base URL 与 `url` 完全一致（`DshRuntimeLock.java` 的 `loopbackLaunchUrl`）；本轮无需改动；
 - `DshSettingsState` 在最后发布批次更新默认 Runtime，并增加已验证/未验证版本提示；
 - `plugin.xml` 注册 `DshRemoteService` 为 project service，由 IntelliJ dispose 管理资源。
 
@@ -194,24 +197,37 @@ state 前比较 generation token。
 `/?token=...` 只能用于根路径交换：Host 返回绑定 scheme/host/port 的 HttpOnly session
 Cookie，之后每个 unary 与 `/api/remote.mux` upgrade 都发送该 Cookie。
 
-IntelliJ 侧实现要求：
+这一节的大部分已由 `851be02` 在 `refactor/dshaction` 上实现。执行本方案时**不要重做**
+下列条目，重写 carrier 时把它们平移进 `DshRemoteAuth` 即可。
 
-- `DshRuntimeService` 将 URL 解析为不含 token 的 `baseUrl` 和仅供认证/打开浏览器使用的
-  `launchUrl`；当前 `URL_PATTERN` 必须扩展到安全识别可选 token；
-- token 不进入 `RuntimeStatus`、普通日志、异常、诊断或 JCEF state；`launchUrl` 只保留
-  在 Runtime Service 内存和跨 IDE 共享启动锁的专用字段中；
-- `DshRemoteAuth` 使用不自动跟随重定向的专用 `HttpClient` 请求 launch URL，严格读取
-  第一条合法 `Set-Cookie`，且永远不把 launch token 传给 RPC carrier；
-- `DshRuntimeLock` 写入可选 `launchUrl`，让后启动的 IntelliJ/VS Code 进程各自交换
-  Cookie；读取时要求其 base URL 与 `url` authority 完全一致；
-- Cookie 只绑定规范化 authority；base URL、端口或进程 generation 改变就清除；
-- `DshRemoteUnaryClient` 为每个 RPC 加 `Cookie` header；
-- `DshRemoteMuxClient` 在 `newWebSocketBuilder()` upgrade 时加同一 Cookie；
-- 同一 authority 的并发调用共享一个认证 future，失败后允许下一 generation 重试；
-- 401 清除该 authority Cookie 并终止当前 generation，不在同一个请求中无限重放；
-- 配置的 `serverUrl` 若携带 token，按同样流程交换；若既无 token 也无已知 Cookie，
-  返回明确 auth error；
-- 健康检查分为公开页面可达性与已认证 Remote probe，不能再用旧 `host.describe`。
+已完成（附实现位置）：
+
+| 要求 | 实现 |
+| --- | --- |
+| URL 解析为不含 token 的 `baseUrl` + 仅供认证/开浏览器的 `launchUrl` | `DshRuntimeEndpoint.parse/extract`；`OUTPUT_URL` 已安全识别可选 token |
+| token 不进入日志 | `DshRuntimeService.redactRuntimeOutput`；`RuntimeStatus` 一律用 baseUrl 构造 |
+| 专用 `HttpClient` 不跟随重定向 | `AUTH_HTTP_CLIENT` 配置 `Redirect.NEVER` |
+| 严格读取第一条合法 `Set-Cookie` | `ensureAuthenticated` 用 `firstValue("set-cookie")` 并以正则校验形状 |
+| 启动锁写入并校验 `launchUrl` | `DshRuntimeLock.loopbackLaunchUrl`，要求 base URL 与 `url` 一致 |
+| Cookie 绑定 authority，endpoint 变化即清除 | `setRuntimeEndpoint` / `clearRuntimeEndpoint` 在 base 或 launch 变化时清空 `authCookie` |
+| unary 携带 Cookie | `DshRpcClient` 经 `requestHeaders` 注入 |
+| WebSocket upgrade 携带同一 Cookie | `DshMuxClient` 经 `requestHeaders` 注入 |
+| 同 authority 并发调用不重复认证 | `synchronized (authLock)` + 双重检查；`Objects.equals(launchUrl, launch)` 拒绝跨代写入 |
+| 配置的 `serverUrl` 携带 token 时同流程交换 | `DshRuntimeEndpoint.parse` 提取 token 为 `launchUrl` |
+
+仍需完成：
+
+- **401 处理缺失**。当前三处清空 `authCookie` 都由 endpoint 变化驱动，没有任何一处响应
+  401。需要：401 清除该 authority Cookie 并终止当前 generation，不在同一请求内无限重放。
+- **健康检查仍用旧 endpoint**。`DshRpcClient.isHarnessHealthy` 仍 POST
+  `/api/host.describe`。需拆为公开页面可达性与已认证 Remote probe（见 §11 的
+  `session/list` capability probe）。
+- **移除 pre-0.1.2 兼容分支**。`ensureAuthenticated` 目前把「2xx 但没有 Cookie」当作合法的
+  旧 Runtime 兼容路径放过。这与 §1 第 5 条和 §3「旧 Runtime 明确拒绝」直接冲突：保留它会让
+  `0.1.1-rc.2` 静默通过鉴权，然后在 RPC 层因缺 endpoint 报出难以定位的错误。实现 §11 的
+  版本提示时必须同时删掉这个分支，让不返回 Cookie 的 Runtime 在鉴权阶段就失败。
+- 认证并发目前是锁而非共享 future；改写为 `DshRemoteAuth` 时按 §6.1 的 executor 模型
+  重整为 generation-scoped future，避免在 connection executor 上持锁阻塞。
 
 ## 7. Wire 契约实现
 
@@ -241,8 +257,13 @@ CompletableFuture<JsonElement> call(
 }
 ```
 
-必须纠正当前实现的扁平 payload：`args` 的字段名来自 Host 方法参数名，而不是把 DTO
-摊平。典型映射：
+必须纠正当前实现的扁平 payload：`args` 是按参数逐个命名的对象，而不是把 DTO 摊平。
+
+**字段名的权威来源是 descriptor 的 `wire`，不是 TS 方法签名里的参数标识符。** 上游解码走
+`args[parameter.wire]`（`packages/api/gateway/src/index.ts`），`wire` 不保证等于源码参数名。
+§15 把「DTO 摊平进 `args`」列为头号风险，因此 `DshRemoteContracts.java` 应从 descriptor
+导出或对照 descriptor 核对，不得照抄方法签名。下表按 `0.1.2-rc.1` 的签名给出直觉，属于
+参考而非权威：
 
 | Host 方法 | 正确 `args` |
 | --- | --- |
@@ -255,6 +276,10 @@ CompletableFuture<JsonElement> call(
 
 实现要求：
 
+- **payload 必须严格只含 `args` 一个键**，零参 endpoint 的 `args` 必须严格为空对象。上游
+  校验为 `Reflect.ownKeys(payload).length !== 1` 且 `Reflect.ownKeys(payload.args).length !== 0`
+  即报 `gateway/arguments-invalid`（`gateway/src/index.ts`），多一个字段就整体失败。当前
+  `DshRpcClient` 习惯往 envelope 里附加字段，carrier 重写时必须由 contract 层拦住；
 - endpoint 只允许 contract 中的 `<namespace>/<method>` 和保留项 `$events/result`；
 - URL endpoint 与 envelope `method` 完全一致；
 - 返回 `void` 的成功响应允许缺失 `value`，由 contract 决定而非硬编码单 endpoint；
@@ -507,6 +532,11 @@ workspace/control/$events 始终属于 Project generation。
 临时 bridge 只能位于 `DshRemoteService` facade 内，并在同一批次末删除；不得让 UI、
 projector 或 store 同时理解两代 wire 类型。
 
+分支谱系：以上 9 个提交建立在 `refactor/dshaction` 谱系上，而把 `runtimeVersion` 真正
+作用于全部启动候选的改动在 `fix/pin-runtime-version`（从 `main` 切出）。第 9 步「更新默认
+Runtime」会同时触及两条线的同一批文案，因此先合 pin 分支、再在其之上推进第 9 步；否则
+`refactor/dshaction` 合入 main 时会把 `launcherCandidates` 覆盖回不带版本的形态，pin 失效。
+
 ## 14. 验收方案
 
 遵守“不新增单元测试”规则，使用现有 Gradle 检查、真实 Runtime smoke 和故障注入。
@@ -526,6 +556,8 @@ rg -n 'events\.mux|events\.host|/api/respond|session\.history|workspace\.list|ho
 - 上述旧协议字符串不出现在生产代码；
 - `/api/` 只出现在 Remote carrier 和 Runtime 健康/启动模块；
 - contract 文件注明 `dsh-v0.1.2-rc.1` 与目标 commit；
+- contract 中每个 endpoint 的 `args` 字段名逐一对照上游 descriptor 的 `wire`，而非方法签名；
+  零参 endpoint 断言发出的 `args` 为空对象；
 - IntelliJ EDT 上不存在阻塞 HTTP、stream opening 或 pagination；
 - Project dispose 后没有活动 socket、logical stream 或 executor task。
 
@@ -583,6 +615,11 @@ rg -n 'events\.mux|events\.host|/api/respond|session\.history|workspace\.list|ho
 | 为旧版兼容引入双状态机 | 当前 fail-fast；需要时另建完整 Legacy adapter |
 
 ## 16. 后续 Runtime 升级门禁
+
+`runtimeVersion` 现在会经 `DshRuntimeService.pinRuntimeVersion` 作用于全部启动候选（含
+默认的 `pnpm dlx` 主路径与两条 npx 回退），此前它只影响 npx 回退。因此改这一个值即可整体
+切换托管 Runtime 版本 —— 也正因如此，改它之前必须走完下列门禁。注意设置项留空或填
+`latest` 会退回追踪最新版，发布前应确认默认值不是空值。
 
 每次修改默认 `runtimeVersion` 前必须：
 
