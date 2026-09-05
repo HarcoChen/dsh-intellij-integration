@@ -42,6 +42,8 @@ import top.harcochen.dsh.remote.DshRemoteUnaryClient;
 public final class DshRuntimeService implements Disposable {
     private static final Logger LOG = Logger.getInstance(DshRuntimeService.class);
     private static final int DEFAULT_PORT = 3080;
+    /** The npm package the Runtime ships as; see {@link #pinRuntimeVersion}. */
+    private static final String RUNTIME_PACKAGE = "@deepseek-ai/dsh";
 
     private final Project project;
     private final ExecutorService executor;
@@ -372,11 +374,9 @@ public final class DshRuntimeService implements Disposable {
     private List<List<String>> launcherCandidates(DshSettingsState settings) {
         String command = settings.command == null ? "dsh" : settings.command.trim();
         if (command.isEmpty()) command = "dsh";
-        String runtimeVersion =
-                settings.runtimeVersion == null || settings.runtimeVersion.isBlank()
-                        ? "latest"
-                        : settings.runtimeVersion.trim();
-        List<String> configuredArgs = splitArguments(settings.commandArgs);
+        String runtimeVersion = settings.runtimeVersion == null || settings.runtimeVersion.isBlank()
+                ? "latest" : settings.runtimeVersion.trim();
+        List<String> configuredArgs = pinRuntimeVersion(splitArguments(settings.commandArgs), runtimeVersion);
         if (!hasPort(configuredArgs)) {
             configuredArgs = new ArrayList<>(configuredArgs);
             configuredArgs.add("--port");
@@ -393,7 +393,7 @@ public final class DshRuntimeService implements Disposable {
             List<String> fallback = new ArrayList<>();
             fallback.add(platformCommand("npx"));
             fallback.add("--yes");
-            fallback.add("@deepseek-ai/dsh@" + runtimeVersion);
+            fallback.add(RUNTIME_PACKAGE + "@" + runtimeVersion);
             fallback.add("web");
             fallback.add("--no-open");
             if (!hasPort(fallback)) {
@@ -409,7 +409,7 @@ public final class DshRuntimeService implements Disposable {
             if (!configuredArgs.isEmpty() && "dlx".equals(configuredArgs.get(0))) {
                 npx.addAll(configuredArgs.subList(1, configuredArgs.size()));
             } else {
-                npx.add("@deepseek-ai/dsh@" + runtimeVersion);
+                npx.add(RUNTIME_PACKAGE + "@" + runtimeVersion);
                 npx.add("web");
                 npx.add("--no-open");
             }
@@ -677,6 +677,28 @@ public final class DshRuntimeService implements Disposable {
             int from = Math.max(0, values.length - lines);
             return String.join("\n", Arrays.copyOfRange(values, from, values.length)).trim();
         }
+    }
+
+    /**
+     * Pin a bare {@code @deepseek-ai/dsh} package spec to the configured runtime version.
+     *
+     * <p>{@code pnpm dlx @deepseek-ai/dsh} resolves the {@code latest} dist-tag on every launch, so
+     * an upstream release reaches users the moment it is published -- including one whose RPC
+     * surface this plugin has not adapted to yet. The version setting already existed but only
+     * reached the npx fallbacks, never the configured command, which is the path the defaults
+     * actually take.
+     *
+     * <p>Only a bare package name is rewritten. An explicit version or tag, a scoped alias, a
+     * tarball URL, or a local checkout path is left exactly as written, so pointing the plugin at a
+     * working tree or deliberately tracking {@code @latest} still works.
+     */
+    private static List<String> pinRuntimeVersion(List<String> args, String runtimeVersion) {
+        if (runtimeVersion.isBlank() || "latest".equals(runtimeVersion)) return args;
+        List<String> result = new ArrayList<>(args.size());
+        for (String arg : args) {
+            result.add(RUNTIME_PACKAGE.equals(arg) ? arg + "@" + runtimeVersion : arg);
+        }
+        return result;
     }
 
     private static boolean hasPort(List<String> args) {
