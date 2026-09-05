@@ -284,7 +284,7 @@ final class DshSessionStateStore {
         return number > 0 && number <= Integer.MAX_VALUE ? (int) number : null;
     }
 
-    void receiveMuxFrame(JsonObject frame, String selectedSession, JsonArray sessions) {
+    void receiveMuxFrame(JsonObject frame, String selectedSession) {
         String type = DshJson.string(frame, "type");
         String frameSession = DshJson.string(frame, "sessionId");
         if (type == null || frameSession == null) {
@@ -292,7 +292,7 @@ final class DshSessionStateStore {
         }
         boolean changed;
         synchronized (lock) {
-            changed = acceptMuxFrame(frame, type, frameSession, sessions);
+            changed = acceptMuxFrame(frame, type, frameSession);
         }
         boolean titleChanged =
                 changed
@@ -303,8 +303,7 @@ final class DshSessionStateStore {
         }
     }
 
-    private boolean acceptMuxFrame(
-            JsonObject frame, String type, String frameSession, JsonArray sessions) {
+    private boolean acceptMuxFrame(JsonObject frame, String type, String frameSession) {
         if ("session/queue".equals(type)) {
             queueBySession.put(frameSession, queueDockItems(frame.get("items")));
             return true;
@@ -314,11 +313,10 @@ final class DshSessionStateStore {
             return true;
         }
         if ("session/projection".equals(type)) {
-            boolean accepted = acceptProjectionFrame(frameSession, frame);
-            if (accepted && "title".equals(DshJson.string(frame, "key"))) {
-                applySessionTitle(frameSession, frame, sessions);
-            }
-            return accepted;
+            // The title lands in this session's projection cells like any other key. Readers
+            // overlay it onto the catalog via sessionTitle, which keeps the catalog array owned
+            // by its single writer instead of being mutated from the mux thread.
+            return acceptProjectionFrame(frameSession, frame);
         }
         LinkedHashMap<String, JsonObject> interactions =
                 interactionsBySession.computeIfAbsent(
@@ -406,25 +404,14 @@ final class DshSessionStateStore {
         return true;
     }
 
-    private static void applySessionTitle(String session, JsonObject frame, JsonArray sessions) {
-        JsonElement value = frame.has("value") ? frame.get("value") : null;
+    /** The live title this session last projected, or null when it has not projected one. */
+    String sessionTitle(String session) {
+        JsonElement value = projectionValue(session, "title");
         if (value == null || !value.isJsonPrimitive()) {
-            return;
+            return null;
         }
         String title = value.getAsString();
-        if (title.isBlank()) {
-            return;
-        }
-        for (JsonElement candidate : sessions) {
-            if (!candidate.isJsonObject()) {
-                continue;
-            }
-            JsonObject item = candidate.getAsJsonObject();
-            if (session.equals(DshJson.string(item, "sessionId"))) {
-                item.addProperty("title", title);
-                return;
-            }
-        }
+        return title.isBlank() ? null : title;
     }
 
     JsonArray queue(String session) {

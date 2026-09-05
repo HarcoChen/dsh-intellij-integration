@@ -155,7 +155,7 @@ final class DshDiffController {
                                 sides.title(),
                                 sides.beforeText(),
                                 sides.afterText(),
-                                sides.title(),
+                                sides.path(),
                                 DshBundle.message("dsh.diff.before.turn", turn),
                                 DshBundle.message("dsh.diff.after.turn", turn));
                     } catch (Exception error) {
@@ -247,10 +247,7 @@ final class DshDiffController {
         ApplicationManager.getApplication()
                 .invokeLater(
                         () -> {
-                            FileType fileType =
-                                    FileTypeManager.getInstance()
-                                            .getFileTypeByFileName(
-                                                    Path.of(path).getFileName().toString());
+                            FileType fileType = fileTypeOf(path);
                             com.intellij.diff.DiffContentFactory factory =
                                     com.intellij.diff.DiffContentFactory.getInstance();
                             com.intellij.diff.requests.SimpleDiffRequest request =
@@ -266,6 +263,24 @@ final class DshDiffController {
                                             afterTitle);
                             com.intellij.diff.DiffManager.getInstance().showDiff(project, request);
                         });
+    }
+
+    /**
+     * File type for a repository path. Runs on the EDT inside {@code invokeLater}, where a thrown
+     * {@link java.nio.file.InvalidPathException} would escape the caller's catch and silently
+     * suppress the diff view, so an unparseable path degrades to an unrecognized type instead.
+     */
+    private static FileType fileTypeOf(String path) {
+        String name = path;
+        try {
+            Path fileName = Path.of(path).getFileName();
+            if (fileName != null) name = fileName.toString();
+        } catch (RuntimeException ignored) {
+            int separator = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'));
+            if (separator >= 0 && separator + 1 < path.length())
+                name = path.substring(separator + 1);
+        }
+        return FileTypeManager.getInstance().getFileTypeByFileName(name);
     }
 
     private void report(Exception error) {

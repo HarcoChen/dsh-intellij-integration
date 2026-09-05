@@ -159,8 +159,12 @@ final class DshSubagentController {
                             DshJson.string(candidate.getAsJsonObject(), "sessionId"))) {
                 continue;
             }
-            JsonObject value = candidate.getAsJsonObject().getAsJsonObject("subagentTiming");
-            return normalizeTiming(value);
+            JsonObject row = candidate.getAsJsonObject();
+            // getAsJsonObject throws when the member is present but not an object, and this
+            // projection is Runtime-supplied. Guard the type the way lines below do.
+            return row.has("subagentTiming") && row.get("subagentTiming").isJsonObject()
+                    ? normalizeTiming(row.getAsJsonObject("subagentTiming"))
+                    : null;
         }
         return null;
     }

@@ -113,7 +113,13 @@ final class DshSettingsController {
                                 }
                             }
                         }
-                        panel = DshSettingsProjector.presentPanel(described);
+                        // Re-check: togglePanel may have closed the panel while presentPanel ran,
+                        // and writing the stale panel back would resurrect a closed dialog.
+                        JsonObject presented = DshSettingsProjector.presentPanel(described);
+                        if (generation.get() != requestedGeneration) {
+                            return;
+                        }
+                        panel = presented;
                     } catch (Exception error) {
                         if (generation.get() != requestedGeneration) {
                             return;

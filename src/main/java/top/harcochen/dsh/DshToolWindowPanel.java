@@ -652,6 +652,31 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
         }
     }
 
+    /**
+     * The session catalog for the webview, with each row's title refreshed from the live title
+     * projection. The mux thread only ever writes projection cells, so the catalog array stays
+     * owned by the refresh that built it and no reader races a concurrent mutation.
+     */
+    private JsonArray sessionCatalogForState() {
+        JsonArray catalog = sessions.deepCopy();
+        for (JsonElement candidate : catalog) {
+            if (!candidate.isJsonObject()) continue;
+            JsonObject item = candidate.getAsJsonObject();
+            String id = string(item, "sessionId");
+            if (id == null) continue;
+            String title = sessionState.sessionTitle(id);
+            if (title != null) item.addProperty("title", title);
+        }
+        return catalog;
+    }
+
+    /** A catalog row's title, preferring the live projection over the catalog snapshot. */
+    private String sessionTitleOf(JsonObject item, String fallback) {
+        String id = string(item, "sessionId");
+        String projected = id == null ? null : sessionState.sessionTitle(id);
+        return projected != null ? projected : stringOr(item, "title", fallback);
+    }
+
     private boolean containsSession(String id) {
         for (JsonElement candidate : sessions) {
             if (candidate.isJsonObject()
@@ -796,7 +821,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
         }
         state.add("currentWorkspace", currentWorkspace);
         if (sessionId != null) state.addProperty("sessionId", sessionId);
-        state.add("sessions", sessions.deepCopy());
+        state.add("sessions", sessionCatalogForState());
         if (pendingAgentPreset != null && !pendingAgentPreset.isBlank()) {
             state.addProperty("agentPreset", pendingAgentPreset);
         }
@@ -906,7 +931,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
     }
 
     private void receiveMuxFrame(JsonObject frame) {
-        sessionState.receiveMuxFrame(frame, sessionId, sessions);
+        sessionState.receiveMuxFrame(frame, sessionId);
     }
 
     private void openBrowser() {
@@ -930,7 +955,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
             if (!candidate.isJsonObject()) continue;
             JsonObject item = candidate.getAsJsonObject();
             if (current.equals(string(item, "sessionId"))) {
-                title = stringOr(item, "title", current);
+                title = sessionTitleOf(item, current);
                 break;
             }
         }

@@ -289,20 +289,38 @@ public final class DshRuntimeService implements Disposable {
      * port probe can.
      */
     private DshRuntimeEndpoint findExistingRuntime(int configuredPort) {
-        DshRuntimeEndpoint advertised = runtimeLock.readAdvertisedEndpoint();
-        if (advertised != null) {
-            setRuntimeEndpoint(advertised);
-            if (client.isHarnessHealthy(advertised.baseUrl)) return advertised;
+        // Probing has to publish each candidate first: isHarnessHealthy authenticates, and the
+        // launch-token exchange reads the endpoint fields. So the endpoint is dirty for the whole
+        // probe, and a run that finds nothing must put back what it found on entry -- otherwise
+        // baseUrl is left pointing at the last dead candidate and every later RPC goes there.
+        String entryBase = baseUrl;
+        String entryLaunch = launchUrl;
+        boolean settled = false;
+        try {
+            DshRuntimeEndpoint advertised = runtimeLock.readAdvertisedEndpoint();
+            if (advertised != null) {
+                setRuntimeEndpoint(advertised);
+                if (client.isHarnessHealthy(advertised.baseUrl)) {
+                    settled = true;
+                    return advertised;
+                }
+            }
+            List<Integer> ports = new ArrayList<>();
+            if (configuredPort > 0) ports.add(configuredPort);
+            if (configuredPort != DEFAULT_PORT) ports.add(DEFAULT_PORT);
+            for (Integer port : ports) {
+                DshRuntimeEndpoint candidate =
+                        DshRuntimeEndpoint.ofBase("http://127.0.0.1:" + port);
+                setRuntimeEndpoint(candidate);
+                if (client.isHarnessHealthy(candidate.baseUrl)) {
+                    settled = true;
+                    return candidate;
+                }
+            }
+            return null;
+        } finally {
+            if (!settled) restoreRuntimeEndpoint(entryBase, entryLaunch);
         }
-        List<Integer> ports = new ArrayList<>();
-        if (configuredPort > 0) ports.add(configuredPort);
-        if (configuredPort != DEFAULT_PORT) ports.add(DEFAULT_PORT);
-        for (Integer port : ports) {
-            String candidate = "http://127.0.0.1:" + port;
-            setRuntimeEndpoint(DshRuntimeEndpoint.ofBase(candidate));
-            if (client.isHarnessHealthy(candidate)) return DshRuntimeEndpoint.ofBase(candidate);
-        }
-        return null;
     }
 
     /** Wait for the editor that won the start lock to advertise its Runtime. */
@@ -596,6 +614,28 @@ public final class DshRuntimeService implements Disposable {
         launchUrl = null;
         synchronized (authLock) {
             authCookie = null;
+        }
+    }
+
+    /**
+     * Put back an endpoint captured before a probe. Unlike {@link #setRuntimeEndpoint} this writes
+     * both fields verbatim, so a launch token taken from the snapshot is restored rather than
+     * inferred, and a snapshot of "no endpoint" restores as no endpoint.
+     */
+    private void restoreRuntimeEndpoint(String previousBase, String previousLaunch) {
+        if (previousBase == null || previousBase.isBlank()) {
+            clearRuntimeEndpoint();
+            return;
+        }
+        boolean changed =
+                !Objects.equals(baseUrl, previousBase)
+                        || !Objects.equals(launchUrl, previousLaunch);
+        baseUrl = previousBase;
+        launchUrl = previousLaunch;
+        if (changed) {
+            synchronized (authLock) {
+                authCookie = null;
+            }
         }
     }
 

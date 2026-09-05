@@ -228,18 +228,32 @@ final class DshIdeContextController {
         }
         String suffix = DshBundle.message("dsh.context.truncated");
         int budget = Math.max(0, limit - suffix.getBytes(StandardCharsets.UTF_8).length);
+        // Advance by code point, not by char: splitting a surrogate pair would both mis-count the
+        // byte budget (a lone surrogate encodes as the 3-byte replacement character) and leave a
+        // mojibake character at the cut.
         StringBuilder result = new StringBuilder();
         int used = 0;
-        for (int index = 0; index < value.length(); index++) {
-            String character = value.substring(index, index + 1);
-            int size = character.getBytes(StandardCharsets.UTF_8).length;
+        int index = 0;
+        while (index < value.length()) {
+            int codePoint = value.codePointAt(index);
+            int width = Character.charCount(codePoint);
+            int size = utf8Length(codePoint);
             if (used + size > budget) {
                 break;
             }
-            result.append(character);
+            result.append(value, index, index + width);
             used += size;
+            index += width;
         }
         return result + suffix;
+    }
+
+    /** UTF-8 byte length of one code point, without allocating a String or a byte array. */
+    private static int utf8Length(int codePoint) {
+        if (codePoint < 0x80) return 1;
+        if (codePoint < 0x800) return 2;
+        if (codePoint < 0x10000) return 3;
+        return 4;
     }
 
     void fileReferenceQuery(String query) {
@@ -249,30 +263,29 @@ final class DshIdeContextController {
                     String normalized = query == null ? "" : query.trim().toLowerCase(Locale.ROOT);
                     String root = project.getBasePath();
                     if (root != null) {
-                        try (var paths = Files.walk(Path.of(root), 4)) {
+                        Path base = Path.of(root);
+                        // Match first, cap second: capping the walk instead spends the whole
+                        // budget on whatever is enumerated first -- usually .git and build output.
+                        try (var paths = Files.walk(base, 4)) {
                             paths.filter(Files::isRegularFile)
+                                    .map(
+                                            path ->
+                                                    base.relativize(path)
+                                                            .toString()
+                                                            .replace('\\', '/'))
+                                    .filter(relative -> matchesReferenceQuery(relative, normalized))
                                     .limit(300)
                                     .forEach(
-                                            path -> {
-                                                String relative =
-                                                        Path.of(root)
-                                                                .relativize(path)
-                                                                .toString()
-                                                                .replace('\\', '/');
-                                                if (normalized.isBlank()
-                                                        || relative.toLowerCase(Locale.ROOT)
-                                                                .contains(normalized)) {
-                                                    JsonObject candidate = new JsonObject();
-                                                    candidate.addProperty("kind", "file");
-                                                    candidate.addProperty("label", relative);
-                                                    candidate.addProperty(
-                                                            "insertText", "@" + relative);
-                                                    candidate.addProperty(
-                                                            "description",
-                                                            DshBundle.message(
-                                                                    "dsh.context.project.file"));
-                                                    result.add(candidate);
-                                                }
+                                            relative -> {
+                                                JsonObject candidate = new JsonObject();
+                                                candidate.addProperty("kind", "file");
+                                                candidate.addProperty("label", relative);
+                                                candidate.addProperty("insertText", "@" + relative);
+                                                candidate.addProperty(
+                                                        "description",
+                                                        DshBundle.message(
+                                                                "dsh.context.project.file"));
+                                                result.add(candidate);
                                             });
                         } catch (Exception error) {
                             LOG.debug(
@@ -283,6 +296,10 @@ final class DshIdeContextController {
                     fileReferenceCandidates = result;
                     stateChanged.run();
                 });
+    }
+
+    private static boolean matchesReferenceQuery(String relative, String normalized) {
+        return normalized.isBlank() || relative.toLowerCase(Locale.ROOT).contains(normalized);
     }
 
     void openPicker() {

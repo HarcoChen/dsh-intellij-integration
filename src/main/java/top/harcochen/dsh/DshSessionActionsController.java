@@ -62,11 +62,13 @@ final class DshSessionActionsController {
         if (session == null || session.equals(modelCatalogSession)) {
             return;
         }
-        modelCatalogSession = session;
         try {
-            modelCatalog = client.modelCatalog(session);
+            // Claim the session only once the load succeeds, so a transient RPC failure does not
+            // permanently pin this session to an empty catalog via the guard above.
+            JsonObject catalog = client.modelCatalog(session);
+            modelCatalog = catalog;
+            modelCatalogSession = session;
         } catch (Exception error) {
-            modelCatalog = null;
             LOG.debug("The connected Harness did not expose a model catalog", error);
         }
     }
@@ -432,7 +434,8 @@ final class DshSessionActionsController {
         String kind = result == null ? null : DshJson.string(result, "kind");
         String text = result == null ? null : DshJson.string(result, "text");
         if ("error".equals(kind)) {
-            throw new IllegalStateException(text == null ? "Permission command failed" : text);
+            throw new IllegalStateException(
+                    text == null ? DshBundle.message("dsh.command.failed") : text);
         }
         if (text != null && !text.isBlank()) {
             notifyUser(text.trim());

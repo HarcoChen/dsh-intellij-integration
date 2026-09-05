@@ -205,8 +205,14 @@ final class DshChangeReviewStore {
         return result;
     }
 
-    /** Both sides of one changed file, as text, or null when it is binary. */
-    record FileSides(String beforeText, String afterText, String title, boolean binary) {}
+    /**
+     * Both sides of one changed file, as text, or null when it is binary.
+     *
+     * <p>{@code title} is localized display text and is not a path; {@code path} is the repository
+     * path the change lands on, which is what file-type detection needs.
+     */
+    record FileSides(
+            String beforeText, String afterText, String title, String path, boolean binary) {}
 
     /**
      * Read both blobs of one changed file. A NUL byte on either side means the change is binary,
@@ -240,11 +246,14 @@ final class DshChangeReviewStore {
                         : DshBundle.message("dsh.change.review.turn.prefix", turn)
                                 + " "
                                 + file.path;
-        if (hasNul(before) || hasNul(after)) return new FileSides(null, null, title, true);
+        if (hasNul(before) || hasNul(after)) {
+            return new FileSides(null, null, title, file.path, true);
+        }
         return new FileSides(
                 new String(before, StandardCharsets.UTF_8),
                 new String(after, StandardCharsets.UTF_8),
                 title,
+                file.path,
                 false);
     }
 

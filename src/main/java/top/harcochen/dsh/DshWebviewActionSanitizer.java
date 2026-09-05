@@ -297,7 +297,7 @@ final class DshWebviewActionSanitizer {
             return hasOnly(input, "type", "active")
                             && input.has("active")
                             && input.get("active").isJsonPrimitive()
-                            && input.getAsJsonPrimitive().isBoolean()
+                            && input.get("active").getAsJsonPrimitive().isBoolean()
                     ? input
                     : null;
         }
