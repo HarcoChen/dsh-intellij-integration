@@ -34,6 +34,7 @@
                     factoryClass="top.harcochen.dsh.DshToolWindowFactory"
                     canCloseContent="false"/>
         <projectService serviceImplementation="top.harcochen.dsh.DshRuntimeService"/>
+        <projectService serviceImplementation="top.harcochen.dsh.remote.DshRemoteService"/>
         <projectService serviceImplementation="top.harcochen.dsh.DshSettingsState"/>
         <projectConfigurable parentId="tools" id="top.harcochen.dsh.settings"
                              displayName="DeepSeek Harness"

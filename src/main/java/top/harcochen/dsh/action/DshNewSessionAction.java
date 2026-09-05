@@ -1,9 +1,9 @@
 package top.harcochen.dsh.action;
 
-import top.harcochen.dsh.DshActions;
 import com.intellij.openapi.actionSystem.ActionUpdateThread;
 import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.project.DumbAwareAction;
+import top.harcochen.dsh.DshActions;
 
 public final class DshNewSessionAction extends DumbAwareAction {
     @Override

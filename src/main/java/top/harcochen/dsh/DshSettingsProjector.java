@@ -5,7 +5,6 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.google.gson.JsonPrimitive;
-
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -14,25 +13,23 @@ import java.util.Map;
 import java.util.regex.Pattern;
 
 /**
- * Projects {@code settings.describe} into the settings cards the webview
- * renders, and turns the form's edits back into {@code settings.mutate} path
- * operations.
+ * Projects {@code settings.describe} into the settings cards the webview renders, and turns the
+ * form's edits back into {@code settings.mutate} path operations.
  *
- * The namespace view carries three layers — the resolved value, the composition
- * base, and the raw user section — plus a serialized schemastery schema. Fields
- * are discovered from the schema first, so a setting that has never been written
- * still appears with its description, then from each layer, so a value the
- * schema does not describe is not hidden. Secret slots are listed but their
- * values never ride the wire and are never written from here.
+ * <p>The namespace view carries three layers — the resolved value, the composition base, and the
+ * raw user section — plus a serialized schemastery schema. Fields are discovered from the schema
+ * first, so a setting that has never been written still appears with its description, then from
+ * each layer, so a value the schema does not describe is not hidden. Secret slots are listed but
+ * their values never ride the wire and are never written from here.
  */
 final class DshSettingsProjector {
     private static final Pattern SENSITIVE_LEAF =
-            Pattern.compile("(?:api[_-]?key|token|password|secret|credential|private[_-]?key)$",
+            Pattern.compile(
+                    "(?:api[_-]?key|token|password|secret|credential|private[_-]?key)$",
                     Pattern.CASE_INSENSITIVE);
     private static final Pattern CAMEL_BOUNDARY = Pattern.compile("([a-z0-9])([A-Z])");
 
-    private DshSettingsProjector() {
-    }
+    private DshSettingsProjector() {}
 
     /** The panel view for one {@code settings.describe} result. */
     static JsonObject presentPanel(JsonObject result) {
@@ -42,8 +39,10 @@ final class DshSettingsProjector {
         panel.addProperty("writable", writable);
         panel.addProperty("hasDocument", bool(result, "hasDocument"));
         JsonArray cards = new JsonArray();
-        JsonArray namespaces = result != null && result.has("namespaces") && result.get("namespaces").isJsonArray()
-                ? result.getAsJsonArray("namespaces") : new JsonArray();
+        JsonArray namespaces =
+                result != null && result.has("namespaces") && result.get("namespaces").isJsonArray()
+                        ? result.getAsJsonArray("namespaces")
+                        : new JsonArray();
         for (JsonElement candidate : namespaces) {
             if (!candidate.isJsonObject()) continue;
             cards.add(presentCard(candidate.getAsJsonObject(), writable));
@@ -88,15 +87,19 @@ final class DshSettingsProjector {
 
     private static String titleOf(String ns) {
         String spaced = ns.replaceAll("[-_]+", " ");
-        return spaced.isEmpty() ? spaced : Character.toUpperCase(spaced.charAt(0)) + spaced.substring(1);
+        return spaced.isEmpty()
+                ? spaced
+                : Character.toUpperCase(spaced.charAt(0)) + spaced.substring(1);
     }
 
     /** One discovered leaf setting, keyed by its path. */
     private static JsonArray presentFields(JsonObject namespace) {
         Map<String, JsonObject> fields = new LinkedHashMap<>();
         Map<String, Boolean> secrets = new LinkedHashMap<>();
-        JsonArray secretList = namespace.has("secrets") && namespace.get("secrets").isJsonArray()
-                ? namespace.getAsJsonArray("secrets") : new JsonArray();
+        JsonArray secretList =
+                namespace.has("secrets") && namespace.get("secrets").isJsonArray()
+                        ? namespace.getAsJsonArray("secrets")
+                        : new JsonArray();
         for (JsonElement candidate : secretList) {
             if (!candidate.isJsonObject()) continue;
             List<String> path = pathOf(candidate.getAsJsonObject().get("path"));
@@ -124,13 +127,18 @@ final class DshSettingsProjector {
     }
 
     /**
-     * Walk the schema so a never-written setting still shows up with its
-     * description. A dict node's children come from the value instead, since the
-     * schema declares only the shape of one entry.
+     * Walk the schema so a never-written setting still shows up with its description. A dict node's
+     * children come from the value instead, since the schema declares only the shape of one entry.
      */
-    private static void visitSchema(JsonObject node, List<String> path, int depth, Map<String, JsonObject> fields,
-                                    Map<String, Boolean> secrets, JsonElement value, JsonElement base,
-                                    JsonElement user) {
+    private static void visitSchema(
+            JsonObject node,
+            List<String> path,
+            int depth,
+            Map<String, JsonObject> fields,
+            Map<String, Boolean> secrets,
+            JsonElement value,
+            JsonElement base,
+            JsonElement user) {
         if (depth > 8) return;
         if (secrets.containsKey(key(path))) {
             addField(path, node, fields, secrets, value, base, user);
@@ -142,7 +150,11 @@ final class DshSettingsProjector {
         if ("object".equals(type) && node.has("dict") && node.get("dict").isJsonObject()) {
             for (Map.Entry<String, JsonElement> entry : node.getAsJsonObject("dict").entrySet()) {
                 childKeys.add(entry.getKey());
-                childNodes.put(entry.getKey(), entry.getValue().isJsonObject() ? entry.getValue().getAsJsonObject() : null);
+                childNodes.put(
+                        entry.getKey(),
+                        entry.getValue().isJsonObject()
+                                ? entry.getValue().getAsJsonObject()
+                                : null);
             }
         } else if ("dict".equals(type) && node.has("inner") && node.get("inner").isJsonObject()) {
             JsonElement dictValue = valueAtPath(value, path);
@@ -157,31 +169,51 @@ final class DshSettingsProjector {
             for (String childKey : childKeys) {
                 List<String> childPath = new ArrayList<>(path);
                 childPath.add(childKey);
-                visitSchema(childNodes.get(childKey), childPath, depth + 1, fields, secrets, value, base, user);
+                visitSchema(
+                        childNodes.get(childKey),
+                        childPath,
+                        depth + 1,
+                        fields,
+                        secrets,
+                        value,
+                        base,
+                        user);
             }
             return;
         }
         addField(path, node, fields, secrets, value, base, user);
     }
 
-    private static void visitValue(JsonElement node, List<String> path, int depth, Map<String, JsonObject> fields,
-                                   Map<String, Boolean> secrets, JsonElement value, JsonElement base,
-                                   JsonElement user) {
+    private static void visitValue(
+            JsonElement node,
+            List<String> path,
+            int depth,
+            Map<String, JsonObject> fields,
+            Map<String, Boolean> secrets,
+            JsonElement value,
+            JsonElement base,
+            JsonElement user) {
         if (depth > 8 || node == null || node.isJsonNull()) return;
         if (node.isJsonObject()) {
             for (Map.Entry<String, JsonElement> entry : node.getAsJsonObject().entrySet()) {
                 List<String> childPath = new ArrayList<>(path);
                 childPath.add(entry.getKey());
-                visitValue(entry.getValue(), childPath, depth + 1, fields, secrets, value, base, user);
+                visitValue(
+                        entry.getValue(), childPath, depth + 1, fields, secrets, value, base, user);
             }
             return;
         }
         addField(path, null, fields, secrets, value, base, user);
     }
 
-    private static void addField(List<String> path, JsonObject node, Map<String, JsonObject> fields,
-                                 Map<String, Boolean> secrets, JsonElement value, JsonElement base,
-                                 JsonElement user) {
+    private static void addField(
+            List<String> path,
+            JsonObject node,
+            Map<String, JsonObject> fields,
+            Map<String, Boolean> secrets,
+            JsonElement value,
+            JsonElement base,
+            JsonElement user) {
         if (path.isEmpty()) return;
         String pathKey = key(path);
         if (fields.containsKey(pathKey)) return;
@@ -197,27 +229,30 @@ final class DshSettingsProjector {
         field.addProperty("label", labelOf(path));
         String description = descriptionOf(node);
         if (description != null) field.addProperty("description", description);
-        JsonElement typeSource = resolved != null ? resolved : (fromBase != null ? fromBase : fromUser);
+        JsonElement typeSource =
+                resolved != null ? resolved : (fromBase != null ? fromBase : fromUser);
         field.addProperty("type", secret ? "string" : typeOf(typeSource, node));
         field.addProperty("value", secret ? "" : textOf(resolved));
         field.addProperty("overridden", hasPath(user, path));
         field.addProperty("secret", secret);
         // A resolved secret with no explicit slot state is still configured.
-        field.addProperty("secretSet", Boolean.TRUE.equals(secretSet) || (secret && resolved != null));
+        field.addProperty(
+                "secretSet", Boolean.TRUE.equals(secretSet) || (secret && resolved != null));
         fields.put(pathKey, field);
     }
 
     /**
-     * Coerce the webview's edits into path operations. Every value arrives as a
-     * string from the form, so the declared field type decides how it parses; a
-     * value that does not parse is rejected rather than silently coerced. Secret
-     * fields stay with the credential provider and are never written here.
+     * Coerce the webview's edits into path operations. Every value arrives as a string from the
+     * form, so the declared field type decides how it parses; a value that does not parse is
+     * rejected rather than silently coerced. Secret fields stay with the credential provider and
+     * are never written here.
      */
     static JsonArray mutationOps(JsonArray fields, JsonArray changes) {
         Map<String, JsonObject> byPath = new LinkedHashMap<>();
         for (JsonElement candidate : fields) {
             if (!candidate.isJsonObject()) continue;
-            byPath.put(joinPath(candidate.getAsJsonObject().get("path")), candidate.getAsJsonObject());
+            byPath.put(
+                    joinPath(candidate.getAsJsonObject().get("path")), candidate.getAsJsonObject());
         }
         JsonArray ops = new JsonArray();
         for (JsonElement candidate : changes) {
@@ -231,7 +266,9 @@ final class DshSettingsProjector {
                 op.addProperty("op", "unset");
             } else {
                 op.addProperty("op", "set");
-                op.add("value", coerce(string(field, "type", "string"), string(change, "value", "")));
+                op.add(
+                        "value",
+                        coerce(string(field, "type", "string"), string(change, "value", "")));
             }
             ops.add(op);
         }
@@ -242,7 +279,8 @@ final class DshSettingsProjector {
         switch (type) {
             case "boolean" -> {
                 if (!"true".equals(raw) && !"false".equals(raw)) {
-                    throw new IllegalArgumentException(DshBundle.message("dsh.settings.coerce.boolean"));
+                    throw new IllegalArgumentException(
+                            DshBundle.message("dsh.settings.coerce.boolean"));
                 }
                 return new JsonPrimitive(Boolean.parseBoolean(raw));
             }
@@ -250,17 +288,21 @@ final class DshSettingsProjector {
                 try {
                     double parsed = Double.parseDouble(raw.trim());
                     if (!Double.isFinite(parsed)) throw new NumberFormatException(raw);
-                    return new JsonPrimitive(parsed == Math.rint(parsed) && Math.abs(parsed) < 1e15
-                            ? (Number) (long) parsed : (Number) parsed);
+                    return new JsonPrimitive(
+                            parsed == Math.rint(parsed) && Math.abs(parsed) < 1e15
+                                    ? (Number) (long) parsed
+                                    : (Number) parsed);
                 } catch (RuntimeException error) {
-                    throw new IllegalArgumentException(DshBundle.message("dsh.settings.coerce.number"));
+                    throw new IllegalArgumentException(
+                            DshBundle.message("dsh.settings.coerce.number"));
                 }
             }
             case "json" -> {
                 try {
                     return JsonParser.parseString(raw);
                 } catch (RuntimeException error) {
-                    throw new IllegalArgumentException(DshBundle.message("dsh.settings.coerce.json"));
+                    throw new IllegalArgumentException(
+                            DshBundle.message("dsh.settings.coerce.json"));
                 }
             }
             default -> {
@@ -273,7 +315,9 @@ final class DshSettingsProjector {
         if (value == null || !value.isJsonObject()) return null;
         JsonObject source = value.getAsJsonObject();
         // A schemastery envelope points at its root through `uid`/`refs`.
-        if (source.has("uid") && source.get("uid").isJsonPrimitive() && source.has("refs")
+        if (source.has("uid")
+                && source.get("uid").isJsonPrimitive()
+                && source.has("refs")
                 && source.get("refs").isJsonObject()) {
             JsonElement root = source.getAsJsonObject("refs").get(source.get("uid").getAsString());
             return root != null && root.isJsonObject() ? root.getAsJsonObject() : null;
@@ -284,7 +328,9 @@ final class DshSettingsProjector {
     private static JsonElement valueAtPath(JsonElement root, List<String> path) {
         JsonElement current = root;
         for (String segment : path) {
-            if (current == null || !current.isJsonObject() || !current.getAsJsonObject().has(segment)) return null;
+            if (current == null
+                    || !current.isJsonObject()
+                    || !current.getAsJsonObject().has(segment)) return null;
             current = current.getAsJsonObject().get(segment);
         }
         return current == null || current.isJsonNull() ? null : current;
@@ -293,7 +339,9 @@ final class DshSettingsProjector {
     private static boolean hasPath(JsonElement root, List<String> path) {
         JsonElement current = root;
         for (String segment : path) {
-            if (current == null || !current.isJsonObject() || !current.getAsJsonObject().has(segment)) return false;
+            if (current == null
+                    || !current.isJsonObject()
+                    || !current.getAsJsonObject().has(segment)) return false;
             current = current.getAsJsonObject().get(segment);
         }
         return true;
@@ -302,14 +350,19 @@ final class DshSettingsProjector {
     private static String labelOf(List<String> path) {
         String leaf = path.isEmpty() ? "Setting" : path.get(path.size() - 1);
         String spaced = CAMEL_BOUNDARY.matcher(leaf).replaceAll("$1 $2").replaceAll("[_-]+", " ");
-        return spaced.isEmpty() ? spaced : Character.toUpperCase(spaced.charAt(0)) + spaced.substring(1);
+        return spaced.isEmpty()
+                ? spaced
+                : Character.toUpperCase(spaced.charAt(0)) + spaced.substring(1);
     }
 
     private static String descriptionOf(JsonObject node) {
         if (node == null) return null;
         String direct = string(node, "description", null);
         if (direct != null && !direct.isBlank()) return direct.trim();
-        JsonObject meta = node.has("meta") && node.get("meta").isJsonObject() ? node.getAsJsonObject("meta") : null;
+        JsonObject meta =
+                node.has("meta") && node.get("meta").isJsonObject()
+                        ? node.getAsJsonObject("meta")
+                        : null;
         String nested = meta == null ? null : string(meta, "description", null);
         return nested != null && !nested.isBlank() ? nested.trim() : null;
     }
@@ -364,12 +417,15 @@ final class DshSettingsProjector {
 
     private static String string(JsonObject object, String key, String fallback) {
         return object != null && object.has(key) && object.get(key).isJsonPrimitive()
-                ? object.get(key).getAsString() : fallback;
+                ? object.get(key).getAsString()
+                : fallback;
     }
 
     private static boolean bool(JsonObject object, String key) {
         try {
-            return object != null && object.has(key) && object.get(key).isJsonPrimitive()
+            return object != null
+                    && object.has(key)
+                    && object.get(key).isJsonPrimitive()
                     && object.get(key).getAsBoolean();
         } catch (RuntimeException ignored) {
             return false;
@@ -378,8 +434,12 @@ final class DshSettingsProjector {
 
     private static long number(JsonObject object, String key) {
         try {
-            return object != null && object.has(key) && object.get(key).isJsonPrimitive()
-                    && object.get(key).getAsJsonPrimitive().isNumber() ? object.get(key).getAsLong() : 0;
+            return object != null
+                            && object.has(key)
+                            && object.get(key).isJsonPrimitive()
+                            && object.get(key).getAsJsonPrimitive().isNumber()
+                    ? object.get(key).getAsLong()
+                    : 0;
         } catch (RuntimeException ignored) {
             return 0;
         }

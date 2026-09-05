@@ -141,7 +141,7 @@ jobs:
           fi
 
       - name: Build, verify, sign, and verify signature
-        run: ./gradlew clean buildPlugin verifyPlugin signPlugin verifyPluginSignature
+        run: ./gradlew clean lint buildPlugin verifyPlugin signPlugin verifyPluginSignature
 
       - name: Resolve the distribution to release
         id: artifact

@@ -7,12 +7,11 @@ import com.intellij.openapi.wm.StatusBar;
 import com.intellij.openapi.wm.StatusBarWidget;
 import com.intellij.openapi.wm.StatusBarWidgetFactory;
 import com.intellij.util.Consumer;
+import java.awt.event.MouseEvent;
 import org.jetbrains.annotations.Nls;
 import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-
-import java.awt.event.MouseEvent;
 
 public final class DshBalanceWidget implements StatusBarWidget, StatusBarWidget.TextPresentation {
 
@@ -25,15 +24,20 @@ public final class DshBalanceWidget implements StatusBarWidget, StatusBarWidget.
         this.project = project;
         this.service = new DshBalanceService(project);
         Disposer.register(this, service);
-        service.addListener(snapshot ->
-                ApplicationManager.getApplication().invokeLater(() -> {
-                    if (statusBar != null) statusBar.updateWidget(ID);
-                }));
+        service.addListener(
+                snapshot ->
+                        ApplicationManager.getApplication()
+                                .invokeLater(
+                                        () -> {
+                                            if (statusBar != null) statusBar.updateWidget(ID);
+                                        }));
         service.start();
     }
 
     @Override
-    public @NonNls @NotNull String ID() { return ID; }
+    public @NonNls @NotNull String ID() {
+        return ID;
+    }
 
     @Override
     public void install(@NotNull StatusBar statusBar) {
@@ -41,7 +45,9 @@ public final class DshBalanceWidget implements StatusBarWidget, StatusBarWidget.
     }
 
     @Override
-    public @Nullable WidgetPresentation getPresentation() { return this; }
+    public @Nullable WidgetPresentation getPresentation() {
+        return this;
+    }
 
     @Override
     public @NotNull @Nls String getText() {
@@ -56,7 +62,9 @@ public final class DshBalanceWidget implements StatusBarWidget, StatusBarWidget.
     }
 
     @Override
-    public float getAlignment() { return 0.5f; }
+    public float getAlignment() {
+        return 0.5f;
+    }
 
     @Override
     public @Nullable Consumer<MouseEvent> getClickConsumer() {
@@ -75,10 +83,14 @@ public final class DshBalanceWidget implements StatusBarWidget, StatusBarWidget.
 
     public static final class Factory implements StatusBarWidgetFactory {
         @Override
-        public @NonNls @NotNull String getId() { return ID; }
+        public @NonNls @NotNull String getId() {
+            return ID;
+        }
 
         @Override
-        public @Nls @NotNull String getDisplayName() { return DshBundle.message("dsh.balance.widget.name"); }
+        public @Nls @NotNull String getDisplayName() {
+            return DshBundle.message("dsh.balance.widget.name");
+        }
 
         @Override
         public @NotNull StatusBarWidget createWidget(@NotNull Project project) {

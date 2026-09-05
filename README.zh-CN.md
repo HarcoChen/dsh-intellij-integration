@@ -73,7 +73,7 @@ graph TD
 | 命令 / 参数 | `pnpm dlx @deepseek-ai/dsh web --no-open` | Runtime 的启动方式，也可以指向已安装的 `dsh` 或本地源码目录。 |
 | 服务地址 / 端口 | `""` / `0` | 设置后直接连接已运行的 dsh web Runtime，不再本地启动。 |
 | 自动启动 | `true` | 项目打开时自动启动或连接 Runtime。 |
-| Runtime 版本 | `0.1.1-rc.2` | 托管 Runtime 的锁定版本。 |
+| Runtime 版本 | `0.1.2-rc.1` | 托管 Remote 协议的锁定版本。 |
 | npm 镜像 | `https://registry.npmmirror.com` | 下载后备重试的 Registry 镜像。 |
 | 超时 | 启动 `30s`，请求 `600s` | 等待启动和单次 RPC 调用的超时时间。 |
 | 上下文字节数 | `120000` | 单次请求中 `<ide_context>` 的最大 UTF-8 字节数。 |
@@ -82,6 +82,8 @@ graph TD
 ## 从源码构建
 
 ```bash
+./gradlew format         # 应用仓库统一的 Java 格式化规则
+./gradlew lint           # 检查格式并运行 Checkstyle
 ./gradlew verifyPlugin   # 结构与兼容性检查
 ./gradlew buildPlugin    # 生成可安装的 zip
 ```
