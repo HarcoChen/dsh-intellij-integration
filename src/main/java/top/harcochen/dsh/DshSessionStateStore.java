@@ -199,6 +199,91 @@ final class DshSessionStateStore {
                 : snapshot.value();
     }
 
+    /**
+     * Resolve a finalized user/assistant message sequence to the turn it belongs to.
+     *
+     * <p>The WebView only sends a sequence number. Keeping this lookup in the state store means
+     * checkpoint actions are checked against the latest authoritative history rather than trusting
+     * an arbitrary number supplied by the untrusted page.
+     */
+    Integer checkpointTurn(String session, long sequence) {
+        if (session == null || sequence < 0) return null;
+        JsonArray events;
+        synchronized (lock) {
+            HistoryProjectionCache cache = historyCaches.get(session);
+            if (cache == null) return null;
+            events = cache.events.deepCopy();
+        }
+        java.util.List<JsonObject> ordered = new java.util.ArrayList<>();
+        for (JsonElement candidate : events) {
+            if (!candidate.isJsonObject()) continue;
+            JsonObject wrapper = candidate.getAsJsonObject();
+            JsonObject event = historyEvent(wrapper);
+            if (event != null) ordered.add(wrapper);
+        }
+        ordered.sort(
+                java.util.Comparator.comparingLong(
+                        wrapper ->
+                                DshJson.longValue(
+                                        historyEvent(wrapper).get("seq"), Long.MAX_VALUE)));
+
+        JsonObject target = null;
+        for (JsonObject wrapper : ordered) {
+            JsonObject event = historyEvent(wrapper);
+            long eventSeq = DshJson.longValue(event.get("seq"), Long.MIN_VALUE);
+            if (eventSeq == sequence) {
+                target = event;
+                break;
+            }
+        }
+        if (target == null) return null;
+        String type = DshJson.string(target, "type");
+        if (!"user/message".equals(type) && !"assistant/message".equals(type)) return null;
+        if ("user/message".equals(type)) {
+            JsonObject data = historyObject(target, "data");
+            JsonObject source = data == null ? null : historyObject(data, "source");
+            if (source != null && !"user".equals(DshJson.string(source, "kind"))) return null;
+        }
+
+        JsonObject targetData = historyObject(target, "data");
+        Integer explicit = positiveTurn(targetData == null ? null : targetData.get("turn"));
+        if (explicit != null) return explicit;
+
+        Integer active = null;
+        for (JsonObject wrapper : ordered) {
+            JsonObject event = historyEvent(wrapper);
+            long eventSeq = DshJson.longValue(event.get("seq"), Long.MAX_VALUE);
+            if (eventSeq > sequence) break;
+            JsonObject data = historyObject(event, "data");
+            Integer turn = positiveTurn(data == null ? null : data.get("turn"));
+            String eventType = DshJson.string(event, "type");
+            if ("turn/start".equals(eventType) && turn != null) {
+                active = turn;
+            } else if ("turn/end".equals(eventType) && turn != null && turn.equals(active)) {
+                active = null;
+            }
+        }
+        return active;
+    }
+
+    private static JsonObject historyEvent(JsonObject wrapper) {
+        return wrapper != null && wrapper.has("event") && wrapper.get("event").isJsonObject()
+                ? wrapper.getAsJsonObject("event")
+                : wrapper;
+    }
+
+    private static JsonObject historyObject(JsonObject parent, String key) {
+        return parent != null && parent.has(key) && parent.get(key).isJsonObject()
+                ? parent.getAsJsonObject(key)
+                : null;
+    }
+
+    private static Integer positiveTurn(JsonElement value) {
+        if (value == null || !value.isJsonPrimitive()) return null;
+        long number = DshJson.longValue(value, -1L);
+        return number > 0 && number <= Integer.MAX_VALUE ? (int) number : null;
+    }
+
     void receiveMuxFrame(JsonObject frame, String selectedSession, JsonArray sessions) {
         String type = DshJson.string(frame, "type");
         String frameSession = DshJson.string(frame, "sessionId");
@@ -494,6 +579,25 @@ final class DshSessionStateStore {
             }
             result.add(field, source.get(field).deepCopy());
         }
+        return result;
+    }
+
+    /** Validate and expose the optional public plan-mode projection. */
+    JsonObject plan(String session) {
+        JsonElement value = projectionValue(session, "plan");
+        if (value == null || !value.isJsonObject()) return null;
+        JsonObject source = value.getAsJsonObject();
+        if (!source.has("active")
+                || !source.has("pending")
+                || !source.get("active").isJsonPrimitive()
+                || !source.get("pending").isJsonPrimitive()
+                || !source.getAsJsonPrimitive("active").isBoolean()
+                || !source.getAsJsonPrimitive("pending").isBoolean()) {
+            return null;
+        }
+        JsonObject result = new JsonObject();
+        result.addProperty("active", source.get("active").getAsBoolean());
+        result.addProperty("pending", source.get("pending").getAsBoolean());
         return result;
     }
 

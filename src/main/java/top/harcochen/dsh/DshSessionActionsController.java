@@ -227,6 +227,11 @@ final class DshSessionActionsController {
     }
 
     void fork() {
+        forkAt(null);
+    }
+
+    /** Fork the current session, optionally cutting it at a finalized message sequence. */
+    void forkAt(Long atSeq) {
         String current = sessionId.get();
         if (current == null) {
             return;
@@ -234,7 +239,7 @@ final class DshSessionActionsController {
         operations.execute(
                 () -> {
                     try {
-                        String forked = client.forkSession(current);
+                        String forked = client.forkSession(current, atSeq);
                         if (!forked.isBlank()) {
                             selectSession.accept(forked);
                         }
@@ -390,6 +395,23 @@ final class DshSessionActionsController {
                     try {
                         JsonElement execution =
                                 client.executeCommand(current, "/permission " + preset);
+                        showCommandResult(execution);
+                        refreshState.run();
+                    } catch (Exception error) {
+                        report(error);
+                    }
+                });
+    }
+
+    /** Toggle the Runtime's public plan command for the current session. */
+    void setPlanMode(boolean active) {
+        String current = sessionId.get();
+        if (current == null) return;
+        operations.execute(
+                () -> {
+                    try {
+                        JsonElement execution =
+                                client.executeCommand(current, active ? "/plan on" : "/plan off");
                         showCommandResult(execution);
                         refreshState.run();
                     } catch (Exception error) {

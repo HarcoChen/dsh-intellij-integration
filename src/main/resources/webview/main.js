@@ -1085,7 +1085,7 @@
             }
             return dispatcher.useContext(Context);
           }
-          function useState16(initialState) {
+          function useState17(initialState) {
             var dispatcher = resolveDispatcher();
             return dispatcher.useState(initialState);
           }
@@ -1093,11 +1093,11 @@
             var dispatcher = resolveDispatcher();
             return dispatcher.useReducer(reducer, initialArg, init);
           }
-          function useRef8(initialValue) {
+          function useRef9(initialValue) {
             var dispatcher = resolveDispatcher();
             return dispatcher.useRef(initialValue);
           }
-          function useEffect13(create, deps) {
+          function useEffect15(create, deps) {
             var dispatcher = resolveDispatcher();
             return dispatcher.useEffect(create, deps);
           }
@@ -1880,15 +1880,15 @@
           exports.useContext = useContext;
           exports.useDebugValue = useDebugValue;
           exports.useDeferredValue = useDeferredValue;
-          exports.useEffect = useEffect13;
+          exports.useEffect = useEffect15;
           exports.useId = useId;
           exports.useImperativeHandle = useImperativeHandle;
           exports.useInsertionEffect = useInsertionEffect;
           exports.useLayoutEffect = useLayoutEffect2;
           exports.useMemo = useMemo4;
           exports.useReducer = useReducer;
-          exports.useRef = useRef8;
-          exports.useState = useState16;
+          exports.useRef = useRef9;
+          exports.useState = useState17;
           exports.useSyncExternalStore = useSyncExternalStore;
           exports.useTransition = useTransition;
           exports.version = ReactVersion;
@@ -23666,12 +23666,18 @@
     "Slash commands": "Slash \u547D\u4EE4",
     "Skill candidates": "Skill \u5019\u9009",
     "Add one-shot IDE context": "\u6DFB\u52A0\u4E00\u6B21\u6027 IDE context",
+    "Recent terminal command": "\u6700\u8FD1\u7684\u7EC8\u7AEF\u547D\u4EE4",
     "The connected dsh server does not expose the /compact command. Update dsh or enable the command-compact package.": "\u5F53\u524D\u8FDE\u63A5\u7684 dsh server \u672A\u63D0\u4F9B /compact command\u3002\u8BF7\u66F4\u65B0 dsh \u6216\u542F\u7528 command-compact package\u3002",
     "Compacting": "\u6B63\u5728\u538B\u7F29",
     "Select the current session model": "\u9009\u62E9\u5F53\u524D\u4F1A\u8BDD\u6A21\u578B",
     "Select reasoning effort": "\u9009\u62E9\u63A8\u7406\u5F3A\u5EA6",
     "Select agent mode": "\u9009\u62E9 Agent \u6A21\u5F0F",
     "Describe a task; use @ for files, $ for skills...": "\u63CF\u8FF0\u4EFB\u52A1\uFF1B\u4F7F\u7528 @ \u5F15\u7528\u6587\u4EF6\uFF0C\u4F7F\u7528 $ \u9009\u62E9 Skill\u2026",
+    "Describe your task to generate a plan": "\u63CF\u8FF0\u4F60\u7684\u4EFB\u52A1\u4EE5\u751F\u6210\u8BA1\u5212",
+    "Plan mode on, click to turn off": "Plan \u6A21\u5F0F\u5DF2\u5F00\u542F\uFF0C\u70B9\u51FB\u5173\u95ED",
+    "Plan mode on \u2014 click to turn off (/plan off)": "Plan \u6A21\u5F0F\u5DF2\u5F00\u542F \u2014 \u70B9\u51FB\u5173\u95ED\uFF08/plan off\uFF09",
+    "Plan mode off, click to turn on": "Plan \u6A21\u5F0F\u5DF2\u5173\u95ED\uFF0C\u70B9\u51FB\u5F00\u542F",
+    "Plan mode off \u2014 click to turn on (/plan on)": "Plan \u6A21\u5F0F\u5DF2\u5173\u95ED \u2014 \u70B9\u51FB\u5F00\u542F\uFF08/plan on\uFF09",
     "Toggle focus mode": "\u5207\u6362 Focus \u6A21\u5F0F",
     "Open the current session trace": "\u6253\u5F00\u5F53\u524D\u4F1A\u8BDD Trace",
     "Stop the dsh runtime": "\u505C\u6B62 dsh \u8FD0\u884C\u65F6",
@@ -23749,7 +23755,22 @@
     " \xB7 waiting for response": " \xB7 \u7B49\u5F85\u63A5\u6536",
     " \xB7 streaming": " \xB7 \u6D41\u5F0F\u751F\u6210",
     "Locate in Trace": "\u5728 Trace \u4E2D\u5B9A\u4F4D",
+    "Message actions": "\u6D88\u606F\u64CD\u4F5C",
+    "Fork from here": "\u4ECE\u8FD9\u91CC Fork",
+    "Restore code to here": "\u5C06\u4EE3\u7801\u6062\u590D\u5230\u8FD9\u91CC",
+    "Fork + restore code": "Fork \u5E76\u6062\u590D\u4EE3\u7801",
     "Retry": "\u91CD\u8BD5",
+    "Like": "\u8D5E",
+    "Like (selected)": "\u5DF2\u8D5E",
+    "Dislike": "\u8E29",
+    "Dislike (selected)": "\u5DF2\u8E29",
+    "Add note": "\u6DFB\u52A0\u5907\u6CE8",
+    "Add feedback note": "\u6DFB\u52A0\u53CD\u9988\u5907\u6CE8",
+    "Edit feedback note": "\u7F16\u8F91\u53CD\u9988\u5907\u6CE8",
+    "Feedback": "\u53CD\u9988",
+    "Feedback note": "\u53CD\u9988\u5907\u6CE8",
+    "Optional feedback note": "\u53EF\u9009\uFF1A\u544A\u8BC9\u6211\u4EEC\u66F4\u591A\u4FE1\u606F",
+    "Save feedback note": "\u4FDD\u5B58\u53CD\u9988\u5907\u6CE8",
     "Describe a task.": "\u76F4\u63A5\u63CF\u8FF0\u4EFB\u52A1\u3002",
     "The current selection is attached automatically. You can also use @ to reference files.": "\u5F53\u524D\u9009\u533A\u4F1A\u81EA\u52A8\u9644\u52A0\uFF0C\u4E5F\u53EF\u4EE5\u7528 @ \u5F15\u7528\u6587\u4EF6\u3002",
     "Ctrl/Cmd + Enter to send.": "Ctrl/Cmd + Enter \u53D1\u9001\u3002",
@@ -23828,6 +23849,18 @@
     "Steer now": "\u7ACB\u5373\u8F6C\u5411",
     "parent available": "\u7236\u4F1A\u8BDD\u53EF\u7528",
     "parent unavailable": "\u7236\u4F1A\u8BDD\u4E0D\u53EF\u7528",
+    "duration: {duration}": "\u8017\u65F6\uFF1A{duration}",
+    "Total active duration: {duration}": "\u603B\u6D3B\u8DC3\u8017\u65F6\uFF1A{duration}",
+    "{seconds}s": "{seconds}\u79D2",
+    "{minutes}m {seconds}s": "{minutes}\u5206{seconds}\u79D2",
+    "{hours}h {minutes}m {seconds}s": "{hours}\u5C0F\u65F6{minutes}\u5206{seconds}\u79D2",
+    "{days}d": "{days}\u5929",
+    "{days}d {hours}h": "{days}\u5929{hours}\u5C0F\u65F6",
+    "~{months}mo": "\u7EA6{months}\u4E2A\u6708",
+    "~{months}mo {days}d": "\u7EA6{months}\u4E2A\u6708{days}\u5929",
+    "~{years}y": "\u7EA6{years}\u5E74",
+    "~{years}y {months}mo": "\u7EA6{years}\u5E74{months}\u4E2A\u6708",
+    "{days}d {hours}h {minutes}m {seconds}s": "{days}\u5929{hours}\u5C0F\u65F6{minutes}\u5206{seconds}\u79D2",
     "Loading history...": "\u52A0\u8F7D history\u2026",
     "Running {operation}...": "\u6B63\u5728\u6267\u884C {operation}\u2026",
     "Add a task for the continuable subagent": "\u7ED9 continuable subagent \u8FFD\u52A0\u4EFB\u52A1",
@@ -23902,8 +23935,12 @@
     focusMode: false
   };
   var PERMISSION_PRESET_COMMAND = "permission";
+  var PLAN_COMMAND_NAME = "plan";
   function canSwitchPermissions(commands) {
     return commands.some((command) => command.name === PERMISSION_PRESET_COMMAND);
+  }
+  function canTogglePlan(commands) {
+    return commands.some((command) => command.name === PLAN_COMMAND_NAME);
   }
   function statusLabel(status) {
     if (status.state === "running") return t("Running");
@@ -24097,6 +24134,9 @@
   }
   function AppShotIcon({ size = 14 }) {
     return /* @__PURE__ */ import_react2.default.createElement("svg", { ...base(size) }, /* @__PURE__ */ import_react2.default.createElement("rect", { x: "1.5", y: "3", width: "13", height: "10", rx: "1.5" }), /* @__PURE__ */ import_react2.default.createElement("path", { d: "M1.5 6h13M4 4.5h.01M6 4.5h.01" }), /* @__PURE__ */ import_react2.default.createElement("circle", { cx: "8", cy: "9.5", r: "2" }));
+  }
+  function TerminalIcon({ size = 14 }) {
+    return /* @__PURE__ */ import_react2.default.createElement("svg", { ...base(size) }, /* @__PURE__ */ import_react2.default.createElement("rect", { x: "1.5", y: "2", width: "13", height: "12", rx: "1.5" }), /* @__PURE__ */ import_react2.default.createElement("path", { d: "m4 6 2.2 2L4 10M7.8 10H11" }));
   }
   function SearchIcon({ size = 14 }) {
     return /* @__PURE__ */ import_react2.default.createElement("svg", { ...base(size) }, /* @__PURE__ */ import_react2.default.createElement("circle", { cx: "7", cy: "7", r: "4" }), /* @__PURE__ */ import_react2.default.createElement("path", { d: "M10.2 10.2 14 14" }));
@@ -24754,6 +24794,55 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
   }
 
   // webview/src/components/MessageItem.tsx
+  function MessageCheckpointMenu({ seq }) {
+    const [open, setOpen] = (0, import_react8.useState)(false);
+    const menuRef = (0, import_react8.useRef)(null);
+    (0, import_react8.useEffect)(() => {
+      if (!open) return;
+      const onPointerDown = (event) => {
+        if (menuRef.current && !menuRef.current.contains(event.target)) {
+          setOpen(false);
+        }
+      };
+      const onKeyDown = (event) => {
+        if (event.key === "Escape") setOpen(false);
+      };
+      document.addEventListener("mousedown", onPointerDown);
+      document.addEventListener("keydown", onKeyDown);
+      return () => {
+        document.removeEventListener("mousedown", onPointerDown);
+        document.removeEventListener("keydown", onKeyDown);
+      };
+    }, [open]);
+    const run = (type) => {
+      postAction({ type, seq });
+      setOpen(false);
+    };
+    return /* @__PURE__ */ import_react8.default.createElement("div", { className: `dsh-message-actions${open ? " open" : ""}`, ref: menuRef }, /* @__PURE__ */ import_react8.default.createElement(
+      "button",
+      {
+        type: "button",
+        className: "dsh-message-action-trigger dsh-icon-button",
+        "aria-label": t("Message actions"),
+        "aria-expanded": open,
+        title: t("Message actions"),
+        onClick: (event) => {
+          event.stopPropagation();
+          setOpen((current) => !current);
+        }
+      },
+      /* @__PURE__ */ import_react8.default.createElement(MoreIcon, null)
+    ), open ? /* @__PURE__ */ import_react8.default.createElement("div", { className: "dsh-message-action-menu" }, /* @__PURE__ */ import_react8.default.createElement("button", { type: "button", onClick: (event) => {
+      event.stopPropagation();
+      run("forkFromMessage");
+    } }, t("Fork from here")), /* @__PURE__ */ import_react8.default.createElement("button", { type: "button", onClick: (event) => {
+      event.stopPropagation();
+      run("restoreCodeToMessage");
+    } }, t("Restore code to here")), /* @__PURE__ */ import_react8.default.createElement("button", { type: "button", onClick: (event) => {
+      event.stopPropagation();
+      run("forkAndRestoreCodeToMessage");
+    } }, t("Fork + restore code"))) : null);
+  }
   var MessageItem = import_react8.default.memo(function MessageItem2({
     message,
     submitting,
@@ -24762,6 +24851,7 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
     const stateClass = message.state === "streaming" ? " dsh-streaming" : message.state === "pending" ? " dsh-pending" : "";
     const stateLabel = message.state === "pending" ? t(" \xB7 waiting for response") : message.state === "streaming" && message.role === "assistant" ? ` \xB7 ${agentStatusLabel ?? t("Thinking...")}` : message.state === "streaming" ? t(" \xB7 streaming") : "";
     const hasTrace = Number.isSafeInteger(message.seq) && (message.seq ?? -1) >= 0;
+    const checkpointSeq = (message.role === "user" || message.role === "assistant") && message.state !== "streaming" && message.state !== "pending" && typeof message.seq === "number" && Number.isSafeInteger(message.seq) && message.seq >= 0 ? message.seq : void 0;
     return /* @__PURE__ */ import_react8.default.createElement(
       "div",
       {
@@ -24778,7 +24868,7 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
           title: t("Locate in Trace")
         },
         "trace"
-      ) : null),
+      ) : null, checkpointSeq === void 0 ? null : /* @__PURE__ */ import_react8.default.createElement(MessageCheckpointMenu, { seq: checkpointSeq })),
       /* @__PURE__ */ import_react8.default.createElement(MessageContent, { message, agentStatusLabel }),
       message.state === "failed" ? /* @__PURE__ */ import_react8.default.createElement(
         "button",
@@ -25278,17 +25368,78 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
 
   // webview/src/components/dock/SubagentsPanel.tsx
   var import_react16 = __toESM(require_react());
-  function SubagentPreviewCard({ preview }) {
+  function activityDuration(timing, activity, now) {
+    if (timing === void 0) return void 0;
+    if (timing.active === void 0) return timing.settledMs;
+    const end = activity === "running" ? now : timing.active.through;
+    return timing.settledMs + Math.max(0, end - timing.active.since);
+  }
+  function splitDuration(milliseconds) {
+    const totalSeconds = Math.floor(Math.max(0, milliseconds) / 1e3);
+    const totalMinutes = Math.floor(totalSeconds / 60);
+    const totalHours = Math.floor(totalMinutes / 60);
+    return {
+      seconds: totalSeconds % 60,
+      minutes: totalMinutes % 60,
+      hours: totalHours % 24,
+      days: Math.floor(totalHours / 24),
+      totalHours
+    };
+  }
+  function formatDuration(milliseconds) {
+    const { seconds, minutes, hours, days, totalHours } = splitDuration(milliseconds);
+    if (days >= 365) {
+      const years = Math.floor(days / 365);
+      const months = Math.floor(days % 365 / 30);
+      return months === 0 ? t("~{years}y", { years }) : t("~{years}y {months}mo", { years, months });
+    }
+    if (days >= 30) {
+      const months = Math.floor(days / 30);
+      const remainingDays = days % 30;
+      return remainingDays === 0 ? t("~{months}mo", { months }) : t("~{months}mo {days}d", { months, days: remainingDays });
+    }
+    if (days > 0) {
+      return hours === 0 ? t("{days}d", { days }) : t("{days}d {hours}h", { days, hours });
+    }
+    if (totalHours > 0) {
+      return t("{hours}h {minutes}m {seconds}s", {
+        hours: totalHours,
+        minutes: String(minutes).padStart(2, "0"),
+        seconds: String(seconds).padStart(2, "0")
+      });
+    }
+    if (minutes > 0) {
+      return t("{minutes}m {seconds}s", {
+        minutes,
+        seconds: String(seconds).padStart(2, "0")
+      });
+    }
+    return t("{seconds}s", { seconds });
+  }
+  function formatExactDuration(milliseconds) {
+    const { seconds, minutes, hours, days } = splitDuration(milliseconds);
+    if (days === 0) return formatDuration(milliseconds);
+    return t("{days}d {hours}h {minutes}m {seconds}s", {
+      days,
+      hours: String(hours).padStart(2, "0"),
+      minutes: String(minutes).padStart(2, "0"),
+      seconds: String(seconds).padStart(2, "0")
+    });
+  }
+  function SubagentPreviewCard({ preview, now }) {
     const [followUp, setFollowUp] = (0, import_react16.useState)("");
     const busy = Boolean(preview.pendingAction);
     const canFollowUp = preview.parentAvailable && !busy;
+    const durationMs = activityDuration(preview.timing, preview.activity, now);
+    const duration = durationMs === void 0 ? void 0 : formatDuration(durationMs);
+    const durationTitle = durationMs === void 0 ? void 0 : formatExactDuration(durationMs);
     const sendFollowUp = () => {
       const text = followUp.trim();
       if (!text || !canFollowUp) return;
       setFollowUp("");
       postAction({ type: "followUpSubagent", childSessionId: preview.childSessionId, text });
     };
-    return /* @__PURE__ */ import_react16.default.createElement("div", { className: "dsh-card" }, /* @__PURE__ */ import_react16.default.createElement("div", { className: "dsh-feature-head" }, /* @__PURE__ */ import_react16.default.createElement("div", { className: "dsh-card-title" }, preview.label), /* @__PURE__ */ import_react16.default.createElement("button", { type: "button", className: "dsh-button dsh-button-secondary", onClick: () => postAction({ type: "closeSubagent" }) }, t("Close"))), /* @__PURE__ */ import_react16.default.createElement("div", { className: "dsh-card-detail" }, preview.mode, " \xB7 ", preview.activity, " \xB7 ", preview.parentAvailable ? t("parent available") : t("parent unavailable")), preview.state === "loading" ? /* @__PURE__ */ import_react16.default.createElement("div", { className: "dsh-card-detail" }, t("Loading history...")) : null, preview.error ? /* @__PURE__ */ import_react16.default.createElement("div", { className: "dsh-card-error" }, preview.error) : null, preview.pendingAction ? /* @__PURE__ */ import_react16.default.createElement("div", { className: "dsh-card-detail" }, t("Running {operation}...", { operation: preview.pendingAction })) : null, preview.messages.length ? /* @__PURE__ */ import_react16.default.createElement("div", { className: "dsh-subagent-transcript", onClick: (event) => handleMarkdownClick(event.target), onKeyDown: handleMarkdownKeydown }, preview.messages.map((message) => /* @__PURE__ */ import_react16.default.createElement(
+    return /* @__PURE__ */ import_react16.default.createElement("div", { className: "dsh-card" }, /* @__PURE__ */ import_react16.default.createElement("div", { className: "dsh-feature-head" }, /* @__PURE__ */ import_react16.default.createElement("div", { className: "dsh-card-title" }, preview.label), /* @__PURE__ */ import_react16.default.createElement("button", { type: "button", className: "dsh-button dsh-button-secondary", onClick: () => postAction({ type: "closeSubagent" }) }, t("Close"))), /* @__PURE__ */ import_react16.default.createElement("div", { className: "dsh-card-detail", title: durationTitle === void 0 ? void 0 : t("Total active duration: {duration}", { duration: durationTitle }) }, preview.mode, " \xB7 ", preview.activity, duration === void 0 ? "" : ` \xB7 ${t("duration: {duration}", { duration })}`, " \xB7 ", preview.parentAvailable ? t("parent available") : t("parent unavailable")), preview.state === "loading" ? /* @__PURE__ */ import_react16.default.createElement("div", { className: "dsh-card-detail" }, t("Loading history...")) : null, preview.error ? /* @__PURE__ */ import_react16.default.createElement("div", { className: "dsh-card-error" }, preview.error) : null, preview.pendingAction ? /* @__PURE__ */ import_react16.default.createElement("div", { className: "dsh-card-detail" }, t("Running {operation}...", { operation: preview.pendingAction })) : null, preview.messages.length ? /* @__PURE__ */ import_react16.default.createElement("div", { className: "dsh-subagent-transcript", onClick: (event) => handleMarkdownClick(event.target), onKeyDown: handleMarkdownKeydown }, preview.messages.map((message) => /* @__PURE__ */ import_react16.default.createElement(
       "div",
       {
         className: `dsh-message dsh-role-${message.role}`,
@@ -25323,20 +25474,33 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
     )) : null);
   }
   function SubagentsPanel({ tree, preview }) {
+    const [now, setNow] = (0, import_react16.useState)(() => Date.now());
+    const hasRunningTiming = tree.nodes.some(
+      (node) => node.kind === "child" && node.activity === "running" && node.timing?.active !== void 0
+    ) || preview?.activity === "running" && preview.timing?.active !== void 0;
+    (0, import_react16.useEffect)(() => {
+      if (!hasRunningTiming) return;
+      const timer = window.setInterval(() => setNow(Date.now()), 1e3);
+      return () => window.clearInterval(timer);
+    }, [hasRunningTiming]);
     const statusText = tree.state === "loading" ? t("Loading...") : tree.state === "error" ? tree.error || t("Loading failed") : tree.nodes.length ? "" : t("No subagents");
     return /* @__PURE__ */ import_react16.default.createElement("div", null, /* @__PURE__ */ import_react16.default.createElement("div", { className: "dsh-feature-head" }, /* @__PURE__ */ import_react16.default.createElement("div", { className: "dsh-dock-title" }, t("Subagent Tree")), /* @__PURE__ */ import_react16.default.createElement("button", { type: "button", className: "dsh-button dsh-button-secondary", disabled: tree.state === "loading", onClick: () => postAction({ type: "refreshSubagents" }) }, t("Refresh"))), statusText ? /* @__PURE__ */ import_react16.default.createElement("div", { className: "dsh-card-detail" }, statusText) : null, tree.nodes.map((node) => {
       const depthClass = `dsh-tree-depth-${Math.min(8, Math.max(0, Number(node.depth || 1) - 1))}`;
       if (node.kind === "diagnostic") {
         return /* @__PURE__ */ import_react16.default.createElement("div", { className: `dsh-tree-row ${depthClass}`, key: node.id }, /* @__PURE__ */ import_react16.default.createElement("div", null, /* @__PURE__ */ import_react16.default.createElement("div", { className: "dsh-tree-label" }, node.id), /* @__PURE__ */ import_react16.default.createElement("div", { className: "dsh-tree-meta" }, t("diagnostic \xB7 {reason} \xB7 parent {parent}", { reason: node.reason || "", parent: node.parentSessionId }))));
       }
+      const durationMs = node.activity === void 0 ? void 0 : activityDuration(node.timing, node.activity, now);
+      const duration = durationMs === void 0 ? void 0 : formatDuration(durationMs);
+      const durationTitle = durationMs === void 0 ? void 0 : formatExactDuration(durationMs);
       const meta = [
         node.mode,
         node.activity,
+        duration === void 0 ? void 0 : t("duration: {duration}", { duration }),
         node.hasChildren ? t("has children") : t("leaf"),
         node.parentAvailable ? t("parent available") : t("parent unavailable")
       ].filter(Boolean).join(" \xB7 ");
-      return /* @__PURE__ */ import_react16.default.createElement("div", { className: `dsh-tree-row ${depthClass}`, key: node.id }, /* @__PURE__ */ import_react16.default.createElement("div", null, /* @__PURE__ */ import_react16.default.createElement("div", { className: "dsh-tree-label" }, node.label || node.id), /* @__PURE__ */ import_react16.default.createElement("div", { className: "dsh-tree-meta" }, meta, /* @__PURE__ */ import_react16.default.createElement("br", null), t("parent {parent}", { parent: node.parentSessionId }))), /* @__PURE__ */ import_react16.default.createElement("button", { type: "button", className: "dsh-button dsh-button-secondary", onClick: () => postAction({ type: "openSubagent", childSessionId: node.id }) }, t("History")));
-    }), preview ? /* @__PURE__ */ import_react16.default.createElement(SubagentPreviewCard, { preview }) : null);
+      return /* @__PURE__ */ import_react16.default.createElement("div", { className: `dsh-tree-row ${depthClass}`, key: node.id }, /* @__PURE__ */ import_react16.default.createElement("div", null, /* @__PURE__ */ import_react16.default.createElement("div", { className: "dsh-tree-label" }, node.label || node.id), /* @__PURE__ */ import_react16.default.createElement("div", { className: "dsh-tree-meta", title: durationTitle === void 0 ? void 0 : t("Total active duration: {duration}", { duration: durationTitle }) }, meta, /* @__PURE__ */ import_react16.default.createElement("br", null), t("parent {parent}", { parent: node.parentSessionId }))), /* @__PURE__ */ import_react16.default.createElement("button", { type: "button", className: "dsh-button dsh-button-secondary", onClick: () => postAction({ type: "openSubagent", childSessionId: node.id }) }, t("History")));
+    }), preview ? /* @__PURE__ */ import_react16.default.createElement(SubagentPreviewCard, { preview, now }) : null);
   }
 
   // webview/src/components/dock/TodosPanel.tsx
@@ -26317,6 +26481,7 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
     sessionStats,
     reasoningEffort,
     imageLimits,
+    plan,
     busy,
     submitting,
     cancelling,
@@ -26331,7 +26496,25 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
     const textareaRef = (0, import_react28.useRef)(null);
     const attachmentMenuRef = (0, import_react28.useRef)(null);
     const imageInputRef = (0, import_react28.useRef)(null);
+    const planToggleTargetRef = (0, import_react28.useRef)();
     const imageDrafts = useImageDrafts(imageLimits);
+    const planActive = plan !== void 0 && (plan.pending ? !plan.active : plan.active);
+    const planCommandAvailable = canTogglePlan(commands);
+    const togglePlan = (0, import_react28.useCallback)(() => {
+      if (!planCommandAvailable) return;
+      const next = !(planToggleTargetRef.current ?? planActive);
+      planToggleTargetRef.current = next;
+      postAction({
+        type: "setPlanMode",
+        active: next
+      });
+    }, [planActive, planCommandAvailable]);
+    (0, import_react28.useEffect)(() => {
+      if (plan === void 0 || !plan.pending) planToggleTargetRef.current = void 0;
+    }, [plan?.active, plan?.pending]);
+    (0, import_react28.useEffect)(() => {
+      planToggleTargetRef.current = void 0;
+    }, [sessionId]);
     (0, import_react28.useEffect)(() => {
       return subscribeAddImageDraft((image) => imageDrafts.addUploads([image]));
     }, [imageDrafts.addUploads]);
@@ -26565,6 +26748,18 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
             className: "dsh-menu-item",
             onClick: () => {
               setAttachmentMenuVisible(false);
+              postAction({ type: "openTerminalCommandPicker" });
+            }
+          },
+          /* @__PURE__ */ import_react28.default.createElement(TerminalIcon, null),
+          t("Recent terminal command")
+        ), /* @__PURE__ */ import_react28.default.createElement(
+          "button",
+          {
+            type: "button",
+            className: "dsh-menu-item",
+            onClick: () => {
+              setAttachmentMenuVisible(false);
               imageInputRef.current?.click();
             }
           },
@@ -26604,7 +26799,7 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
         {
           ref: textareaRef,
           className: "dsh-prompt",
-          placeholder: t("Describe a task; use @ for files, $ for skills..."),
+          placeholder: t(planActive ? "Describe your task to generate a plan" : "Describe a task; use @ for files, $ for skills..."),
           value: text,
           disabled: submitting,
           rows: 2,
@@ -26622,6 +26817,13 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
             void imageDrafts.addFiles(files);
           },
           onKeyDown: (event) => {
+            if (event.key === "Tab" && event.shiftKey && !event.altKey && !event.ctrlKey && !event.metaKey && !event.repeat && !referenceMenuVisible && completion.skillMatches.length === 0 && completion.slashCandidateCount === 0) {
+              if (planCommandAvailable) {
+                event.preventDefault();
+                togglePlan();
+                return;
+              }
+            }
             if (handleReferenceKeyDown(event)) return;
             if (completion.handleCompletionKeyDown(event)) return;
             if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
@@ -26667,7 +26869,20 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
         busy ? /* @__PURE__ */ import_react28.default.createElement(StopIcon, null) : /* @__PURE__ */ import_react28.default.createElement(SendIcon, null),
         busy ? cancelling ? t("Stopping...") : t("Stop") : sendLabel
       )
-    ), /* @__PURE__ */ import_react28.default.createElement("div", { className: "dsh-composer-footer" }, /* @__PURE__ */ import_react28.default.createElement(
+    ), /* @__PURE__ */ import_react28.default.createElement("div", { className: "dsh-composer-footer" }, planActive || planCommandAvailable ? /* @__PURE__ */ import_react28.default.createElement(
+      "button",
+      {
+        type: "button",
+        className: `dsh-plan-chip${planActive ? "" : " dsh-plan-chip-off"}`,
+        title: planActive ? t("Plan mode on \u2014 click to turn off (/plan off)") : t("Plan mode off \u2014 click to turn on (/plan on)"),
+        "aria-label": planActive ? t("Plan mode on, click to turn off") : t("Plan mode off, click to turn on"),
+        "aria-pressed": planActive,
+        disabled: !planCommandAvailable,
+        onClick: togglePlan
+      },
+      /* @__PURE__ */ import_react28.default.createElement("span", null, "Plan"),
+      planActive ? /* @__PURE__ */ import_react28.default.createElement("span", { "aria-hidden": "true" }, "\xD7") : null
+    ) : null, /* @__PURE__ */ import_react28.default.createElement(
       PermissionModeChip,
       {
         permissions,
@@ -26864,6 +27079,7 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
         sessionStats: state.sessionStats,
         reasoningEffort: state.reasoningEffort,
         imageLimits: state.imageLimits,
+        plan: state.plan,
         busy: state.busy,
         submitting: state.submitting,
         cancelling: state.cancelling,

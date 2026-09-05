@@ -7,8 +7,13 @@ import com.intellij.util.EnvironmentUtil;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -25,8 +30,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import org.jetbrains.annotations.NotNull;
 
 /**
@@ -38,11 +41,14 @@ import org.jetbrains.annotations.NotNull;
  */
 public final class DshRuntimeService implements Disposable {
     private static final Logger LOG = Logger.getInstance(DshRuntimeService.class);
-    private static final Pattern URL_PATTERN =
-            Pattern.compile(
-                    "https?://(?:127\\.0\\.0\\.1|localhost|0\\.0\\.0\\.0|\\[::1\\]):[0-9]{1,5}",
-                    Pattern.CASE_INSENSITIVE);
     private static final int DEFAULT_PORT = 3080;
+    private static final int AUTH_TIMEOUT_MS = 1_500;
+    private static final HttpClient AUTH_HTTP_CLIENT =
+            HttpClient.newBuilder()
+                    .version(HttpClient.Version.HTTP_1_1)
+                    .connectTimeout(Duration.ofMillis(AUTH_TIMEOUT_MS))
+                    .followRedirects(HttpClient.Redirect.NEVER)
+                    .build();
 
     private final Project project;
     private final ExecutorService executor;
@@ -50,12 +56,15 @@ public final class DshRuntimeService implements Disposable {
             new CopyOnWriteArrayList<>();
     private final StringBuilder output = new StringBuilder();
     private final Object lifecycleLock = new Object();
+    private final Object authLock = new Object();
 
     /** Machine-wide start lock, shared with the VS Code extension. */
     private final DshRuntimeLock runtimeLock = new DshRuntimeLock();
 
     private volatile Process process;
     private volatile String baseUrl;
+    private volatile String launchUrl;
+    private volatile String authCookie;
     private volatile RuntimeStatus status = new RuntimeStatus(RuntimeState.STOPPED, null, null);
     private volatile CompletableFuture<String> startFuture;
     private volatile boolean stopping;
@@ -73,7 +82,9 @@ public final class DshRuntimeService implements Disposable {
         this.client =
                 new DshRpcClient(
                         () -> baseUrl,
-                        () -> DshSettingsState.getInstance(this.project).requestTimeoutMs);
+                        () -> DshSettingsState.getInstance(this.project).requestTimeoutMs,
+                        this::ensureAuthenticated,
+                        this::requestHeaders);
     }
 
     public static DshRuntimeService getInstance(@NotNull Project project) {
@@ -86,6 +97,30 @@ public final class DshRuntimeService implements Disposable {
 
     public String getUrl() {
         return baseUrl;
+    }
+
+    /** URL suitable for opening in a browser; unlike API calls it retains the launch token. */
+    public String getBrowserUrl() {
+        return launchUrl != null ? launchUrl : baseUrl;
+    }
+
+    /** Headers for authenticated WebSocket upgrades and other non-RPC transports. */
+    Map<String, String> requestHeaders() {
+        String cookie = authCookie;
+        return cookie == null || cookie.isBlank()
+                ? Collections.emptyMap()
+                : Map.of("Cookie", cookie);
+    }
+
+    /** Best-effort authentication entry point used by the asynchronous Mux client. */
+    boolean ensureAuthenticatedForTransport() {
+        try {
+            ensureAuthenticated();
+            return true;
+        } catch (DshRpcClient.DshRpcException error) {
+            LOG.debug("DSH Runtime authentication failed", error);
+            return false;
+        }
     }
 
     public DshRpcClient getClient() {
@@ -166,9 +201,18 @@ public final class DshRuntimeService implements Disposable {
 
     private String startBlocking() {
         DshSettingsState settings = DshSettingsState.getInstance(project);
-        String configuredUrl = DshRpcClient.normalizeUrl(settings.serverUrl);
+        DshRuntimeEndpoint configuredEndpoint = DshRuntimeEndpoint.parse(settings.serverUrl, false);
+        String configuredUrl =
+                configuredEndpoint == null
+                        ? DshRpcClient.normalizeUrl(settings.serverUrl)
+                        : configuredEndpoint.baseUrl;
+        if (configuredUrl != null) {
+            setRuntimeEndpoint(
+                    configuredEndpoint == null
+                            ? DshRuntimeEndpoint.ofBase(configuredUrl)
+                            : configuredEndpoint);
+        }
         if (configuredUrl != null && client.isWebHealthy(configuredUrl)) {
-            baseUrl = configuredUrl;
             setStatus(
                     new RuntimeStatus(
                             RuntimeState.RUNNING,
@@ -178,15 +222,15 @@ public final class DshRuntimeService implements Disposable {
         }
 
         int configuredPort = settings.serverPort;
-        String existing = findExistingRuntime(configuredPort);
+        DshRuntimeEndpoint existing = findExistingRuntime(configuredPort);
         if (existing != null) {
-            baseUrl = existing;
+            setRuntimeEndpoint(existing);
             setStatus(
                     new RuntimeStatus(
                             RuntimeState.RUNNING,
-                            existing,
+                            existing.baseUrl,
                             DshBundle.message("dsh.runtime.connected.existing")));
-            return existing;
+            return existing.baseUrl;
         }
 
         // The start lock is shared with the VS Code extension, so at most one
@@ -194,31 +238,31 @@ public final class DshRuntimeService implements Disposable {
         // normal path when both start together: wait for the winner's URL
         // rather than racing it to a second Runtime.
         if (!runtimeLock.acquire()) {
-            String peer = awaitPeerRuntime(configuredPort, settings.startupTimeoutMs);
+            DshRuntimeEndpoint peer = awaitPeerRuntime(configuredPort, settings.startupTimeoutMs);
             if (peer != null) {
-                baseUrl = peer;
+                setRuntimeEndpoint(peer);
                 setStatus(
                         new RuntimeStatus(
                                 RuntimeState.RUNNING,
-                                peer,
+                                peer.baseUrl,
                                 DshBundle.message("dsh.runtime.connected.peer")));
-                return peer;
+                return peer.baseUrl;
             }
             throw new IllegalStateException(DshBundle.message("dsh.runtime.peer.start.failed"));
         }
 
-        int outputOffset = outputLength();
         Process child;
-        String detected;
+        DshRuntimeEndpoint detected;
         try {
             child = launch(settings);
             process = child;
             streamOutput(child);
             try {
-                detected = waitForServer(child, settings, outputOffset);
-            } catch (RuntimeException error) {
+                detected = waitForServer(child, settings);
+            } catch (RuntimeException | Error error) {
                 process = null;
                 if (child.isAlive()) child.destroyForcibly();
+                clearRuntimeEndpoint();
                 throw error;
             }
         } catch (RuntimeException | Error error) {
@@ -229,12 +273,14 @@ public final class DshRuntimeService implements Disposable {
         }
         // Publish only after the server answers, so the advertised URL is
         // always one a peer can attach to immediately.
-        runtimeLock.publishUrl(detected);
-        baseUrl = detected;
+        runtimeLock.publishUrl(detected.baseUrl, detected.launchUrl);
+        setRuntimeEndpoint(detected);
         setStatus(
                 new RuntimeStatus(
-                        RuntimeState.RUNNING, detected, DshBundle.message("dsh.runtime.running")));
-        return detected;
+                        RuntimeState.RUNNING,
+                        detected.baseUrl,
+                        DshBundle.message("dsh.runtime.running")));
+        return detected.baseUrl;
     }
 
     /**
@@ -242,27 +288,31 @@ public final class DshRuntimeService implements Disposable {
      * conventional ports. The lock is what finds a Runtime listening on an ephemeral port, which no
      * port probe can.
      */
-    private String findExistingRuntime(int configuredPort) {
-        String advertised = runtimeLock.readAdvertisedUrl();
-        if (advertised != null && client.isHarnessHealthy(advertised)) return advertised;
+    private DshRuntimeEndpoint findExistingRuntime(int configuredPort) {
+        DshRuntimeEndpoint advertised = runtimeLock.readAdvertisedEndpoint();
+        if (advertised != null) {
+            setRuntimeEndpoint(advertised);
+            if (client.isHarnessHealthy(advertised.baseUrl)) return advertised;
+        }
         List<Integer> ports = new ArrayList<>();
         if (configuredPort > 0) ports.add(configuredPort);
         if (configuredPort != DEFAULT_PORT) ports.add(DEFAULT_PORT);
         for (Integer port : ports) {
             String candidate = "http://127.0.0.1:" + port;
-            if (client.isHarnessHealthy(candidate)) return candidate;
+            setRuntimeEndpoint(DshRuntimeEndpoint.ofBase(candidate));
+            if (client.isHarnessHealthy(candidate)) return DshRuntimeEndpoint.ofBase(candidate);
         }
         return null;
     }
 
     /** Wait for the editor that won the start lock to advertise its Runtime. */
-    private String awaitPeerRuntime(int configuredPort, int startupTimeoutMs) {
+    private DshRuntimeEndpoint awaitPeerRuntime(int configuredPort, int startupTimeoutMs) {
         long deadline =
                 System.nanoTime()
                         + TimeUnit.MILLISECONDS.toNanos(Math.max(1_000, startupTimeoutMs));
         while (System.nanoTime() < deadline && !stopping) {
-            String url = findExistingRuntime(configuredPort);
-            if (url != null) return url;
+            DshRuntimeEndpoint endpoint = findExistingRuntime(configuredPort);
+            if (endpoint != null) return endpoint;
             try {
                 Thread.sleep(250);
             } catch (InterruptedException interrupted) {
@@ -377,8 +427,9 @@ public final class DshRuntimeService implements Disposable {
                                             child.getInputStream(), StandardCharsets.UTF_8))) {
                         String line;
                         while ((line = reader.readLine()) != null) {
+                            observeRuntimeEndpoint(line);
                             appendLog(line);
-                            LOG.info("[dsh] " + line);
+                            LOG.info("[dsh] " + redactRuntimeOutput(line));
                         }
                     } catch (IOException error) {
                         if (!stopping)
@@ -405,7 +456,7 @@ public final class DshRuntimeService implements Disposable {
                 });
     }
 
-    private String waitForServer(Process child, DshSettingsState settings, int outputOffset) {
+    private DshRuntimeEndpoint waitForServer(Process child, DshSettingsState settings) {
         long deadline =
                 System.nanoTime()
                         + TimeUnit.MILLISECONDS.toNanos(Math.max(1_000, settings.startupTimeoutMs));
@@ -418,12 +469,16 @@ public final class DshRuntimeService implements Disposable {
                         DshBundle.message("dsh.runtime.exited.before.ready")
                                 + (tail.isBlank() ? "" : "\n\n" + tail));
             }
-            String outputUrl = findUrl(logsSince(outputOffset));
-            List<String> candidates = new ArrayList<>();
-            if (outputUrl != null) candidates.add(outputUrl);
-            if (settings.serverPort > 0) candidates.add("http://127.0.0.1:" + settings.serverPort);
-            for (String candidate : candidates) {
-                if (client.isWebHealthy(candidate)) return DshRpcClient.normalizeUrl(candidate);
+            DshRuntimeEndpoint endpoint = currentEndpoint();
+            List<DshRuntimeEndpoint> candidates = new ArrayList<>();
+            if (endpoint != null) candidates.add(endpoint);
+            if (settings.serverPort > 0) {
+                candidates.add(
+                        DshRuntimeEndpoint.ofBase("http://127.0.0.1:" + settings.serverPort));
+            }
+            for (DshRuntimeEndpoint candidate : candidates) {
+                setRuntimeEndpoint(candidate);
+                if (client.isWebHealthy(candidate.baseUrl)) return candidate;
             }
             try {
                 Thread.sleep(250);
@@ -445,7 +500,7 @@ public final class DshRuntimeService implements Disposable {
         }
         Process child = process;
         process = null;
-        baseUrl = null;
+        clearRuntimeEndpoint();
         // Released before the child is reaped: a peer polling the lock should
         // stop seeing a URL the moment this Runtime is on its way down.
         runtimeLock.release();
@@ -490,13 +545,19 @@ public final class DshRuntimeService implements Disposable {
                 .append(
                         settings.serverUrl == null || settings.serverUrl.isBlank()
                                 ? "<none>"
-                                : settings.serverUrl)
+                                : redactRuntimeOutput(settings.serverUrl))
                 .append('\n');
         report.append("Configured server port: ")
                 .append(settings.serverPort == 0 ? "automatic" : settings.serverPort)
                 .append('\n');
         report.append("Runtime status: ").append(status.state).append('\n');
         report.append("Runtime URL: ").append(baseUrl == null ? "<none>" : baseUrl).append('\n');
+        report.append("Runtime launch token: ")
+                .append(launchUrl == null ? "not advertised" : "advertised")
+                .append('\n');
+        report.append("Runtime auth cookie: ")
+                .append(authCookie == null ? "not established" : "established")
+                .append('\n');
         report.append("API key environment variable: ").append(settings.apiKeyEnv).append('\n');
         String key = settings.apiKeyEnv == null ? "" : settings.apiKeyEnv.trim();
         report.append("API key environment variable present: ")
@@ -519,6 +580,125 @@ public final class DshRuntimeService implements Disposable {
         return report.toString();
     }
 
+    private DshRuntimeEndpoint currentEndpoint() {
+        String currentBase = baseUrl;
+        if (currentBase == null || currentBase.isBlank()) return null;
+        String currentLaunch = launchUrl;
+        if (currentLaunch == null || currentLaunch.isBlank()) {
+            return DshRuntimeEndpoint.ofBase(currentBase);
+        }
+        DshRuntimeEndpoint endpoint = DshRuntimeEndpoint.parse(currentLaunch, false);
+        return endpoint == null ? DshRuntimeEndpoint.ofBase(currentBase) : endpoint;
+    }
+
+    private void clearRuntimeEndpoint() {
+        baseUrl = null;
+        launchUrl = null;
+        synchronized (authLock) {
+            authCookie = null;
+        }
+    }
+
+    /** Observe the raw child output before redacting it for the visible Runtime log. */
+    private void observeRuntimeEndpoint(String text) {
+        DshRuntimeEndpoint discovered = DshRuntimeEndpoint.extract(text);
+        if (discovered == null) return;
+        DshRuntimeEndpoint previous = currentEndpoint();
+        if (previous != null
+                && previous.baseUrl.equals(discovered.baseUrl)
+                && Objects.equals(previous.launchUrl, discovered.launchUrl)) return;
+        setRuntimeEndpoint(discovered);
+        if (runtimeLock.isHeld()) runtimeLock.publishUrl(discovered.baseUrl, discovered.launchUrl);
+    }
+
+    /** Replace the active endpoint and invalidate a cookie bound to the old endpoint. */
+    private void setRuntimeEndpoint(DshRuntimeEndpoint endpoint) {
+        if (endpoint == null) return;
+        String previousBase = baseUrl;
+        String previousLaunch = launchUrl;
+        String nextLaunch =
+                endpoint.launchUrl != null
+                        ? endpoint.launchUrl
+                        : Objects.equals(previousBase, endpoint.baseUrl) ? previousLaunch : null;
+        baseUrl = endpoint.baseUrl;
+        launchUrl = nextLaunch;
+        if (!Objects.equals(previousBase, baseUrl) || !Objects.equals(previousLaunch, launchUrl)) {
+            synchronized (authLock) {
+                authCookie = null;
+            }
+        }
+    }
+
+    /** Exchange the one-time launch URL token for the Runtime-owned session cookie. */
+    private void ensureAuthenticated() throws DshRpcClient.DshRpcException {
+        String launch = launchUrl;
+        if (launch == null || launch.isBlank() || authCookie != null) return;
+        synchronized (authLock) {
+            if (launchUrl == null || launchUrl.isBlank() || authCookie != null) return;
+            launch = launchUrl;
+            HttpRequest request;
+            try {
+                request =
+                        HttpRequest.newBuilder()
+                                .uri(URI.create(launch))
+                                .timeout(Duration.ofMillis(AUTH_TIMEOUT_MS))
+                                .header("accept", "text/plain")
+                                .GET()
+                                .build();
+            } catch (IllegalArgumentException error) {
+                throw new DshRpcClient.DshRpcException(
+                        "runtime.auth",
+                        "invalid-launch-url",
+                        "DSH Runtime launch URL is invalid",
+                        error);
+            }
+            try {
+                HttpResponse<String> response =
+                        AUTH_HTTP_CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+                if (response.statusCode() == 303) {
+                    String setCookie = response.headers().firstValue("set-cookie").orElse(null);
+                    String cookie = setCookie == null ? null : setCookie.split(";", 2)[0].trim();
+                    if (cookie == null || !cookie.matches("^[^=;\\r\\n]+=[^;\\r\\n]*$")) {
+                        throw new DshRpcClient.DshRpcException(
+                                "runtime.auth",
+                                "missing-cookie",
+                                "DSH Runtime authentication did not return a session cookie");
+                    }
+                    if (Objects.equals(launchUrl, launch)) authCookie = cookie;
+                    return;
+                }
+                // Runtimes before 0.1.2 did not require a launch-token exchange. A successful
+                // response remains a valid compatibility path for custom/older servers.
+                if (response.statusCode() >= 200 && response.statusCode() < 300) return;
+                throw new DshRpcClient.DshRpcException(
+                        "runtime.auth",
+                        "http-" + response.statusCode(),
+                        "DSH Runtime authentication returned HTTP " + response.statusCode());
+            } catch (DshRpcClient.DshRpcException error) {
+                throw error;
+            } catch (InterruptedException error) {
+                Thread.currentThread().interrupt();
+                throw new DshRpcClient.DshRpcException(
+                        "runtime.auth",
+                        "interrupted",
+                        "DSH Runtime authentication was interrupted",
+                        error);
+            } catch (Exception error) {
+                throw new DshRpcClient.DshRpcException(
+                        "runtime.auth",
+                        "transport-error",
+                        error.getMessage() == null
+                                ? "DSH Runtime authentication failed"
+                                : error.getMessage(),
+                        error);
+            }
+        }
+    }
+
+    private static String redactRuntimeOutput(String value) {
+        return value == null ? "" : value.replaceAll("([?&]token=)[A-Za-z0-9_-]+", "$1<redacted>");
+    }
+
     private void setStatus(RuntimeStatus next) {
         status = next;
         for (Consumer<RuntimeStatus> listener : listeners) {
@@ -532,20 +712,8 @@ public final class DshRuntimeService implements Disposable {
 
     private void appendLog(String line) {
         synchronized (output) {
-            output.append(line).append('\n');
+            output.append(redactRuntimeOutput(line)).append('\n');
             if (output.length() > 250_000) output.delete(0, output.length() - 200_000);
-        }
-    }
-
-    private int outputLength() {
-        synchronized (output) {
-            return output.length();
-        }
-    }
-
-    private String logsSince(int offset) {
-        synchronized (output) {
-            return output.substring(Math.max(0, Math.min(offset, output.length())));
         }
     }
 
@@ -555,11 +723,6 @@ public final class DshRuntimeService implements Disposable {
             int from = Math.max(0, values.length - lines);
             return String.join("\n", Arrays.copyOfRange(values, from, values.length)).trim();
         }
-    }
-
-    private static String findUrl(String value) {
-        Matcher matcher = URL_PATTERN.matcher(value == null ? "" : value);
-        return matcher.find() ? DshRpcClient.normalizeUrl(matcher.group()) : null;
     }
 
     private static boolean hasPort(List<String> args) {

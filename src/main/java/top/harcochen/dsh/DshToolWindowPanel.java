@@ -101,7 +101,12 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
         this.project = project;
         this.runtime = DshRuntimeService.getInstance(project);
         this.client = runtime.getClient();
-        this.muxClient = new DshMuxClient(runtime::getUrl, this::receiveMuxFrame);
+        this.muxClient =
+                new DshMuxClient(
+                        runtime::getUrl,
+                        runtime::requestHeaders,
+                        runtime::ensureAuthenticatedForTransport,
+                        this::receiveMuxFrame);
         this.operations =
                 Executors.newCachedThreadPool(
                         runnable -> {
@@ -131,6 +136,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
                         client,
                         operations,
                         markdownRenderCache,
+                        () -> sessions,
                         this::postStateLater,
                         this::notify,
                         error -> lastError = error);
@@ -290,7 +296,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
         JButton openBrowser = new JButton(DshBundle.message("dsh.fallback.button.open.browser"));
         openBrowser.addActionListener(
                 event -> {
-                    String url = runtime.getUrl();
+                    String url = runtime.getBrowserUrl();
                     if (url != null) BrowserUtil.browse(url);
                     else notify(DshBundle.message("dsh.fallback.runtime.not.started"));
                 });
@@ -354,6 +360,10 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
             case "searchSession" -> sessionActions.search();
             case "renameSession" -> sessionActions.rename();
             case "forkSession" -> sessionActions.fork();
+            case "forkFromMessage" -> checkpointFork(integer(action, "seq", -1));
+            case "restoreCodeToMessage" -> checkpointRestore(integer(action, "seq", -1));
+            case "forkAndRestoreCodeToMessage" ->
+                    checkpointForkAndRestore(integer(action, "seq", -1));
             case "archiveSession" -> sessionActions.archive();
             case "openTrace" -> openTrace(action);
             case "openBrowser" -> openBrowser();
@@ -386,6 +396,10 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
             case "openReasoningEffort" -> sessionActions.openReasoningEffort();
             case "setPermissionPreset" ->
                     sessionActions.setPermissionPreset(string(action, "value"));
+            case "setPlanMode" -> setPlanMode(bool(action, "active", false));
+            case "openTerminalCommandPicker" ->
+                    notify(
+                            "Recent terminal command capture is not available in this IntelliJ build.");
             case "goalCreate", "goalEdit", "goalPause", "goalResume", "goalComplete", "goalClear" ->
                     goals.mutate(sessionId, action);
             case "refreshSubagents" -> subagents.refresh(sessionId);
@@ -403,6 +417,46 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
             case "restoreTurnChanges" -> diffs.restoreTurnChanges(integer(action, "turn", 0));
             default -> LOG.debug("Ignoring unsupported DSH webview action: " + type);
         }
+    }
+
+    private void checkpointFork(int sequence) {
+        Integer turn = checkpointTurn(sequence);
+        if (turn == null) return;
+        sessionActions.forkAt((long) sequence);
+    }
+
+    private void checkpointRestore(int sequence) {
+        Integer turn = checkpointTurn(sequence);
+        if (turn == null) return;
+        diffs.restoreTurnChanges(turn);
+    }
+
+    private void checkpointForkAndRestore(int sequence) {
+        Integer turn = checkpointTurn(sequence);
+        if (turn == null) return;
+        String current = sessionId;
+        if (current == null || current.isBlank()) return;
+        diffs.restoreTurnChanges(turn, () -> sessionActions.forkAt((long) sequence));
+    }
+
+    private Integer checkpointTurn(int sequence) {
+        String current = sessionId;
+        if (current == null || current.isBlank() || sequence < 0) return null;
+        Integer turn = sessionState.checkpointTurn(current, sequence);
+        if (turn == null) {
+            notify("This message is no longer available for a checkpoint action.");
+        }
+        return turn;
+    }
+
+    private void setPlanMode(boolean active) {
+        String current = sessionId;
+        if (current == null || current.isBlank()) return;
+        if (!sessionState.isRegisteredCommand(current, "plan")) {
+            notify("The connected DSH Runtime does not expose the /plan command.");
+            return;
+        }
+        sessionActions.setPlanMode(active);
     }
 
     /** Keep the JCEF page as an untrusted action sender, matching dsh-ide's boundary. */
@@ -653,6 +707,21 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
             if (source.has("blank")) item.addProperty("blank", bool(source, "blank", false));
             if (source.has("agentPreset"))
                 item.add("agentPreset", source.get("agentPreset").deepCopy());
+            JsonObject sourceProjections =
+                    source.has("projections") && source.get("projections").isJsonObject()
+                            ? source.getAsJsonObject("projections")
+                            : null;
+            JsonObject sourceValues =
+                    sourceProjections != null
+                                    && sourceProjections.has("values")
+                                    && sourceProjections.get("values").isJsonObject()
+                            ? sourceProjections.getAsJsonObject("values")
+                            : null;
+            if (sourceValues != null
+                    && sourceValues.has("subagentTiming")
+                    && sourceValues.get("subagentTiming").isJsonObject()) {
+                item.add("subagentTiming", sourceValues.get("subagentTiming").deepCopy());
+            }
             items.add(item);
         }
         items.sort(
@@ -777,6 +846,8 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
         if (imageLimits != null) state.add("imageLimits", imageLimits);
         JsonObject sessionStats = sessionState.sessionStats(sessionId);
         if (sessionStats != null) state.add("sessionStats", sessionStats);
+        JsonObject plan = sessionState.plan(sessionId);
+        if (plan != null) state.add("plan", plan);
         JsonObject tokenUsage =
                 sessionState.tokenUsage(sessionId, sessionActions.modelCatalog(sessionId));
         if (tokenUsage != null) state.add("tokenUsage", tokenUsage);
@@ -839,7 +910,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
     }
 
     private void openBrowser() {
-        String url = runtime.getUrl();
+        String url = runtime.getBrowserUrl();
         if (url == null) {
             notify(DshBundle.message("dsh.runtime.not.running"));
             return;

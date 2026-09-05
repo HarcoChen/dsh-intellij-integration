@@ -7,6 +7,7 @@ import com.intellij.openapi.diagnostic.Logger;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.WebSocket;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -18,6 +19,8 @@ final class DshMuxClient implements AutoCloseable {
     private static final Logger LOG = Logger.getInstance(DshMuxClient.class);
 
     private final Supplier<String> baseUrl;
+    private final Supplier<Map<String, String>> requestHeaders;
+    private final Supplier<Boolean> ensureAuthenticated;
     private final Consumer<JsonObject> receiver;
     private final HttpClient http = HttpClient.newHttpClient();
     private final AtomicBoolean connecting = new AtomicBoolean();
@@ -26,31 +29,54 @@ final class DshMuxClient implements AutoCloseable {
     private volatile boolean closed;
 
     DshMuxClient(Supplier<String> baseUrl, Consumer<JsonObject> receiver) {
+        this(baseUrl, () -> Map.of(), () -> true, receiver);
+    }
+
+    DshMuxClient(
+            Supplier<String> baseUrl,
+            Supplier<Map<String, String>> requestHeaders,
+            Supplier<Boolean> ensureAuthenticated,
+            Consumer<JsonObject> receiver) {
         this.baseUrl = baseUrl;
+        this.requestHeaders = requestHeaders;
+        this.ensureAuthenticated = ensureAuthenticated;
         this.receiver = receiver;
     }
 
     void ensureConnected() {
-        String configured = DshRpcClient.normalizeUrl(baseUrl.get());
-        if (closed || configured == null) return;
-        if (socket != null && configured.equals(connectedUrl)) return;
-        if (!connecting.compareAndSet(false, true)) return;
-        URI uri =
-                URI.create(
-                        (configured.startsWith("https://") ? "wss://" : "ws://")
-                                + configured.substring(configured.indexOf("://") + 3)
-                                + "/api/events.mux");
-        http.newWebSocketBuilder()
-                .buildAsync(uri, new Listener(configured))
-                .whenComplete(
-                        (opened, error) -> {
-                            connecting.set(false);
-                            if (error != null) {
-                                LOG.debug("DSH mux connection failed", error);
-                                return;
-                            }
-                            if (closed) opened.sendClose(WebSocket.NORMAL_CLOSURE, "disposed");
-                        });
+        try {
+            String configured = DshRpcClient.normalizeUrl(baseUrl.get());
+            if (closed || configured == null) return;
+            if (!Boolean.TRUE.equals(ensureAuthenticated.get())) return;
+            if (socket != null && configured.equals(connectedUrl)) return;
+            if (!connecting.compareAndSet(false, true)) return;
+            URI uri =
+                    URI.create(
+                            (configured.startsWith("https://") ? "wss://" : "ws://")
+                                    + configured.substring(configured.indexOf("://") + 3)
+                                    + "/api/events.mux");
+            WebSocket.Builder builder = http.newWebSocketBuilder();
+            for (Map.Entry<String, String> entry : requestHeaders.get().entrySet()) {
+                if (entry.getKey() != null
+                        && entry.getValue() != null
+                        && !entry.getValue().isBlank()) {
+                    builder.header(entry.getKey(), entry.getValue());
+                }
+            }
+            builder.buildAsync(uri, new Listener(configured))
+                    .whenComplete(
+                            (opened, error) -> {
+                                connecting.set(false);
+                                if (error != null) {
+                                    LOG.debug("DSH mux connection failed", error);
+                                    return;
+                                }
+                                if (closed) opened.sendClose(WebSocket.NORMAL_CLOSURE, "disposed");
+                            });
+        } catch (RuntimeException error) {
+            connecting.set(false);
+            LOG.debug("Unable to prepare DSH mux connection", error);
+        }
     }
 
     @Override

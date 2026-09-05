@@ -165,6 +165,11 @@ final class DshDiffController {
     }
 
     void restoreTurnChanges(int turn) {
+        restoreTurnChanges(turn, null);
+    }
+
+    /** Restore a turn and invoke {@code onSuccess} after the guarded write completes. */
+    void restoreTurnChanges(int turn, Runnable onSuccess) {
         String current = sessionId.get();
         if (turn <= 0 || current == null) {
             return;
@@ -178,10 +183,11 @@ final class DshDiffController {
             return;
         }
         int count = changeReviews.restorableFileCount(current, turn);
-        ApplicationManager.getApplication().invokeLater(() -> confirmRestore(current, turn, count));
+        ApplicationManager.getApplication()
+                .invokeLater(() -> confirmRestore(current, turn, count, onSuccess));
     }
 
-    private void confirmRestore(String current, int turn, int count) {
+    private void confirmRestore(String current, int turn, int count, Runnable onSuccess) {
         int answer =
                 Messages.showYesNoDialog(
                         project,
@@ -191,10 +197,10 @@ final class DshDiffController {
         if (answer != Messages.YES) {
             return;
         }
-        operations.execute(() -> restore(current, turn));
+        operations.execute(() -> restore(current, turn, onSuccess));
     }
 
-    private void restore(String current, int turn) {
+    private void restore(String current, int turn, Runnable onSuccess) {
         try {
             if (isSessionRunning(current)) {
                 throw new IllegalStateException(DshBundle.message("dsh.restore.wait.for.turn"));
@@ -202,6 +208,9 @@ final class DshDiffController {
             changeReviews.restore(current, turn);
             com.intellij.openapi.vfs.VirtualFileManager.getInstance().asyncRefresh(null);
             notifyUser(DshBundle.message("dsh.restore.success", turn));
+            if (onSuccess != null) {
+                onSuccess.run();
+            }
         } catch (Exception error) {
             report(error);
         }

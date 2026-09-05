@@ -16,6 +16,7 @@ final class DshSubagentController {
     private final DshRpcClient client;
     private final ExecutorService operations;
     private final DshMarkdownRenderCache markdownRenderCache;
+    private final java.util.function.Supplier<JsonArray> sessions;
     private final Runnable stateChanged;
     private final Consumer<String> notifier;
     private final Consumer<String> errorSink;
@@ -28,12 +29,14 @@ final class DshSubagentController {
             DshRpcClient client,
             ExecutorService operations,
             DshMarkdownRenderCache markdownRenderCache,
+            java.util.function.Supplier<JsonArray> sessions,
             Runnable stateChanged,
             Consumer<String> notifier,
             Consumer<String> errorSink) {
         this.client = client;
         this.operations = operations;
         this.markdownRenderCache = markdownRenderCache;
+        this.sessions = sessions;
         this.stateChanged = stateChanged;
         this.notifier = notifier;
         this.errorSink = errorSink;
@@ -136,6 +139,8 @@ final class DshSubagentController {
                 node.addProperty("mode", mode);
                 node.addProperty("activity", activity);
                 node.addProperty("hasChildren", hasChildren);
+                JsonObject timing = timingFor(id);
+                if (timing != null) node.add("timing", timing);
                 nodes.add(node);
                 if (hasChildren) {
                     frontier.add(new TreeLevel(id, depth + 1));
@@ -143,6 +148,39 @@ final class DshSubagentController {
             }
         }
         return nodes;
+    }
+
+    /** Read the optional timing projection already carried by the session catalog. */
+    private JsonObject timingFor(String childSessionId) {
+        JsonArray catalog = sessions.get();
+        for (JsonElement candidate : catalog) {
+            if (!candidate.isJsonObject()
+                    || !childSessionId.equals(
+                            DshJson.string(candidate.getAsJsonObject(), "sessionId"))) {
+                continue;
+            }
+            JsonObject value = candidate.getAsJsonObject().getAsJsonObject("subagentTiming");
+            return normalizeTiming(value);
+        }
+        return null;
+    }
+
+    private static JsonObject normalizeTiming(JsonObject value) {
+        if (value == null) return null;
+        long settled = DshJson.longValue(value.get("settledMs"), -1L);
+        if (settled < 0) return null;
+        JsonObject result = new JsonObject();
+        result.addProperty("settledMs", settled);
+        if (!value.has("active") || !value.get("active").isJsonObject()) return result;
+        JsonObject active = value.getAsJsonObject("active");
+        long since = DshJson.longValue(active.get("since"), -1L);
+        long through = DshJson.longValue(active.get("through"), -1L);
+        if (since < 0 || through < since) return null;
+        JsonObject activeView = new JsonObject();
+        activeView.addProperty("since", since);
+        activeView.addProperty("through", through);
+        result.add("active", activeView);
+        return result;
     }
 
     private static void addDiagnosticNode(
@@ -204,6 +242,23 @@ final class DshSubagentController {
                         requestedPreview.messages =
                                 markdownRenderCache.render(
                                         projected.messages, "subagent:" + childSessionId);
+                        JsonObject projections =
+                                history.has("projections")
+                                                && history.get("projections").isJsonObject()
+                                        ? history.getAsJsonObject("projections")
+                                        : null;
+                        JsonObject values =
+                                projections != null
+                                                && projections.has("values")
+                                                && projections.get("values").isJsonObject()
+                                        ? projections.getAsJsonObject("values")
+                                        : null;
+                        if (values != null
+                                && values.has("subagentTiming")
+                                && values.get("subagentTiming").isJsonObject()) {
+                            requestedPreview.timing =
+                                    normalizeTiming(values.getAsJsonObject("subagentTiming"));
+                        }
                         requestedPreview.state = "ready";
                     } catch (Exception error) {
                         if (preview != requestedPreview) {
@@ -351,6 +406,9 @@ final class DshSubagentController {
         result.addProperty("activity", currentPreview.activity);
         result.addProperty("state", currentPreview.state);
         result.add("messages", currentPreview.messages.deepCopy());
+        if (currentPreview.timing != null) {
+            result.add("timing", currentPreview.timing.deepCopy());
+        }
         if (currentPreview.pendingAction != null) {
             result.addProperty("pendingAction", currentPreview.pendingAction);
         }
@@ -389,6 +447,7 @@ final class DshSubagentController {
         private final String mode;
         private final boolean parentAvailable;
         private final String activity;
+        private JsonObject timing;
         private String state = "loading";
         private JsonArray messages = new JsonArray();
         private String pendingAction;

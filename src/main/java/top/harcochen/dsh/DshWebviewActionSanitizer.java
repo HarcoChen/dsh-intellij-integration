@@ -285,6 +285,22 @@ final class DshWebviewActionSanitizer {
             int turn = DshJson.integer(input, "turn", 0);
             return hasOnly(input, "type", "turn") && turn > 0 && turn <= 1_000_000 ? input : null;
         }
+        if ("forkFromMessage".equals(type)
+                || "restoreCodeToMessage".equals(type)
+                || "forkAndRestoreCodeToMessage".equals(type)) {
+            int sequence = DshJson.integer(input, "seq", -1);
+            return hasOnly(input, "type", "seq") && sequence >= 0 && sequence <= 1_000_000
+                    ? input
+                    : null;
+        }
+        if ("setPlanMode".equals(type)) {
+            return hasOnly(input, "type", "active")
+                            && input.has("active")
+                            && input.get("active").isJsonPrimitive()
+                            && input.getAsJsonPrimitive().isBoolean()
+                    ? input
+                    : null;
+        }
         if (type.startsWith("switch")
                 || type.startsWith("open")
                 || type.startsWith("remove")

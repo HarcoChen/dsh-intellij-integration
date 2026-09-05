@@ -11,6 +11,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.util.Collections;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.UUID;
@@ -29,10 +30,22 @@ public final class DshRpcClient {
     private final HttpClient httpClient;
     private final Supplier<String> baseUrl;
     private final Supplier<Integer> timeoutMs;
+    private final RequestAuthenticator authenticator;
+    private final Supplier<Map<String, String>> requestHeaders;
 
     public DshRpcClient(@NotNull Supplier<String> baseUrl, @NotNull Supplier<Integer> timeoutMs) {
+        this(baseUrl, timeoutMs, () -> {}, Collections::emptyMap);
+    }
+
+    DshRpcClient(
+            @NotNull Supplier<String> baseUrl,
+            @NotNull Supplier<Integer> timeoutMs,
+            @NotNull RequestAuthenticator authenticator,
+            @NotNull Supplier<Map<String, String>> requestHeaders) {
         this.baseUrl = baseUrl;
         this.timeoutMs = timeoutMs;
+        this.authenticator = authenticator;
+        this.requestHeaders = requestHeaders;
         this.httpClient =
                 HttpClient.newBuilder()
                         .version(HttpClient.Version.HTTP_1_1)
@@ -48,6 +61,7 @@ public final class DshRpcClient {
         if (configured == null) {
             throw new DshRpcException(method, "not-connected", "DSH Runtime is not connected");
         }
+        authenticate(method);
 
         String rpcId = UUID.randomUUID().toString();
         JsonObject requestBody = new JsonObject();
@@ -60,9 +74,9 @@ public final class DshRpcClient {
                 HttpRequest.newBuilder()
                         .uri(URI.create(configured + "/api/" + method))
                         .timeout(Duration.ofMillis(clampedTimeout()))
-                        .header("content-type", "application/json")
                         .POST(HttpRequest.BodyPublishers.ofString(requestBody.toString()))
                         .build();
+        request = withHeaders(request, Map.of("content-type", "application/json"));
         try {
             HttpResponse<String> response =
                     httpClient.send(request, HttpResponse.BodyHandlers.ofString());
@@ -307,8 +321,20 @@ public final class DshRpcClient {
     }
 
     public String forkSession(String sessionId) throws DshRpcException {
+        return forkSession(sessionId, null);
+    }
+
+    /** Fork a session at an optional completed-message sequence. */
+    public String forkSession(String sessionId, Long atSeq) throws DshRpcException {
         JsonObject payload = new JsonObject();
         payload.addProperty("sessionId", sessionId);
+        if (atSeq != null) {
+            if (atSeq < 0) {
+                throw new DshRpcException(
+                        "session.fork", "invalid-sequence", "Fork sequence must not be negative");
+            }
+            payload.addProperty("atSeq", atSeq);
+        }
         JsonObject value = objectValue("session.fork", payload);
         return stringOr(value, "sessionId", "");
     }
@@ -364,6 +390,49 @@ public final class DshRpcClient {
     /** Every configurable provider merged with the live route registry. */
     public JsonObject providers() throws DshRpcException {
         return objectValue("llm.providers", new JsonObject());
+    }
+
+    /** Host-scoped model catalog used by provider configuration surfaces. */
+    public JsonObject llmModels() throws DshRpcException {
+        return objectValue("llm.models", new JsonObject());
+    }
+
+    /** Discover models from an unsaved provider configuration draft. */
+    public JsonObject discoverLlmModels(JsonObject draft) throws DshRpcException {
+        return objectValue(
+                "llm.discoverModels", draft == null ? new JsonObject() : draft.deepCopy());
+    }
+
+    /** Read credential metadata without ever returning the secret value. */
+    public JsonObject describeCredentials(JsonArray refs) throws DshRpcException {
+        JsonObject payload = new JsonObject();
+        payload.add("refs", refs == null ? new JsonArray() : refs.deepCopy());
+        return objectValue("credentials.describe", payload);
+    }
+
+    /** Store a credential through the Runtime-owned credential provider. */
+    public void setCredential(String ref, String value) throws DshRpcException {
+        if (ref == null || ref.isBlank() || value == null || value.isBlank()) {
+            throw new DshRpcException(
+                    "credentials.set",
+                    "invalid-credential",
+                    "Credential reference and value are required");
+        }
+        JsonObject payload = new JsonObject();
+        payload.addProperty("ref", ref);
+        payload.addProperty("value", value);
+        call("credentials.set", payload);
+    }
+
+    /** Remove a credential through the Runtime-owned credential provider. */
+    public void unsetCredential(String ref) throws DshRpcException {
+        if (ref == null || ref.isBlank()) {
+            throw new DshRpcException(
+                    "credentials.unset", "invalid-credential", "Credential reference is required");
+        }
+        JsonObject payload = new JsonObject();
+        payload.addProperty("ref", ref);
+        call("credentials.unset", payload);
     }
 
     /** Every registered settings namespace, with redacted layered values. */
@@ -575,6 +644,7 @@ public final class DshRpcClient {
         String configured = normalizeUrl(baseUrl.get());
         if (configured == null)
             throw new DshRpcException("respond", "not-connected", "DSH Runtime is not connected");
+        authenticate("respond");
         JsonObject result = new JsonObject();
         result.addProperty("ok", accepted);
         if (accepted && value != null) result.add("value", value.deepCopy());
@@ -592,9 +662,9 @@ public final class DshRpcClient {
                 HttpRequest.newBuilder()
                         .uri(URI.create(configured + "/api/respond"))
                         .timeout(Duration.ofMillis(clampedTimeout()))
-                        .header("content-type", "application/json")
                         .POST(HttpRequest.BodyPublishers.ofString(body.toString()))
                         .build();
+        request = withHeaders(request, Map.of("content-type", "application/json"));
         try {
             HttpResponse<String> response =
                     httpClient.send(request, HttpResponse.BodyHandlers.ofString());
@@ -619,12 +689,18 @@ public final class DshRpcClient {
     public boolean isWebHealthy(String url) {
         String normalized = normalizeUrl(url);
         if (normalized == null) return false;
+        try {
+            authenticator.ensureAuthenticated();
+        } catch (Exception ignored) {
+            return false;
+        }
         HttpRequest request =
                 HttpRequest.newBuilder()
                         .uri(URI.create(normalized + "/"))
                         .timeout(Duration.ofMillis(Math.min(clampedTimeout(), 1_500)))
                         .GET()
                         .build();
+        request = withHeaders(request, Collections.emptyMap());
         try {
             HttpResponse<Void> response =
                     httpClient.send(request, HttpResponse.BodyHandlers.discarding());
@@ -638,6 +714,11 @@ public final class DshRpcClient {
     public boolean isHarnessHealthy(String url) {
         String normalized = normalizeUrl(url);
         if (normalized == null) return false;
+        try {
+            authenticator.ensureAuthenticated();
+        } catch (Exception ignored) {
+            return false;
+        }
         JsonObject body = new JsonObject();
         body.addProperty("type", "client-request");
         body.addProperty("rpcId", "dsh-intellij-probe-" + UUID.randomUUID());
@@ -647,9 +728,9 @@ public final class DshRpcClient {
                 HttpRequest.newBuilder()
                         .uri(URI.create(normalized + "/api/host.describe"))
                         .timeout(Duration.ofMillis(Math.min(clampedTimeout(), 1_500)))
-                        .header("content-type", "application/json")
                         .POST(HttpRequest.BodyPublishers.ofString(body.toString()))
                         .build();
+        request = withHeaders(request, Map.of("content-type", "application/json"));
         try {
             HttpResponse<String> response =
                     httpClient.send(request, HttpResponse.BodyHandlers.ofString());
@@ -665,6 +746,52 @@ public final class DshRpcClient {
 
     public boolean isHealthy(String url) {
         return isHarnessHealthy(url);
+    }
+
+    private void authenticate(String method) throws DshRpcException {
+        try {
+            authenticator.ensureAuthenticated();
+        } catch (DshRpcException error) {
+            throw error;
+        } catch (Exception error) {
+            throw new DshRpcException(
+                    method,
+                    "authentication-failed",
+                    error.getMessage() == null
+                            ? "DSH Runtime authentication failed"
+                            : error.getMessage(),
+                    error);
+        }
+    }
+
+    private HttpRequest withHeaders(HttpRequest request, Map<String, String> required) {
+        // HttpRequest is immutable. Rebuild it once so the same cookie set is used by RPC,
+        // response, and probe requests without ever placing the launch token in an API URL.
+        HttpRequest.Builder builder =
+                HttpRequest.newBuilder(request.uri())
+                        .timeout(request.timeout().orElse(Duration.ofMillis(clampedTimeout())))
+                        .method(
+                                request.method(),
+                                request.bodyPublisher()
+                                        .map(HttpRequest.BodyPublisher.class::cast)
+                                        .orElse(HttpRequest.BodyPublishers.noBody()));
+        for (Map.Entry<String, java.util.List<String>> entry : request.headers().map().entrySet()) {
+            for (String value : entry.getValue()) builder.header(entry.getKey(), value);
+        }
+        for (Map.Entry<String, String> entry : requestHeaders.get().entrySet()) {
+            if (entry.getKey() != null && entry.getValue() != null && !entry.getValue().isBlank()) {
+                builder.header(entry.getKey(), entry.getValue());
+            }
+        }
+        for (Map.Entry<String, String> entry : required.entrySet()) {
+            builder.header(entry.getKey(), entry.getValue());
+        }
+        return builder.build();
+    }
+
+    @FunctionalInterface
+    interface RequestAuthenticator {
+        void ensureAuthenticated() throws Exception;
     }
 
     private JsonObject objectValue(String method, JsonObject payload) throws DshRpcException {
