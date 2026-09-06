@@ -332,6 +332,15 @@ public final class DshRuntimeService implements Disposable {
 
     private Process launch(DshSettingsState settings) {
         List<List<String>> candidates = launcherCandidates(settings);
+        if (settings.enableCompaction) {
+            String patch = writeCompactionPatch();
+            if (patch != null) {
+                for (List<String> candidate : candidates) {
+                    insertWebLauncherPatch(candidate, patch);
+                }
+                appendLog("[dsh] compaction command enabled with patch: " + patch);
+            }
+        }
         Map<String, String> environment = executionEnvironment();
         Throwable last = null;
         for (List<String> command : candidates) {
@@ -703,6 +712,74 @@ public final class DshRuntimeService implements Disposable {
             result.add(RUNTIME_PACKAGE.equals(arg) ? arg + "@" + runtimeVersion : arg);
         }
         return result;
+    }
+
+    /**
+     * Write the launcher patch that re-enables the compaction command for this process, matching
+     * dsh-ide's enableCompaction. Returns null when the patch cannot be written; the launch then
+     * proceeds without it.
+     */
+    private String writeCompactionPatch() {
+        Path patch =
+                Path.of(
+                        System.getProperty("java.io.tmpdir"),
+                        "dsh-intellij-" + ProcessHandle.current().pid() + "-compaction.patch.yml");
+        try {
+            java.nio.file.Files.writeString(
+                    patch,
+                    "- id: compaction-basic\n  disabled: false\n\n- id: command-compact\n  disabled: false\n",
+                    java.nio.file.StandardOpenOption.CREATE,
+                    java.nio.file.StandardOpenOption.TRUNCATE_EXISTING,
+                    java.nio.file.StandardOpenOption.WRITE);
+            return patch.toString();
+        } catch (IOException error) {
+            LOG.warn("Unable to write the compaction launcher patch", error);
+            return null;
+        }
+    }
+
+    /** Index of the Web-app token in one launch command, or -1 for non-web profiles. */
+    private static int webProfileIndex(List<String> args) {
+        for (int index = 0; index < args.size(); index++) {
+            String argument = args.get(index);
+            if (argument.equals("web")
+                    || argument.equals("--profile=web")
+                    || (argument.equals("--profile")
+                            && index + 1 < args.size()
+                            && args.get(index + 1).equals("web"))) {
+                return index;
+            }
+        }
+        return -1;
+    }
+
+    /**
+     * Insert a DSH launcher flag before the first Web-app argument. DSH stops parsing its own flags
+     * at the first unknown token, so app flags such as {@code --no-open} must not precede a later
+     * launcher-level {@code --patch}.
+     */
+    private static void insertWebLauncherPatch(List<String> args, String patchPath) {
+        int profileIndex = webProfileIndex(args);
+        if (profileIndex < 0) {
+            args.add("--patch");
+            args.add(patchPath);
+            return;
+        }
+        int insertionIndex = profileIndex + 1;
+        while (insertionIndex < args.size()) {
+            String argument = args.get(insertionIndex);
+            if (argument.equals("--patch")) {
+                insertionIndex += 2;
+            } else if (argument.startsWith("--patch=")
+                    || argument.equals("--dump-config")
+                    || argument.equals("--dump-default-config")) {
+                insertionIndex += 1;
+            } else {
+                break;
+            }
+        }
+        args.add(insertionIndex, "--patch");
+        args.add(insertionIndex + 1, patchPath);
     }
 
     private static boolean hasPort(List<String> args) {

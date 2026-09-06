@@ -34,6 +34,7 @@ public final class DshSettingsConfigurable implements Configurable {
     private JBCheckBox autoStart;
     private JBCheckBox persistSession;
     private JBCheckBox installWhenMissing;
+    private JBCheckBox enableCompaction;
 
     public DshSettingsConfigurable(Project project) {
         this.project = project;
@@ -70,6 +71,8 @@ public final class DshSettingsConfigurable implements Configurable {
         persistSession = new JBCheckBox(DshBundle.message("dsh.settings.persist.session.label"));
         installWhenMissing =
                 new JBCheckBox(DshBundle.message("dsh.settings.install.when.missing.label"));
+        enableCompaction =
+                new JBCheckBox(DshBundle.message("dsh.settings.enable.compaction.label"));
 
         addRow(
                 DshBundle.message("dsh.settings.command.label"),
@@ -114,6 +117,7 @@ public final class DshSettingsConfigurable implements Configurable {
         addCheckbox(autoStart);
         addCheckbox(persistSession);
         addCheckbox(installWhenMissing);
+        addCheckbox(enableCompaction);
 
         JPanel note = new JPanel();
         note.setLayout(new BoxLayout(note, BoxLayout.Y_AXIS));
@@ -178,7 +182,8 @@ public final class DshSettingsConfigurable implements Configurable {
                 || !safe(apiKeyEnv.getText()).equals(safe(state.apiKeyEnv))
                 || autoStart.isSelected() != state.autoStart
                 || persistSession.isSelected() != state.persistSession
-                || installWhenMissing.isSelected() != state.installWhenMissing;
+                || installWhenMissing.isSelected() != state.installWhenMissing
+                || enableCompaction.isSelected() != state.enableCompaction;
     }
 
     @Override
@@ -234,6 +239,7 @@ public final class DshSettingsConfigurable implements Configurable {
         state.autoStart = autoStart.isSelected();
         state.persistSession = persistSession.isSelected();
         state.installWhenMissing = installWhenMissing.isSelected();
+        state.enableCompaction = enableCompaction.isSelected();
         DshRuntimeService.getInstance(project).settingsChanged();
     }
 
@@ -254,6 +260,7 @@ public final class DshSettingsConfigurable implements Configurable {
         autoStart.setSelected(state.autoStart);
         persistSession.setSelected(state.persistSession);
         installWhenMissing.setSelected(state.installWhenMissing);
+        enableCompaction.setSelected(state.enableCompaction);
     }
 
     private static int parseRequired(String value, String label, int minimum, int maximum)

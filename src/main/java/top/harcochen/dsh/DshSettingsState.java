@@ -29,6 +29,10 @@ public final class DshSettingsState implements PersistentStateComponent<DshSetti
     public String lastSessionId = "";
 
     public boolean installWhenMissing = true;
+
+    /** Enable the compaction command by injecting a launcher patch into web-profile launches. */
+    public boolean enableCompaction = true;
+
     public String runtimeVersion = "0.1.2-rc.1";
     public String npmRegistry = "https://registry.npmmirror.com";
     public int startupTimeoutMs = 30_000;
@@ -59,6 +63,7 @@ public final class DshSettingsState implements PersistentStateComponent<DshSetti
         persistSession = state.persistSession;
         lastSessionId = state.lastSessionId;
         installWhenMissing = state.installWhenMissing;
+        enableCompaction = state.enableCompaction;
         runtimeVersion = state.runtimeVersion;
         npmRegistry = state.npmRegistry;
         startupTimeoutMs = state.startupTimeoutMs;
