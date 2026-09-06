@@ -376,7 +376,7 @@ final class DshIdeContextController {
         }
     }
 
-    private void insertCurrentFileReference() {
+    void insertCurrentFileReference() {
         Editor editor = FileEditorManager.getInstance(project).getSelectedTextEditor();
         VirtualFile file =
                 editor == null
@@ -408,6 +408,33 @@ final class DshIdeContextController {
         message.addProperty("type", "insertText");
         message.addProperty("text", value + " ");
         webviewMessage.accept(message);
+    }
+
+    /** Replace the whole composer text; the panel queues it until the webview is ready. */
+    void setComposerText(String value) {
+        if (value == null || value.isBlank()) {
+            return;
+        }
+        JsonObject message = new JsonObject();
+        message.addProperty("type", "setText");
+        message.addProperty("text", value);
+        webviewMessage.accept(message);
+    }
+
+    /**
+     * Attach the working-tree Git diff as a one-shot context item for the next prompt, mirroring
+     * dsh-ide's git-diff capture. Re-running replaces the previous chip.
+     */
+    void attachGitDiff(String content, boolean truncated) {
+        JsonObject item = new JsonObject();
+        item.addProperty("id", java.util.UUID.randomUUID().toString());
+        item.addProperty("kind", "git-diff");
+        item.addProperty("label", DshBundle.message("dsh.git.diff.label"));
+        item.addProperty("path", project.getName());
+        item.addProperty("content", content);
+        item.addProperty("byteLength", content.getBytes(StandardCharsets.UTF_8).length);
+        item.addProperty("truncated", truncated);
+        replaceContextItem(item);
     }
 
     private void attachDiagnostics() {

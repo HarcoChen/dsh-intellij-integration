@@ -95,6 +95,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
     private volatile JsonArray messages = new JsonArray();
     private volatile DshMessageProjector.Projection projection;
     private volatile String lastError;
+    private volatile JsonObject pendingComposerUpdate;
 
     public DshToolWindowPanel(@NotNull Project project) {
         super(new BorderLayout());
@@ -461,6 +462,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
         if ("ready".equals(type)) {
             webviewReady = true;
             postStateLater();
+            flushPendingComposerUpdate();
             subagents.refresh(sessionId);
             return;
         }
@@ -528,9 +530,10 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
             case "setPermissionPreset" ->
                     sessionActions.setPermissionPreset(string(action, "value"));
             case "setPlanMode" -> setPlanMode(bool(action, "active", false));
-            case "openTerminalCommandPicker" ->
-                    notify(
-                            "Recent terminal command capture is not available in this IntelliJ build.");
+            case "prefillGitDiff" -> prefillGitDiffTask(string(action, "kind"));
+            case "askAboutResource" ->
+                    askAboutResource(string(action, "path"), bool(action, "isDirectory", false));
+            case "insertEditorReference" -> ideContext.insertCurrentFileReference();
             case "goalCreate", "goalEdit", "goalPause", "goalResume", "goalComplete", "goalClear" ->
                     goals.mutate(sessionId, action);
             case "refreshSubagents" -> subagents.refresh(sessionId);
@@ -588,6 +591,163 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
             return;
         }
         sessionActions.setPlanMode(active);
+    }
+
+    /** Dispatch a structured action from IDE menus, as if it came from the webview. */
+    public void runAction(JsonElement value) {
+        receiveAction(value);
+    }
+
+    /** Replace the composer text; queued until the webview is ready, like dsh-ide. */
+    public void setComposerText(String text) {
+        queueComposerUpdate("setText", text);
+    }
+
+    /** Insert text at the composer caret; queued until the webview is ready. */
+    public void insertComposerText(String text) {
+        queueComposerUpdate("insertText", text + " ");
+    }
+
+    private void queueComposerUpdate(String type, String text) {
+        if (text == null || text.isBlank()) {
+            return;
+        }
+        JsonObject update = new JsonObject();
+        update.addProperty("type", type);
+        update.addProperty("text", text);
+        pendingComposerUpdate = update;
+        DshActions.openToolWindow(project);
+        flushPendingComposerUpdate();
+    }
+
+    private void flushPendingComposerUpdate() {
+        if (!webviewReady) {
+            return;
+        }
+        JsonObject update = pendingComposerUpdate;
+        pendingComposerUpdate = null;
+        if (update != null) {
+            postToWebview(update);
+        }
+    }
+
+    /**
+     * Attach the working-tree Git diff as a one-shot context chip and prefill the composer with the
+     * requested task prompt, mirroring dsh-ide's git diff quick tasks.
+     */
+    private void prefillGitDiffTask(String kind) {
+        operations.execute(
+                () -> {
+                    String base = project.getBasePath();
+                    if (base == null) {
+                        notify(DshBundle.message("dsh.git.diff.no.project"));
+                        return;
+                    }
+                    String content;
+                    boolean failed = false;
+                    try {
+                        ProcessBuilder builder =
+                                new ProcessBuilder("git", "diff", "--no-ext-diff", "--unified=3");
+                        builder.directory(Path.of(base).toFile());
+                        builder.redirectErrorStream(false);
+                        Process process = builder.start();
+                        String output;
+                        try (var reader =
+                                new java.io.BufferedReader(
+                                        new java.io.InputStreamReader(
+                                                process.getInputStream(),
+                                                java.nio.charset.StandardCharsets.UTF_8))) {
+                            StringBuilder collected = new StringBuilder();
+                            char[] buffer = new char[8192];
+                            int read;
+                            while ((read = reader.read(buffer)) >= 0)
+                                collected.append(buffer, 0, read);
+                            output = collected.toString();
+                        }
+                        if (!process.waitFor(10, java.util.concurrent.TimeUnit.SECONDS)) {
+                            process.destroyForcibly();
+                            failed = true;
+                        }
+                        if (failed || process.exitValue() != 0) failed = true;
+                        if (failed) {
+                            notify(
+                                    DshBundle.message(
+                                            "dsh.git.diff.failed", "git diff exited non-zero"));
+                            return;
+                        }
+                        content =
+                                output.isBlank() ? DshBundle.message("dsh.git.diff.empty") : output;
+                    } catch (java.io.IOException | InterruptedException error) {
+                        if (error instanceof InterruptedException)
+                            Thread.currentThread().interrupt();
+                        notify(
+                                DshBundle.message(
+                                        "dsh.git.diff.failed",
+                                        error.getMessage() == null
+                                                ? "git diff"
+                                                : error.getMessage()));
+                        return;
+                    }
+                    int cap =
+                            Math.min(
+                                    DshSettingsState.getInstance(project).maxContextBytes, 300_000);
+                    String[] limited = truncateUtf8(content, cap);
+                    String finalKind = kind == null ? "explain" : kind;
+                    ApplicationManager.getApplication()
+                            .invokeLater(
+                                    () -> {
+                                        if (disposed) return;
+                                        ideContext.attachGitDiff(
+                                                limited[0], Boolean.parseBoolean(limited[1]));
+                                        setComposerText(
+                                                DshBundle.message(
+                                                        "dsh.git.diff.task." + finalKind));
+                                    });
+                });
+    }
+
+    /** UTF-8-safe truncation; returns {text, truncated}. */
+    private static String[] truncateUtf8(String value, int maxBytes) {
+        if (value.getBytes(java.nio.charset.StandardCharsets.UTF_8).length <= maxBytes) {
+            return new String[] {value, "false"};
+        }
+        StringBuilder builder = new StringBuilder();
+        int bytes = 0;
+        for (int offset = 0; offset < value.length(); ) {
+            int codePoint = value.codePointAt(offset);
+            int width = utf8Width(codePoint);
+            if (bytes + width > maxBytes) break;
+            builder.appendCodePoint(codePoint);
+            bytes += width;
+            offset += Character.charCount(codePoint);
+        }
+        return new String[] {builder.toString(), "true"};
+    }
+
+    private static int utf8Width(int codePoint) {
+        if (codePoint < 0x80) return 1;
+        if (codePoint < 0x800) return 2;
+        if (codePoint < 0x10000) return 3;
+        return 4;
+    }
+
+    /** Prefill a workspace-scoped prompt about one project resource, like dsh-ide. */
+    private void askAboutResource(String relativePath, boolean directory) {
+        String cleaned = relativePath == null ? "" : relativePath.replace('\\', '/');
+        if (cleaned.isBlank() || cleaned.contains("..")) {
+            notify(DshBundle.message("dsh.ask.resource.outside"));
+            return;
+        }
+        String type =
+                DshBundle.message(
+                        directory ? "dsh.ask.resource.directory" : "dsh.ask.resource.file");
+        setComposerText(
+                String.join(
+                        "\n",
+                        DshBundle.message("dsh.ask.resource.prompt"),
+                        DshBundle.message("dsh.ask.resource.root") + ": " + project.getBasePath(),
+                        DshBundle.message("dsh.ask.resource.target") + ": " + cleaned,
+                        DshBundle.message("dsh.ask.resource.type") + ": " + type));
     }
 
     /** Keep the JCEF page as an untrusted action sender, matching dsh-ide's boundary. */

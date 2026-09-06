@@ -10,6 +10,19 @@ import java.util.function.Consumer;
 public final class DshActions {
     private DshActions() {}
 
+    /** Reveal the tool window and hand the panel to the operation once it is up. */
+    public static void withPanel(Project project, Consumer<DshToolWindowPanel> operation) {
+        openToolWindow(project);
+        ToolWindow window = ToolWindowManager.getInstance(project).getToolWindow("DSH");
+        if (window == null) return;
+        window.show(
+                () -> {
+                    if (window.getContentManager().getContentCount() == 0) return;
+                    var component = window.getContentManager().getContent(0).getComponent();
+                    if (component instanceof DshToolWindowPanel panel) operation.accept(panel);
+                });
+    }
+
     public static void openToolWindow(Project project) {
         ToolWindow window = ToolWindowManager.getInstance(project).getToolWindow("DSH");
         if (window != null) window.show(null);

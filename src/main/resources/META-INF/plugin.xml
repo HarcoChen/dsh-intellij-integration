@@ -80,6 +80,22 @@
         <action id="Dsh.AskAboutSelection" class="top.harcochen.dsh.action.DshAskAboutSelectionAction">
             <add-to-group group-id="EditorPopupMenu" anchor="last" />
         </action>
+        <action id="Dsh.AskAboutResource" class="top.harcochen.dsh.action.DshAskAboutResourceAction">
+            <add-to-group group-id="ProjectViewPopupMenu" anchor="last" />
+            <add-to-group group-id="EditorTabPopupMenu" anchor="last" />
+        </action>
+        <action id="Dsh.InsertEditorReference" class="top.harcochen.dsh.action.DshInsertEditorReferenceAction" />
+        <action id="Dsh.ExplainDiff" class="top.harcochen.dsh.action.DshGitDiffTaskAction" />
+        <action id="Dsh.FixDiff" class="top.harcochen.dsh.action.DshGitDiffTaskAction" />
+        <action id="Dsh.ReviewDiff" class="top.harcochen.dsh.action.DshGitDiffTaskAction" />
+        <action id="Dsh.DocsDiff" class="top.harcochen.dsh.action.DshGitDiffTaskAction" />
+        <group id="Dsh.GitDiffTasks" popup="true">
+            <add-to-group group-id="Vcs.ContextMenu" anchor="last" />
+            <reference ref="Dsh.ExplainDiff" />
+            <reference ref="Dsh.FixDiff" />
+            <reference ref="Dsh.ReviewDiff" />
+            <reference ref="Dsh.DocsDiff" />
+        </group>
         <action id="Dsh.Explain" class="top.harcochen.dsh.action.DshQuickTaskAction" />
         <action id="Dsh.Fix" class="top.harcochen.dsh.action.DshQuickTaskAction" />
         <action id="Dsh.Review" class="top.harcochen.dsh.action.DshQuickTaskAction" />
