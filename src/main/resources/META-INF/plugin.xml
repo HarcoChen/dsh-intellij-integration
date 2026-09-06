@@ -4,20 +4,37 @@
     <resource-bundle>messages.DshBundle</resource-bundle>
     <vendor email="harcourtzzz@outlook.com" url="https://github.com/HarcoChen/dsh-intellij-integration">HarcoChen</vendor>
     <description><![CDATA[
-        <p>An independent community integration for using DeepSeek Harness (DSH)
-        inside IntelliJ Platform IDEs.</p>
+        <p>Bring DeepSeek Harness (DSH) into IntelliJ IDEA, PyCharm, and other
+        JetBrains IDEs. Chat with your code, review native diffs, and inspect
+        agent activity without leaving your editor.</p>
         <ul>
-            <li>Embedded chat, sessions, history, tool cards, and runtime status</li>
-            <li>Editor-aware explain, fix, review, and documentation prompts</li>
-            <li>Local DSH Runtime lifecycle management and diagnostics</li>
-            <li>API keys stored with IntelliJ Password Safe</li>
+            <li><b>Code-aware chat:</b> explain, fix, review, and document selected
+            code from the editor context menu.</li>
+            <li><b>Native diff previews:</b> inspect supported tool edits in the
+            IDE's side-by-side viewer, including proposed changes awaiting
+            approval. No Git repository required.</li>
+            <li><b>Sessions and Trace:</b> revisit conversations, inspect tool
+            cards, and explore session events with built-in Trace analysis.</li>
+            <li><b>Balance at a glance:</b> view your DeepSeek balance and pricing
+            information in the status bar when available.</li>
+            <li><b>Local Runtime management:</b> start, stop, restart, or connect
+            to a compatible existing Harness Runtime across editor windows.</li>
+            <li><b>Secure credentials:</b> store API keys in IntelliJ Password Safe.</li>
+            <li>English and Simplified Chinese interface resources.</li>
         </ul>
-        <p><b>Requirements:</b> a JetBrains IDE with bundled JCEF, plus Node.js
-        with pnpm or npm/npx available when the plugin launches the Runtime.</p>
+        <p><b>Get started:</b> open the DSH tool window, configure your API key,
+        and ask a question or right-click a code selection. Runtime settings
+        are under Settings &gt; Tools &gt; DeepSeek Harness.</p>
+        <p><b>Requirements:</b> IntelliJ Platform 2024.3 or later with JCEF.
+        Local Runtime startup requires Node.js with pnpm or npm/npx, or an
+        installed dsh command. You can also connect to an existing Runtime.</p>
+        <p><a href="https://github.com/HarcoChen/dsh-intellij-integration#readme">Getting started and configuration</a>
+        | <a href="https://github.com/HarcoChen/dsh-intellij-integration/blob/main/README.zh-CN.md">简体中文指南</a>
+        | <a href="https://github.com/HarcoChen/dsh-intellij-integration/issues">Report an issue</a></p>
         <p><b>Data use:</b> the plugin does not collect telemetry. Prompts and
-        explicitly attached editor selections are sent through the local DSH
-        Runtime to the model provider configured by the user.</p>
-        <p>This is an unofficial community plugin and is not endorsed or
+        attached context are sent through the DSH Runtime to the model provider
+        configured by the user.</p>
+        <p>This is an independent community plugin and is not endorsed or
         maintained by DeepSeek or JetBrains.</p>
     ]]></description>
     <idea-version since-build="243" />

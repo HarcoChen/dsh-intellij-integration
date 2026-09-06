@@ -1,78 +1,72 @@
 <p align="center">
-  <img src="src/main/resources/icons/dsh.svg" alt="DSH" width="128">
+  <img src="src/main/resources/icons/dsh.svg" alt="DeepSeek Harness" width="112">
 </p>
 
-<h1 align="center">DSH IntelliJ Integration</h1>
+<h1 align="center">DeepSeek Harness for JetBrains IDEs</h1>
+
+<p align="center">Bring DeepSeek Harness into JetBrains IDEs — chat with your code, review native diffs, and inspect every run.</p>
+
+<p align="center"><strong>English</strong> | <a href="README.zh-CN.md">简体中文</a></p>
 
 <p align="center">
-  DSH integration for IntelliJ Platform IDEs, including IntelliJ IDEA and PyCharm.
-</p>
-
-<p align="center">
-  <a href="https://plugins.jetbrains.com/plugin/33924-deepseek-harness-integration"><img src="https://img.shields.io/jetbrains/plugin/v/33924.svg" alt="JetBrains Plugin Version"></a>
-  <a href="https://github.com/HarcoChen/dsh-intellij-integration/blob/main/LICENSE"><img src="https://img.shields.io/github/license/HarcoChen/dsh-intellij-integration.svg" alt="License"></a>
-  <img src="https://img.shields.io/badge/IntelliJ%20Platform-2024.3%2B-blue.svg" alt="IntelliJ Platform 2024.3+">
-
-
-</p>
-
-<p align="center">
-  <strong>English</strong> | <a href="README.zh-CN.md">简体中文</a>
+  <a href="https://plugins.jetbrains.com/plugin/33924-deepseek-harness-integration"><img src="https://img.shields.io/jetbrains/plugin/v/33924?style=flat-square&amp;label=Marketplace" alt="JetBrains Marketplace version"></a>
+  <a href="https://plugins.jetbrains.com/plugin/33924-deepseek-harness-integration"><img src="https://img.shields.io/jetbrains/plugin/d/33924?style=flat-square" alt="JetBrains Marketplace downloads"></a>
+  <a href="https://github.com/HarcoChen/dsh-intellij-integration/stargazers"><img src="https://img.shields.io/github/stars/HarcoChen/dsh-intellij-integration?style=flat-square" alt="GitHub stars"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/HarcoChen/dsh-intellij-integration?style=flat-square" alt="MIT license"></a>
 </p>
 
 <p align="center">
-  <em>An independent community project. Issues welcome.</em>
+  <a href="https://plugins.jetbrains.com/plugin/33924-deepseek-harness-integration">Install plugin</a> ·
+  <a href="https://github.com/HarcoChen/dsh-intellij-integration/releases">Releases</a> ·
+  <a href="https://github.com/HarcoChen/dsh-intellij-integration/issues">Feedback</a> ·
+  <a href="https://github.com/HarcoChen/dsh-vsc-integration">VS Code edition</a>
 </p>
 
-<p align="center">
-  For VS Code, please see <a href="https://github.com/HarcoChen/dsh-vsc-integration">dsh-vsc-integration</a>.
-</p>
+An independent community plugin for IntelliJ IDEA, PyCharm, and other IntelliJ Platform IDEs. Explain unfamiliar code, investigate a bug, or review a change from the same place you write it.
 
-## Features
+## Quick start
 
-### Chat right in the IDE
+1. **Install** — in **Settings → Plugins → Marketplace**, search for **DeepSeek Harness Integration**, or open the [Marketplace page](https://plugins.jetbrains.com/plugin/33924-deepseek-harness-integration). Restart the IDE if prompted.
+2. **Connect** — open a project and the **DSH** tool window. For local startup, have Node.js and `pnpm` or `npm`/`npx` available. The plugin starts the Runtime automatically by default. Configure the launch command or an existing Runtime's **Server URL** in **Settings → Tools → DeepSeek Harness**.
+3. **Configure credentials** — find **DSH: Configure API Key** via **Find Action**. Restart the local Runtime after changing the key so it receives the new value. An existing external Runtime uses its own credentials.
+4. **Try it** — select a function, right-click **DSH → Explain Selection**, or ask a question in the chat. Inspect tool cards and proposed diffs when an approval is requested.
 
-The `DSH` tool window embeds the full chat surface via JCEF: sessions, history, tool cards, the context composer, focus mode, and runtime status.
+**Requires:** IntelliJ Platform **2024.3+** with JCEF (the embedded browser). The build targets IntelliJ IDEA Community and PyCharm Community 2024.3.6 for compatibility verification. Other IntelliJ Platform IDEs need the same platform APIs and JCEF support.
 
-### Editor-aware prompts
+## From question to reviewed change
 
-Select code and right-click: `DSH: Ask About Selection`, or explain / fix / review / document the selection from the `DSH` popup group. The selection is captured at send time inside an untrusted `<ide_context>` block, capped by the configured byte limit.
+| What you want to do | What DSH brings into your IDE |
+| --- | --- |
+| Understand or improve code | Explain, fix, review, and document selected code from the editor's context menu. |
+| Inspect an agent's edits | Open supported tool diff cards in JetBrains' native side-by-side viewer, including proposed changes awaiting approval. |
+| Keep track of a task | Chat history, session switching, tool cards, and runtime status in the DSH tool window. |
+| Understand a run | Built-in Trace analysis for inspecting session events and tool activity. |
+| Watch usage | A status-bar balance indicator with DeepSeek pricing information when available. |
+| Resume across editors | Reuse a compatible local Harness Runtime across IDE windows and the companion VS Code extension. |
 
-### Managed local Runtime
+### Native diffs, even without Git
 
-The plugin runs `pnpm dlx @deepseek-ai/dsh@0.1.2-rc.1 web --no-open` by default, falls back to an installed `dsh` or `npx`, and probes localhost until the server is ready. Every launch is pinned to the **Runtime version** setting, so an upstream release never reaches you before this plugin supports it; blank or `latest` opts back into tracking the newest release. Start / stop / restart actions are available from the Tools menu, and `DSH: Open Web UI` opens the same session in a browser.
+Review file edits in the IDE's own diff viewer. For supported tool diff cards, DSH reconstructs before/after content from session history, so the preview does not depend on a Git repository. Proposed edits can be previewed before approval. If later file changes make reconstruction unreliable, the plugin reports that instead of showing a misleading comparison.
 
-### Safe credential handling
+### Put the right context into the conversation
 
-API keys are stored in IntelliJ's Password Safe and injected only into a newly started Runtime process — never written to project XML, prompts, or logs. `DSH: Diagnose Environment` and `DSH: Open Runtime Logs` help when something goes wrong.
+Use **DSH: Ask About Selection** for an open-ended question, or the **DSH** context menu for explain / fix / review / documentation tasks. The context picker also supports attaching the current unstaged Git diff. Editor context is bounded by the configurable byte limit.
 
-## Data use and privacy
+### Keep the Runtime close to your tools
 
-The plugin does not collect telemetry. Prompts and editor selections that you explicitly attach are sent through the local DSH Runtime to the model provider configured by you. That provider's terms and privacy policy apply to the requests it processes. API keys remain in IntelliJ Password Safe and are passed only to a newly started local Runtime process.
+The plugin manages local Runtime startup, shutdown, and restart, with `pnpm`, an installed `dsh`, and `npx` launch options. Package-manager launches use the configured Runtime version. You can also connect to an existing Runtime or open its Web UI in a browser.
 
-## Support
-
-Report bugs and request features through the [GitHub issue tracker](https://github.com/HarcoChen/dsh-intellij-integration/issues).
-
-## Architecture and runtime
-
-The host side is plain IntelliJ project services talking to the Harness Web RPC endpoint over loopback. The wire boundary stays typed as JSON, so new Harness projections remain forward compatible; event streams are projected through a short-interval history/catalog refresh, which keeps reconnects and older Harness versions predictable.
-
-```mermaid
-graph TD
-    A[IntelliJ Project Services] <-->|RPC via Loopback Port| B[Local Harness Runtime]
-    A <-->|JCEF Bridge| C[React Webview UI]
-    A -->|Password Safe| D[API Key Injection]
-```
+API keys are stored in IntelliJ **Password Safe** and passed to a newly started local Runtime. The UI includes English and Simplified Chinese resources.
 
 ## Configuration
+
 
 Open **Settings | Tools | DeepSeek Harness**.
 
 | Setting | Default | What it does |
 | --- | --- | --- |
 | Command / Args | `pnpm dlx @deepseek-ai/dsh@0.1.2-rc.1 web --no-open` | How the Runtime is launched; point it at an installed `dsh` or a local checkout instead. |
-| Server URL / Port | `""` / `0` | Connect to an already running dsh web Runtime instead of launching one. |
+| Server URL / Port | `""` / `0` | Prefer an already running DSH Runtime; port `0` selects an available port for local startup. |
 | Auto start | `true` | Start or connect to the Runtime when the project opens. |
 | Runtime version | `0.1.2-rc.1` | Locked version of the managed Remote protocol. |
 | npm registry | `https://registry.npmmirror.com` | Registry mirror used as a download fallback. |
@@ -80,7 +74,19 @@ Open **Settings | Tools | DeepSeek Harness**.
 | Context bytes | `120000` | Maximum UTF-8 bytes of `<ide_context>` included per prompt. |
 | API key env | `DEEPSEEK_API_KEY` | Environment variable the stored key is injected as. |
 
-## Build from source
+## Troubleshooting
+
+| Symptom | Where to start |
+| --- | --- |
+| Runtime does not start | Run **DSH: Diagnose Environment** and **DSH: Open Runtime Logs** via Find Action; check the command and package manager in settings. |
+| Chat reports JCEF is unavailable | Use an IDE runtime with JCEF. The fallback panel provides a browser entry point. |
+| A changed API key is not taking effect | Restart the local Runtime. For an external Runtime, update its credentials directly. |
+
+## Install from a release or build locally
+
+Download the plugin `.zip` from [GitHub Releases](https://github.com/HarcoChen/dsh-intellij-integration/releases), then choose **Settings → Plugins → ⚙ → Install Plugin from Disk…**. Select the archive without unpacking it.
+
+To build from source, use **JDK 21** and the included Gradle wrapper:
 
 ```bash
 ./gradlew format         # apply the repository's Java formatting rules
@@ -89,6 +95,16 @@ Open **Settings | Tools | DeepSeek Harness**.
 ./gradlew buildPlugin    # produce the installable zip
 ```
 
-## License
+On Windows, use `gradlew.bat`. The first build downloads Gradle and the IntelliJ Platform dependencies.
 
-[MIT](LICENSE)
+## Data use and privacy
+
+The plugin does not collect telemetry. Prompts and attached context are sent through the DSH Runtime to your configured model provider; that provider's terms and privacy policy apply. API keys stored by the plugin remain in IntelliJ Password Safe and are passed to newly started local Runtime processes.
+
+## Feedback and contributing
+
+[Report a bug or suggest a feature](https://github.com/HarcoChen/dsh-intellij-integration/issues). For bugs, include your IDE and plugin versions, OS, Runtime version, and reproduction steps. Remove API keys and private code from any logs you share. Documentation improvements and focused pull requests are welcome; see [repository rules](AGENTS.md) before contributing.
+
+If DSH helps your workflow, a GitHub star helps others discover it. For release history and attribution, see [Releases](https://github.com/HarcoChen/dsh-intellij-integration/releases) and [Third-party notices](THIRD_PARTY_NOTICES.md).
+
+This community project is not endorsed or maintained by DeepSeek or JetBrains. Licensed under [MIT](LICENSE).

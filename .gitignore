@@ -2,7 +2,7 @@
 .gradle/
 build/
 out/
-
+docs/
 # IntelliJ Platform Gradle Plugin
 .intellijPlatform/
 
