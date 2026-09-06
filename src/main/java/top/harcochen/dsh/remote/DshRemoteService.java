@@ -346,6 +346,29 @@ public final class DshRemoteService implements Disposable {
                 DshRemoteContracts.argsWorkspaceDelete(workspaceId));
     }
 
+    /** Move one workspace before another (front of the list when {@code before} is null). */
+    public JsonArray insertWorkspaceBefore(String workspaceId, String beforeWorkspaceId)
+            throws DshRemoteException {
+        JsonObject value =
+                objectValue(
+                        unary.call(
+                                DshRemoteContracts.WORKSPACE_INSERT_BEFORE,
+                                DshRemoteContracts.argsWorkspaceInsertBefore(
+                                        workspaceId, beforeWorkspaceId)));
+        return arrayOrEmpty(value, "workspaceIds");
+    }
+
+    /** Move one session before another inside its workspace (front when {@code before} is null). */
+    public JsonObject insertWorkspaceSessionBefore(
+            String workspaceId, String sessionId, String beforeSessionId)
+            throws DshRemoteException {
+        return objectValue(
+                unary.call(
+                        DshRemoteContracts.WORKSPACE_INSERT_SESSION_BEFORE,
+                        DshRemoteContracts.argsWorkspaceInsertSessionBefore(
+                                workspaceId, sessionId, beforeSessionId)));
+    }
+
     public JsonObject agentPresetCatalog() throws DshRemoteException {
         return objectValue(
                 unary.call(DshRemoteContracts.AGENT_PRESETS_LIST, DshRemoteContracts.argsEmpty()));
@@ -394,6 +417,14 @@ public final class DshRemoteService implements Disposable {
                 unary.call(
                         DshRemoteContracts.SETTINGS_MUTATE,
                         DshRemoteContracts.argsSettingsMutate(ns, ops, expectedRevision)));
+    }
+
+    /** Apply one whole-patch update to a settings namespace. */
+    public JsonObject updateSettings(String ns, JsonObject patch) throws DshRemoteException {
+        return objectValue(
+                unary.call(
+                        DshRemoteContracts.SETTINGS_UPDATE,
+                        DshRemoteContracts.argsSettingsUpdate(ns, patch)));
     }
 
     public void openSettingsDocument() throws DshRemoteException {
