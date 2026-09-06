@@ -21,6 +21,13 @@ public final class DshSettingsState implements PersistentStateComponent<DshSetti
     public String serverUrl = "";
     public int serverPort = 0;
     public boolean autoStart = true;
+
+    /** Whether the selected session id survives IDE restarts. */
+    public boolean persistSession = true;
+
+    /** Last selected session for this project; empty when nothing is pinned. */
+    public String lastSessionId = "";
+
     public boolean installWhenMissing = true;
     public String runtimeVersion = "0.1.2-rc.1";
     public String npmRegistry = "https://registry.npmmirror.com";
@@ -49,6 +56,8 @@ public final class DshSettingsState implements PersistentStateComponent<DshSetti
         serverUrl = state.serverUrl;
         serverPort = state.serverPort;
         autoStart = state.autoStart;
+        persistSession = state.persistSession;
+        lastSessionId = state.lastSessionId;
         installWhenMissing = state.installWhenMissing;
         runtimeVersion = state.runtimeVersion;
         npmRegistry = state.npmRegistry;

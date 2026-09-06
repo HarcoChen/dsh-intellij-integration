@@ -32,6 +32,7 @@ public final class DshSettingsConfigurable implements Configurable {
     private JBTextField npmRegistry;
     private JBTextField apiKeyEnv;
     private JBCheckBox autoStart;
+    private JBCheckBox persistSession;
     private JBCheckBox installWhenMissing;
 
     public DshSettingsConfigurable(Project project) {
@@ -66,6 +67,7 @@ public final class DshSettingsConfigurable implements Configurable {
         npmRegistry = new JBTextField();
         apiKeyEnv = new JBTextField();
         autoStart = new JBCheckBox(DshBundle.message("dsh.settings.auto.start.label"));
+        persistSession = new JBCheckBox(DshBundle.message("dsh.settings.persist.session.label"));
         installWhenMissing =
                 new JBCheckBox(DshBundle.message("dsh.settings.install.when.missing.label"));
 
@@ -110,6 +112,7 @@ public final class DshSettingsConfigurable implements Configurable {
                 apiKeyEnv,
                 DshBundle.message("dsh.settings.api.key.env.tooltip"));
         addCheckbox(autoStart);
+        addCheckbox(persistSession);
         addCheckbox(installWhenMissing);
 
         JPanel note = new JPanel();
@@ -174,6 +177,7 @@ public final class DshSettingsConfigurable implements Configurable {
                 || !safe(npmRegistry.getText()).equals(safe(state.npmRegistry))
                 || !safe(apiKeyEnv.getText()).equals(safe(state.apiKeyEnv))
                 || autoStart.isSelected() != state.autoStart
+                || persistSession.isSelected() != state.persistSession
                 || installWhenMissing.isSelected() != state.installWhenMissing;
     }
 
@@ -228,6 +232,7 @@ public final class DshSettingsConfigurable implements Configurable {
         state.npmRegistry = safe(npmRegistry.getText());
         state.apiKeyEnv = safe(apiKeyEnv.getText());
         state.autoStart = autoStart.isSelected();
+        state.persistSession = persistSession.isSelected();
         state.installWhenMissing = installWhenMissing.isSelected();
         DshRuntimeService.getInstance(project).settingsChanged();
     }
@@ -247,6 +252,7 @@ public final class DshSettingsConfigurable implements Configurable {
         npmRegistry.setText(state.npmRegistry);
         apiKeyEnv.setText(state.apiKeyEnv);
         autoStart.setSelected(state.autoStart);
+        persistSession.setSelected(state.persistSession);
         installWhenMissing.setSelected(state.installWhenMissing);
     }
 

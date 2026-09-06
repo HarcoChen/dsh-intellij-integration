@@ -193,6 +193,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
                         () -> {
                             sessionId = null;
                             pendingAgentPreset = null;
+                            DshSettingsState.getInstance(project).lastSessionId = "";
                         },
                         this::refreshAfterMutation,
                         this::postStateLater,
@@ -256,6 +257,9 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
         }
         chooseSessionIfNecessary(current);
         String selected = sessionId;
+        if (selected != null && !selected.isBlank()) {
+            persistSelectedSession();
+        }
         if (selected != null && !selected.isBlank() && !selected.equals(followedSession)) {
             releaseFollowedSession();
             remote.retainSession(selected);
@@ -472,6 +476,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
                 newSessionDraft = true;
                 pendingAgentPreset = null;
                 lastError = null;
+                DshSettingsState.getInstance(project).lastSessionId = "";
                 subagents.reset();
                 postStateLater();
             }
@@ -599,6 +604,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
         sessionId = null;
         newSessionDraft = true;
         pendingAgentPreset = null;
+        DshSettingsState.getInstance(project).lastSessionId = "";
         lastError = null;
         projection = DshMessageProjector.Projection.empty();
         messages = new JsonArray();
@@ -678,6 +684,17 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
     private void chooseSessionIfNecessary(DshRemoteState.Snapshot current) {
         if (newSessionDraft) return;
         if (sessionId != null && containsSession(current, sessionId)) return;
+        // Restore the persisted session first, mirroring dsh-ide's
+        // persistSession: what you had open is what you get back, even when it
+        // is a blank draft. The follow stream dies quietly if the session was
+        // deleted elsewhere, and the catalog fallback below takes over.
+        if (DshSettingsState.getInstance(project).persistSession) {
+            String persisted = DshSettingsState.getInstance(project).lastSessionId;
+            if (persisted != null && !persisted.isBlank() && containsSession(current, persisted)) {
+                sessionId = persisted;
+                return;
+            }
+        }
         // Do not auto-select a blank session. dsh-ide creates the session only
         // when the first prompt is sent, which keeps an opened tool window quiet.
         for (JsonElement candidate : current.catalog) {
@@ -690,6 +707,17 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
                     return;
                 }
             }
+        }
+    }
+
+    /** Persist the selected session so the next project open can restore it. */
+    private void persistSelectedSession() {
+        String current = sessionId;
+        DshSettingsState settings = DshSettingsState.getInstance(project);
+        if (!settings.persistSession) return;
+        String saved = settings.lastSessionId;
+        if (current != null && !current.isBlank() && !current.equals(saved)) {
+            settings.lastSessionId = current;
         }
     }
 
