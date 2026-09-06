@@ -10,10 +10,6 @@ import com.intellij.ui.jcef.JBCefApp;
 import com.intellij.ui.jcef.JBCefBrowser;
 import com.intellij.ui.jcef.JBCefBrowserBase;
 import com.intellij.ui.jcef.JBCefJSQuery;
-import org.jetbrains.annotations.NotNull;
-
-import javax.swing.UIManager;
-import javax.swing.JComponent;
 import java.awt.Color;
 import java.awt.Font;
 import java.beans.PropertyChangeListener;
@@ -21,14 +17,17 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.function.Consumer;
+import javax.swing.JComponent;
+import javax.swing.UIManager;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * Adapts VS Code's webview bridge to IntelliJ's embedded JCEF browser.
  *
- * The React bundle is the same bundle used by dsh-ide. Instead of
- * {@code acquireVsCodeApi} being supplied by VS Code, a JBCefJSQuery carries
- * actions into the project service and host state is delivered with the normal
- * {@code window.postMessage} event expected by {@code webview/src/bridge.ts}.
+ * <p>The React bundle is the same bundle used by dsh-ide. Instead of {@code acquireVsCodeApi} being
+ * supplied by VS Code, a JBCefJSQuery carries actions into the project service and host state is
+ * delivered with the normal {@code window.postMessage} event expected by {@code
+ * webview/src/bridge.ts}.
  */
 public final class DshBridge implements Disposable {
     private static final Logger LOG = Logger.getInstance(DshBridge.class);
@@ -63,21 +62,24 @@ public final class DshBridge implements Disposable {
         this.actionQuery = JBCefJSQuery.create((JBCefBrowserBase) browser);
         this.lookAndFeelListener = ignored -> updateThemeLater();
         UIManager.addPropertyChangeListener(lookAndFeelListener);
-        this.actionQuery.addHandler(request -> {
-            try {
-                JsonElement action = JsonParser.parseString(request);
-                ApplicationManager.getApplication().invokeLater(() -> {
+        this.actionQuery.addHandler(
+                request -> {
                     try {
-                        actionConsumer.accept(action);
+                        JsonElement action = JsonParser.parseString(request);
+                        ApplicationManager.getApplication()
+                                .invokeLater(
+                                        () -> {
+                                            try {
+                                                actionConsumer.accept(action);
+                                            } catch (RuntimeException error) {
+                                                LOG.warn("DSH webview action failed", error);
+                                            }
+                                        });
                     } catch (RuntimeException error) {
-                        LOG.warn("DSH webview action failed", error);
+                        LOG.warn("Ignoring malformed action from the DSH webview", error);
                     }
+                    return null;
                 });
-            } catch (RuntimeException error) {
-                LOG.warn("Ignoring malformed action from the DSH webview", error);
-            }
-            return null;
-        });
     }
 
     public JComponent getComponent() {
@@ -90,18 +92,30 @@ public final class DshBridge implements Disposable {
         String script = readResource("/webview/main.js");
         String injectedPost = actionQuery.inject("JSON.stringify(message)");
         String languageTag = com.intellij.DynamicBundle.getLocale().toLanguageTag();
-        String html = "<!doctype html><html lang=\"" + languageTag + "\"><head><meta charset=\"UTF-8\">"
-                + "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">"
-                + "<title>DSH</title><style>" + css + adapterCss + "</style>"
-                + "<style id=\"dsh-jetbrains-theme\">" + themeCss() + "</style>"
-                + "</head><body><div id=\"root\"></div><script>"
-                + "window.__dshState=undefined;"
-                + "window.acquireVsCodeApi=function(){return {"
-                + "postMessage:function(message){" + injectedPost + "},"
-                + "getState:function(){return window.__dshState;},"
-                + "setState:function(state){window.__dshState=state;}"
-                + "};};"
-                + "</script><script>" + script + "</script></body></html>";
+        String html =
+                "<!doctype html><html lang=\""
+                        + languageTag
+                        + "\"><head><meta charset=\"UTF-8\">"
+                        + "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">"
+                        + "<title>DSH</title><style>"
+                        + css
+                        + adapterCss
+                        + "</style>"
+                        + "<style id=\"dsh-jetbrains-theme\">"
+                        + themeCss()
+                        + "</style>"
+                        + "</head><body><div id=\"root\"></div><script>"
+                        + "window.__dshState=undefined;"
+                        + "window.acquireVsCodeApi=function(){return {"
+                        + "postMessage:function(message){"
+                        + injectedPost
+                        + "},"
+                        + "getState:function(){return window.__dshState;},"
+                        + "setState:function(state){window.__dshState=state;}"
+                        + "};};"
+                        + "</script><script>"
+                        + script
+                        + "</script></body></html>";
         browser.loadHTML(html);
         browser.getComponent().setBackground(themeColor("Panel.background", new Color(0x1E1F22)));
     }
@@ -111,8 +125,11 @@ public final class DshBridge implements Disposable {
         lastState = message;
         String json = message == null ? "null" : message.toString();
         String escaped = escapeJavaScriptString(json);
-        String script = "(function(){var value=JSON.parse('" + escaped + "');"
-                + "window.__dshState=value.state||value;window.postMessage(value,'*');})();";
+        String script =
+                "(function(){var value=JSON.parse('"
+                        + escaped
+                        + "');"
+                        + "window.__dshState=value.state||value;window.postMessage(value,'*');})();";
         browser.getCefBrowser().executeJavaScript(script, browser.getCefBrowser().getURL(), 0);
     }
 
@@ -140,56 +157,102 @@ public final class DshBridge implements Disposable {
 
     private void updateThemeLater() {
         if (disposed) return;
-        ApplicationManager.getApplication().invokeLater(() -> {
-            if (disposed) return;
-            Color background = themeColor("Panel.background", new Color(0x1E1F22));
-            browser.getComponent().setBackground(background);
-            String css = escapeJavaScriptString(themeCss());
-            String script = "(function(){var style=document.getElementById('dsh-jetbrains-theme');"
-                    + "if(style){style.textContent='" + css + "';}})();";
-            browser.getCefBrowser().executeJavaScript(script, browser.getCefBrowser().getURL(), 0);
-        });
+        ApplicationManager.getApplication()
+                .invokeLater(
+                        () -> {
+                            if (disposed) return;
+                            Color background = themeColor("Panel.background", new Color(0x1E1F22));
+                            browser.getComponent().setBackground(background);
+                            String css = escapeJavaScriptString(themeCss());
+                            String script =
+                                    "(function(){var style=document.getElementById('dsh-jetbrains-theme');"
+                                            + "if(style){style.textContent='"
+                                            + css
+                                            + "';}})();";
+                            browser.getCefBrowser()
+                                    .executeJavaScript(script, browser.getCefBrowser().getURL(), 0);
+                        });
     }
 
     /** Translate the active JetBrains look-and-feel into the variables used by dsh-ide. */
     private static String themeCss() {
-        Color background = themeColor("Editor.background", themeColor("Panel.background", new Color(0x1E1F22)));
+        Color background =
+                themeColor(
+                        "Editor.background", themeColor("Panel.background", new Color(0x1E1F22)));
         boolean dark = luminance(background) < 0.48;
-        Color foreground = themeColor("Label.foreground", dark ? new Color(0xDFE1E5) : new Color(0x1F2329));
-        Color muted = themeColor("Label.disabledForeground", dark ? new Color(0x9DA3AD) : new Color(0x6C707E));
+        Color foreground =
+                themeColor("Label.foreground", dark ? new Color(0xDFE1E5) : new Color(0x1F2329));
+        Color muted =
+                themeColor(
+                        "Label.disabledForeground",
+                        dark ? new Color(0x9DA3AD) : new Color(0x6C707E));
         Color panel = themeColor("Panel.background", background);
-        Color surface = themeColor("PopupMenu.background", themeColor("TextField.background", panel));
+        Color surface =
+                themeColor("PopupMenu.background", themeColor("TextField.background", panel));
         Color input = themeColor("TextField.background", dark ? new Color(0x2B2D31) : Color.WHITE);
         Color inputForeground = themeColor("TextField.foreground", foreground);
-        Color border = themeColor("Component.borderColor", themeColor("Separator.separatorColor",
-                dark ? new Color(0x454851) : new Color(0xC9CCD6)));
-        Color primary = themeColor("Button.default.startBackground",
-                themeColor("Focus.color", dark ? new Color(0x3574F0) : new Color(0x315EFB)));
+        Color border =
+                themeColor(
+                        "Component.borderColor",
+                        themeColor(
+                                "Separator.separatorColor",
+                                dark ? new Color(0x454851) : new Color(0xC9CCD6)));
+        Color primary =
+                themeColor(
+                        "Button.default.startBackground",
+                        themeColor(
+                                "Focus.color", dark ? new Color(0x3574F0) : new Color(0x315EFB)));
         Color primaryForeground = themeColor("Button.default.foreground", Color.WHITE);
-        Color hover = themeColor("List.hoverBackground", dark ? new Color(0x33363D) : new Color(0xE8EAED));
+        Color hover =
+                themeColor(
+                        "List.hoverBackground", dark ? new Color(0x33363D) : new Color(0xE8EAED));
         Color selection = themeColor("List.selectionBackground", primary);
         Color selectionForeground = themeColor("List.selectionForeground", primaryForeground);
-        Color link = themeColor("Link.activeForeground", dark ? new Color(0x6EA8FE) : new Color(0x2F65CA));
+        Color link =
+                themeColor(
+                        "Link.activeForeground", dark ? new Color(0x6EA8FE) : new Color(0x2F65CA));
         Color linkHover = themeColor("Link.hoverForeground", link.brighter());
-        Color error = themeColor("Component.errorFocusColor", dark ? new Color(0xFF7B72) : new Color(0xC7222D));
-        Color warning = themeColor("Component.warningFocusColor", dark ? new Color(0xDDBA7D) : new Color(0xA66B00));
-        Color success = themeColor("Component.successFocusColor", dark ? new Color(0x73BD79) : new Color(0x2E7D32));
-        Color errorBackground = themeColor("ValidationTooltip.errorBackground",
-                dark ? new Color(0x3D2022) : new Color(0xFCE8E8));
-        Color scroll = themeColor("ScrollBar.thumbColor", dark ? new Color(0x5C606A) : new Color(0xA8ABB4));
-        Color scrollHover = themeColor("ScrollBar.hoverThumbColor", dark ? new Color(0x777D89) : new Color(0x858993));
+        Color error =
+                themeColor(
+                        "Component.errorFocusColor",
+                        dark ? new Color(0xFF7B72) : new Color(0xC7222D));
+        Color warning =
+                themeColor(
+                        "Component.warningFocusColor",
+                        dark ? new Color(0xDDBA7D) : new Color(0xA66B00));
+        Color success =
+                themeColor(
+                        "Component.successFocusColor",
+                        dark ? new Color(0x73BD79) : new Color(0x2E7D32));
+        Color errorBackground =
+                themeColor(
+                        "ValidationTooltip.errorBackground",
+                        dark ? new Color(0x3D2022) : new Color(0xFCE8E8));
+        Color scroll =
+                themeColor(
+                        "ScrollBar.thumbColor", dark ? new Color(0x5C606A) : new Color(0xA8ABB4));
+        Color scrollHover =
+                themeColor(
+                        "ScrollBar.hoverThumbColor",
+                        dark ? new Color(0x777D89) : new Color(0x858993));
         Color dropdown = themeColor("ComboBox.background", input);
         Color dropdownForeground = themeColor("ComboBox.foreground", inputForeground);
         Color menu = themeColor("PopupMenu.background", surface);
         Color menuForeground = themeColor("PopupMenu.foreground", foreground);
         Color code = themeColor("TextArea.background", input);
         Font labelFont = UIManager.getFont("Label.font");
-        String family = labelFont == null ? "-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif"
-                : cssFontFamily(labelFont.getFamily());
+        String family =
+                labelFont == null
+                        ? "-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif"
+                        : cssFontFamily(labelFont.getFamily());
         int fontSize = labelFont == null ? 13 : Math.max(11, labelFont.getSize());
 
-        StringBuilder css = new StringBuilder(2400).append(":root{")
-                .append("color-scheme:").append(dark ? "dark" : "light").append(';');
+        StringBuilder css =
+                new StringBuilder(2400)
+                        .append(":root{")
+                        .append("color-scheme:")
+                        .append(dark ? "dark" : "light")
+                        .append(';');
         variable(css, "foreground", foreground);
         variable(css, "descriptionForeground", muted);
         variable(css, "sideBar-background", panel);
@@ -242,10 +305,18 @@ public final class DshBridge implements Disposable {
         variable(css, "gitDecoration-modifiedResourceForeground", link);
         variable(css, "gitDecoration-renamedResourceForeground", warning);
         variable(css, "symbolIcon-functionForeground", link);
-        variable(css, "symbolIcon-keywordForeground", dark ? new Color(0xB392F0) : new Color(0x7E57C2));
-        css.append("--vscode-font-family:").append(family).append(';')
-                .append("--vscode-font-size:").append(fontSize).append("px;")
-                .append("--vscode-editor-font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;")
+        variable(
+                css,
+                "symbolIcon-keywordForeground",
+                dark ? new Color(0xB392F0) : new Color(0x7E57C2));
+        css.append("--vscode-font-family:")
+                .append(family)
+                .append(';')
+                .append("--vscode-font-size:")
+                .append(fontSize)
+                .append("px;")
+                .append(
+                        "--vscode-editor-font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;")
                 .append('}');
         return css.toString();
     }
@@ -261,19 +332,29 @@ public final class DshBridge implements Disposable {
 
     private static String cssColor(Color color) {
         if (color.getAlpha() == 255) {
-            return String.format("#%02x%02x%02x", color.getRed(), color.getGreen(), color.getBlue());
+            return String.format(
+                    "#%02x%02x%02x", color.getRed(), color.getGreen(), color.getBlue());
         }
-        return "rgba(" + color.getRed() + ',' + color.getGreen() + ',' + color.getBlue() + ','
-                + String.format(java.util.Locale.ROOT, "%.3f", color.getAlpha() / 255.0) + ')';
+        return "rgba("
+                + color.getRed()
+                + ','
+                + color.getGreen()
+                + ','
+                + color.getBlue()
+                + ','
+                + String.format(java.util.Locale.ROOT, "%.3f", color.getAlpha() / 255.0)
+                + ')';
     }
 
     private static String cssFontFamily(String family) {
-        return "\"" + family.replace("\\", "\\\\").replace("\"", "\\\"")
+        return "\""
+                + family.replace("\\", "\\\\").replace("\"", "\\\"")
                 + "\",-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif";
     }
 
     private static double luminance(Color color) {
-        return (0.2126 * color.getRed() + 0.7152 * color.getGreen() + 0.0722 * color.getBlue()) / 255.0;
+        return (0.2126 * color.getRed() + 0.7152 * color.getGreen() + 0.0722 * color.getBlue())
+                / 255.0;
     }
 
     private static Color blend(Color base, Color overlay, double amount) {

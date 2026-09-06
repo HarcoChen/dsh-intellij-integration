@@ -1,0 +1,34 @@
+name: Quality
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  java:
+    name: Java lint and compile
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          # This job runs ./gradlew from the pull request's own tree. Keep GITHUB_TOKEN out of
+          # the local git config so submitted build logic cannot read it back.
+          persist-credentials: false
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Check formatting, lint, and compilation
+        run: ./gradlew lint compileJava

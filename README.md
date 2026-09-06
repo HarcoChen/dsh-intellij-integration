@@ -19,7 +19,7 @@
   <a href="https://plugins.jetbrains.com/plugin/33924-deepseek-harness-integration">Install plugin</a> ·
   <a href="https://github.com/HarcoChen/dsh-intellij-integration/releases">Releases</a> ·
   <a href="https://github.com/HarcoChen/dsh-intellij-integration/issues">Feedback</a> ·
-  <a href="https://github.com/HarcoChen/deepseek-harness-vscode">VS Code edition</a>
+  <a href="https://github.com/HarcoChen/dsh-vsc-integration">VS Code edition</a>
 </p>
 
 An independent community plugin for IntelliJ IDEA, PyCharm, and other IntelliJ Platform IDEs. Explain unfamiliar code, investigate a bug, or review a change from the same place you write it.
@@ -65,10 +65,10 @@ Open **Settings | Tools | DeepSeek Harness**.
 
 | Setting | Default | What it does |
 | --- | --- | --- |
-| Command / Args | `pnpm dlx @deepseek-ai/dsh web --no-open` | How the Runtime is launched; point it at an installed `dsh` or a local checkout instead. |
+| Command / Args | `pnpm dlx @deepseek-ai/dsh@0.1.2-rc.1 web --no-open` | How the Runtime is launched; point it at an installed `dsh` or a local checkout instead. |
 | Server URL / Port | `""` / `0` | Prefer an already running DSH Runtime; port `0` selects an available port for local startup. |
 | Auto start | `true` | Start or connect to the Runtime when the project opens. |
-| Runtime version | `0.1.1-rc.2` | Locked version of the managed Runtime. |
+| Runtime version | `0.1.2-rc.1` | Locked version of the managed Remote protocol. |
 | npm registry | `https://registry.npmmirror.com` | Registry mirror used as a download fallback. |
 | Timeouts | `30s` startup, `600s` request | How long to wait for startup and individual RPC calls. |
 | Context bytes | `120000` | Maximum UTF-8 bytes of `<ide_context>` included per prompt. |
@@ -89,9 +89,10 @@ Download the plugin `.zip` from [GitHub Releases](https://github.com/HarcoChen/d
 To build from source, use **JDK 21** and the included Gradle wrapper:
 
 ```bash
-./gradlew buildPlugin              # Installable ZIP in build/distributions/
-./gradlew verifyPluginStructure    # Plugin descriptor and archive checks
-./gradlew verifyPlugin             # Compatibility checks against configured IDEs
+./gradlew format         # apply the repository's Java formatting rules
+./gradlew lint           # verify formatting and run Checkstyle
+./gradlew verifyPlugin   # structure and compatibility checks
+./gradlew buildPlugin    # produce the installable zip
 ```
 
 On Windows, use `gradlew.bat`. The first build downloads Gradle and the IntelliJ Platform dependencies.

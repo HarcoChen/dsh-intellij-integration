@@ -19,7 +19,7 @@
   <a href="https://plugins.jetbrains.com/plugin/33924-deepseek-harness-integration">安装插件</a> ·
   <a href="https://github.com/HarcoChen/dsh-intellij-integration/releases">版本下载</a> ·
   <a href="https://github.com/HarcoChen/dsh-intellij-integration/issues">反馈建议</a> ·
-  <a href="https://github.com/HarcoChen/deepseek-harness-vscode">VS Code 版本</a>
+  <a href="https://github.com/HarcoChen/dsh-vsc-integration">VS Code 版本</a>
 </p>
 
 面向 IntelliJ IDEA、PyCharm 等 IntelliJ Platform IDE 的独立社区插件。在写代码的地方解释陌生逻辑、排查问题、审查改动。
@@ -65,10 +65,10 @@ API Key 保存在 IntelliJ **Password Safe** 中，传递给新启动的本地 R
 
 | 设置项 | 默认值 | 说明 |
 | --- | --- | --- |
-| 命令 / 参数 | `pnpm dlx @deepseek-ai/dsh web --no-open` | Runtime 的启动方式，也可以指向已安装的 `dsh` 或本地源码目录。 |
+| 命令 / 参数 | `pnpm dlx @deepseek-ai/dsh@0.1.2-rc.1 web --no-open` | Runtime 的启动方式，也可以指向已安装的 `dsh` 或本地源码目录。 |
 | 服务地址 / 端口 | `""` / `0` | 优先连接已运行的 DSH Runtime；本地启动时端口 `0` 表示自动选择可用端口。 |
 | 自动启动 | `true` | 项目打开时自动启动或连接 Runtime。 |
-| Runtime 版本 | `0.1.1-rc.2` | 托管 Runtime 的锁定版本。 |
+| Runtime 版本 | `0.1.2-rc.1` | 托管 Remote 协议的锁定版本。 |
 | npm 镜像 | `https://registry.npmmirror.com` | 下载后备重试的 Registry 镜像。 |
 | 超时 | 启动 `30s`，请求 `600s` | 等待启动和单次 RPC 调用的超时时间。 |
 | 上下文字节数 | `120000` | 单次请求中 `<ide_context>` 的最大 UTF-8 字节数。 |
@@ -89,9 +89,10 @@ API Key 保存在 IntelliJ **Password Safe** 中，传递给新启动的本地 R
 源码构建需要 **JDK 21**，使用仓库附带的 Gradle wrapper：
 
 ```bash
-./gradlew buildPlugin              # 在 build/distributions/ 生成插件 ZIP
-./gradlew verifyPluginStructure    # 检查插件描述文件与归档结构
-./gradlew verifyPlugin             # 对配置的 IDE 执行兼容性检查
+./gradlew format         # 应用仓库统一的 Java 格式化规则
+./gradlew lint           # 检查格式并运行 Checkstyle
+./gradlew verifyPlugin   # 结构与兼容性检查
+./gradlew buildPlugin    # 生成可安装的 zip
 ```
 
 Windows 使用 `gradlew.bat`。首次构建会下载 Gradle 和 IntelliJ Platform 依赖。

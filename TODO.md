@@ -51,6 +51,31 @@ Status: `[x]` implemented, `[-]` usable but not yet at VS Code parity, `[ ]` not
 - [x] Replace raw Agent Preset text output with native list/detail/copy/edit flows.
 - [x] Preserve runtime session metadata such as attention, archived state, workspace identity, and model label.
 
+## P0 — Runtime authentication compatibility
+
+- [x] Preserve the token-bearing launch URL separately from the API base URL.
+- [x] Exchange the launch token for a session cookie and send that cookie on RPC, response, health,
+      and Mux WebSocket requests.
+- [x] Share the authenticated launch URL between IDE integrations without exposing the token in
+      Runtime logs or diagnostics; retain the pre-0.1.2 no-auth compatibility path.
+
+## Cross-IDE parity — migrated from dsh-ide
+
+These items track the post-0.2.1 functionality found in the adjacent `dsh-ide` checkout. Each
+item is complete only when the IntelliJ host action, Harness RPC/projection boundary, WebView
+action validation, and the user-visible failure path are wired together.
+
+- [ ] Message checkpoints: fork from a finalized message, restore code to that message, or fork and restore together.
+- [ ] Plan Mode: consume the public `plan` projection and expose `/plan` plus a composer toggle.
+- [ ] IDE Provider management: configure endpoints, credentials, and models; discover models through `llm.models` and `llm.discoverModels`.
+- [ ] Debug Context: attach a bounded, one-shot snapshot of the current XDebugger frame, stack, locals, source excerpt, and diagnostics.
+- [ ] Subagent timing: consume `subagentTiming` and show settled/active duration in the tree and preview.
+- [ ] Managed Runtime distribution: cache and integrity-check the platform Runtime instead of relying only on pnpm/npx.
+- [ ] Conversation outline: provide a native session message navigator.
+- [ ] Agent status candidates: support a validated list of status labels instead of one fixed label.
+- [-] Terminal context: deferred until IntelliJ exposes a stable shell-execution event API; do not depend on terminal plugin internals.
+- [-] Message feedback: deferred until the evaluation/statistics loop has a product surface; the upstream sidecar remains optional.
+
 ## Quality gates for each batch
 
 - [x] Reject malformed or surplus WebView action fields at the host boundary for the completed batch.

@@ -1,8 +1,11 @@
+import org.gradle.api.plugins.quality.Checkstyle
 import org.jetbrains.intellij.platform.gradle.extensions.intellijPlatform
 import org.jetbrains.intellij.platform.gradle.tasks.VerifyPluginSignatureTask
 
 plugins {
     id("java")
+    id("checkstyle")
+    id("com.diffplug.spotless") version "8.10.1"
     // The settings plugin supplies the IntelliJ Platform Gradle Plugin version.
     id("org.jetbrains.intellij.platform")
 }
@@ -32,6 +35,53 @@ java {
 tasks.withType<JavaCompile>().configureEach {
     options.encoding = "UTF-8"
     options.release.set(21)
+}
+
+spotless {
+    encoding("UTF-8")
+
+    java {
+        target("src/*/java/**/*.java")
+        googleJavaFormat("1.36.0").aosp()
+        removeUnusedImports()
+        forbidWildcardImports()
+        trimTrailingWhitespace()
+        endWithNewline()
+    }
+
+    format("buildFiles") {
+        target("*.gradle.kts", "*.properties", ".editorconfig", "config/**/*.xml")
+        trimTrailingWhitespace()
+        endWithNewline()
+    }
+}
+
+checkstyle {
+    toolVersion = "14.1.0"
+    configDirectory = layout.projectDirectory.dir("config/checkstyle")
+    isIgnoreFailures = false
+    maxErrors = 0
+    maxWarnings = 0
+}
+
+tasks.withType<Checkstyle>().configureEach {
+    reports {
+        xml.required = true
+        html.required = true
+        sarif.required = true
+    }
+}
+
+tasks.register("lint") {
+    group = "verification"
+    description = "Checks Java formatting and static-analysis rules."
+    dependsOn("spotlessCheck", "checkstyleMain")
+}
+
+tasks.register("format") {
+    group = "formatting"
+    description = "Formats Java and repository build files."
+    dependsOn("spotlessApply")
 }
 
 intellijPlatform {
