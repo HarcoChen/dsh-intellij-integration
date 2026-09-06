@@ -15,6 +15,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Consumer;
 import org.jetbrains.annotations.NotNull;
+import top.harcochen.dsh.DshBundle;
 import top.harcochen.dsh.DshRuntimeService;
 import top.harcochen.dsh.DshSettingsState;
 
@@ -188,7 +189,7 @@ public final class DshRemoteService implements Disposable {
                         ? key.substring(2)
                         : key;
         if (eventId == null || eventId.isBlank() || sessionId == null || sessionId.isBlank()) {
-            return "The interaction is no longer available.";
+            return DshBundle.message("dsh.interaction.unavailable");
         }
         connection.interactionStatus(sessionId, key, "submitting", null, false);
         JsonObject outcome = DshRemoteEventClient.resultOutcome(outcomeValue);

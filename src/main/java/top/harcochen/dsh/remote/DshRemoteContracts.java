@@ -4,6 +4,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import java.util.Objects;
 import java.util.UUID;
 
 /**
@@ -168,9 +169,9 @@ public final class DshRemoteContracts {
                     endpoint, "Remote RPC returned a non-object envelope", null);
         }
         JsonObject envelope = parsed.getAsJsonObject();
-        if (!jsonString(envelope, "type").equals("server-response")
+        if (!"server-response".equals(jsonString(envelope, "type"))
                 || !envelope.has("rpcId")
-                || !jsonString(envelope, "rpcId").equals(expectedRpcId)) {
+                || !Objects.equals(jsonString(envelope, "rpcId"), expectedRpcId)) {
             throw DshRemoteException.protocol(
                     endpoint, "Remote RPC response envelope did not match the request", null);
         }

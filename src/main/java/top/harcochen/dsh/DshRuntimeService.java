@@ -42,6 +42,7 @@ import top.harcochen.dsh.remote.DshRemoteUnaryClient;
 public final class DshRuntimeService implements Disposable {
     private static final Logger LOG = Logger.getInstance(DshRuntimeService.class);
     private static final int DEFAULT_PORT = 3080;
+
     /** The npm package the Runtime ships as; see {@link #pinRuntimeVersion}. */
     private static final String RUNTIME_PACKAGE = "@deepseek-ai/dsh";
 
@@ -374,9 +375,12 @@ public final class DshRuntimeService implements Disposable {
     private List<List<String>> launcherCandidates(DshSettingsState settings) {
         String command = settings.command == null ? "dsh" : settings.command.trim();
         if (command.isEmpty()) command = "dsh";
-        String runtimeVersion = settings.runtimeVersion == null || settings.runtimeVersion.isBlank()
-                ? "latest" : settings.runtimeVersion.trim();
-        List<String> configuredArgs = pinRuntimeVersion(splitArguments(settings.commandArgs), runtimeVersion);
+        String runtimeVersion =
+                settings.runtimeVersion == null || settings.runtimeVersion.isBlank()
+                        ? "latest"
+                        : settings.runtimeVersion.trim();
+        List<String> configuredArgs =
+                pinRuntimeVersion(splitArguments(settings.commandArgs), runtimeVersion);
         if (!hasPort(configuredArgs)) {
             configuredArgs = new ArrayList<>(configuredArgs);
             configuredArgs.add("--port");

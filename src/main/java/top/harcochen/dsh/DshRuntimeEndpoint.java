@@ -51,13 +51,10 @@ final class DshRuntimeEndpoint {
 
             String host = uri.getHost();
             String lowerHost = host.toLowerCase(Locale.ROOT);
-            if (loopbackOnly
-                    && (!("http".equalsIgnoreCase(scheme))
-                            || !("127.0.0.1".equals(lowerHost)
-                                    || "localhost".equals(lowerHost)
-                                    || "0.0.0.0".equals(lowerHost)
-                                    || "[::1]".equals(lowerHost)
-                                    || "::1".equals(lowerHost)))) return null;
+            if (loopbackOnly && (!("http".equalsIgnoreCase(scheme)) || !isLocalHost(lowerHost)))
+                return null;
+            if (!loopbackOnly && "http".equalsIgnoreCase(scheme) && !isLoopbackHost(lowerHost))
+                return null;
 
             String token = null;
             String query = uri.getQuery();
@@ -117,16 +114,32 @@ final class DshRuntimeEndpoint {
         String candidate = value.trim().replaceAll("/+\\z", "");
         try {
             URI uri = URI.create(candidate);
+            String path = uri.getPath();
             if (!("http".equalsIgnoreCase(uri.getScheme())
                             || "https".equalsIgnoreCase(uri.getScheme()))
                     || uri.getUserInfo() != null
                     || uri.getQuery() != null
                     || uri.getFragment() != null
                     || uri.getHost() == null
-                    || uri.getPort() <= 0) return null;
+                    || uri.getPort() <= 0
+                    || (path != null && !path.isEmpty())
+                    || ("http".equalsIgnoreCase(uri.getScheme())
+                            && !isLoopbackHost(uri.getHost().toLowerCase(Locale.ROOT))))
+                return null;
             return candidate;
         } catch (IllegalArgumentException ignored) {
             return null;
         }
+    }
+
+    private static boolean isLoopbackHost(String host) {
+        return "127.0.0.1".equals(host)
+                || "localhost".equals(host)
+                || "[::1]".equals(host)
+                || "::1".equals(host);
+    }
+
+    private static boolean isLocalHost(String host) {
+        return isLoopbackHost(host) || "0.0.0.0".equals(host);
     }
 }

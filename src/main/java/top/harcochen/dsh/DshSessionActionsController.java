@@ -24,6 +24,7 @@ final class DshSessionActionsController {
     private final DshRemoteService remote;
     private final ExecutorService operations;
     private final Supplier<String> sessionId;
+    private final Supplier<DshRemoteState.SessionView> sessionView;
     private final Supplier<JsonArray> sessions;
     private final Consumer<String> selectSession;
     private final Runnable clearSession;
@@ -42,6 +43,7 @@ final class DshSessionActionsController {
             DshRemoteService remote,
             ExecutorService operations,
             Supplier<String> sessionId,
+            Supplier<DshRemoteState.SessionView> sessionView,
             Supplier<JsonArray> sessions,
             Consumer<String> selectSession,
             Runnable clearSession,
@@ -53,6 +55,7 @@ final class DshSessionActionsController {
         this.remote = remote;
         this.operations = operations;
         this.sessionId = sessionId;
+        this.sessionView = sessionView;
         this.sessions = sessions;
         this.selectSession = selectSession;
         this.clearSession = clearSession;
@@ -86,8 +89,10 @@ final class DshSessionActionsController {
         JsonArray options = new JsonArray();
         JsonObject catalog = modelCatalog(session);
         JsonObject current = currentRoute(view, catalog);
-        currentRouteCache = current;
-        currentRouteSession = session;
+        if (view != null) {
+            currentRouteCache = current;
+            currentRouteSession = session;
+        }
         if (current != null && current.has("reasoningEffort")) {
             value.addProperty("current", DshJson.stringOr(current, "reasoningEffort", "default"));
         }
@@ -379,9 +384,7 @@ final class DshSessionActionsController {
         JsonObject current =
                 session.equals(currentRouteSession) && currentRouteCache != null
                         ? currentRouteCache
-                        : catalog.has("default") && catalog.get("default").isJsonObject()
-                                ? catalog.getAsJsonObject("default")
-                                : null;
+                        : currentRoute(sessionView.get(), catalog);
         String provider = current == null ? null : DshJson.string(current, "provider");
         String model = current == null ? null : DshJson.string(current, "model");
         if (provider == null || model == null) {
@@ -404,8 +407,7 @@ final class DshSessionActionsController {
 
     void openReasoningEffort() {
         String session = sessionId.get();
-        DshRemoteState.SessionView view = null;
-        JsonObject value = reasoningEffort(session, view);
+        JsonObject value = reasoningEffort(session, sessionView.get());
         JsonArray options = value.getAsJsonArray("options");
         if (options == null || options.isEmpty()) {
             notifyUser(DshBundle.message("dsh.model.no.reasoning.effort"));

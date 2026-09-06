@@ -128,7 +128,11 @@ public final class DshRemoteMuxClient {
     /** Close the physical socket; every logical stream fails with a carrier error. */
     public void shutdown() {
         closed = true;
-        dispatch.execute(() -> closeSocket("disposed"));
+        dispatch.execute(
+                () -> {
+                    closeSocket("disposed");
+                    http.shutdownNow();
+                });
     }
 
     /**

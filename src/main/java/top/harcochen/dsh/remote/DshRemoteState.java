@@ -853,23 +853,31 @@ public final class DshRemoteState {
         }
 
         void replaceEvents(JsonArray records, long cursor, boolean hasMore) {
-            JsonArray replaced = records.deepCopy();
-            trimHead(replaced);
-            this.events = replaced;
+            this.events = trimHead(records.deepCopy());
             this.cursor = cursor;
             this.hasMore = hasMore;
         }
 
         void appendEvent(JsonObject event) {
-            JsonArray appended = events.deepCopy();
+            int retained = Math.min(events.size(), MAX_FOLLOW_EVENTS - 1);
+            int from = events.size() - retained;
+            JsonArray appended = new JsonArray();
+            for (int index = from; index < events.size(); index++) {
+                appended.add(events.get(index));
+            }
             appended.add(event);
-            trimHead(appended);
             this.events = appended;
             this.cursor = longValue(event.get("seq"), cursor);
         }
 
-        private void trimHead(JsonArray target) {
-            while (target.size() > MAX_FOLLOW_EVENTS) target.remove(0);
+        private JsonArray trimHead(JsonArray target) {
+            if (target.size() <= MAX_FOLLOW_EVENTS) return target;
+            JsonArray trimmed = new JsonArray();
+            int from = target.size() - MAX_FOLLOW_EVENTS;
+            for (int index = from; index < target.size(); index++) {
+                trimmed.add(target.get(index));
+            }
+            return trimmed;
         }
     }
 

@@ -4,7 +4,9 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.intellij.openapi.diagnostic.Logger;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
@@ -43,12 +45,14 @@ final class DshPromptController {
     private final Consumer<String> errorSink;
     private final Set<String> catalogRequests = java.util.concurrent.ConcurrentHashMap.newKeySet();
 
-    /** One unretired submission: requestId kept until the durable echo reconciles it. */
-    private record PendingPrompt(String requestId, String text) {}
+    /** One unretired submission kept so an explicit retry can replay the exact payload. */
+    private record PendingPrompt(
+            String requestId, String displayText, String wireText, JsonArray images, String mode) {}
 
     private final Object pendingLock = new Object();
-    private final java.util.Map<String, PendingPrompt> pendingBySession =
-            new java.util.LinkedHashMap<>();
+    private final Map<String, LinkedHashMap<String, PendingPrompt>> pendingBySession =
+            new LinkedHashMap<>();
+    private static final int MAX_PENDING_PROMPTS_PER_SESSION = 64;
 
     private volatile boolean commandRegistryUnavailable;
     private volatile boolean submitting;
@@ -93,7 +97,7 @@ final class DshPromptController {
         String text = DshJson.stringOr(action, "text", "");
         JsonArray images =
                 action.has("images") && action.get("images").isJsonArray()
-                        ? action.getAsJsonArray("images")
+                        ? action.getAsJsonArray("images").deepCopy()
                         : new JsonArray();
         if (text.isBlank() && images.isEmpty()) {
             return;
@@ -105,7 +109,25 @@ final class DshPromptController {
         String editorContext = ideContext.captureEditorContext();
         List<String> capturedContextIds = ideContext.contextItemIds();
         stateChanged.run();
-        operations.execute(() -> send(text, images, mode, editorContext, capturedContextIds));
+        scheduleSend(text, images, mode, editorContext, capturedContextIds, null);
+    }
+
+    private void scheduleSend(
+            String text,
+            JsonArray images,
+            String mode,
+            String editorContext,
+            List<String> capturedContextIds,
+            String requestIdOverride) {
+        operations.execute(
+                () ->
+                        send(
+                                text,
+                                images,
+                                mode,
+                                editorContext,
+                                capturedContextIds,
+                                requestIdOverride));
     }
 
     private void send(
@@ -113,11 +135,13 @@ final class DshPromptController {
             JsonArray images,
             String mode,
             String editorContext,
-            List<String> capturedContextIds) {
+            List<String> capturedContextIds,
+            String requestIdOverride) {
         try {
             runtime.startAsync().join();
             String current = sessionProvider.ensure();
-            String commandName = images.isEmpty() ? commandName(text) : null;
+            String commandName =
+                    requestIdOverride == null && images.isEmpty() ? commandName(text) : null;
             if (commandName != null) {
                 ensureCommandCatalog(current);
                 if (sessionState.isRegisteredCommand(current, commandName)) {
@@ -127,7 +151,10 @@ final class DshPromptController {
                 }
             }
             String prompt = editorContext.isBlank() ? text : text + "\n\n" + editorContext;
-            String requestId = requestIdFor(current, prompt);
+            String requestId =
+                    requestIdOverride == null
+                            ? requestIdForNewSubmission(current, text, prompt, images, mode)
+                            : requestIdOverride;
             remote.prompt(
                     requestId,
                     current,
@@ -147,21 +174,39 @@ final class DshPromptController {
         }
     }
 
-    /**
-     * Reuse the pending requestId for the same submission text until its durable echo appears; this
-     * makes a timeout recovery or a user retry idempotent at the Runtime.
-     */
-    private String requestIdFor(String session, String text) {
+    /** Every ordinary submission gets a fresh id; only an explicit retry may pass an old id. */
+    private String requestIdForNewSubmission(
+            String session, String displayText, String wireText, JsonArray images, String mode) {
+        String requestId = UUID.randomUUID().toString();
         synchronized (pendingLock) {
-            PendingPrompt pending = pendingBySession.get(session);
-            if (pending != null
-                    && pending.text().equals(text)
-                    && !remote.hasDurableEcho(session, pending.requestId())) {
-                return pending.requestId();
+            LinkedHashMap<String, PendingPrompt> pending =
+                    pendingBySession.computeIfAbsent(session, ignored -> new LinkedHashMap<>());
+            pending.entrySet().removeIf(entry -> remote.hasDurableEcho(session, entry.getKey()));
+            pending.put(
+                    requestId,
+                    new PendingPrompt(requestId, displayText, wireText, images.deepCopy(), mode));
+            while (pending.size() > MAX_PENDING_PROMPTS_PER_SESSION) {
+                pending.remove(pending.keySet().iterator().next());
             }
-            PendingPrompt fresh = new PendingPrompt(UUID.randomUUID().toString(), text);
-            pendingBySession.put(session, fresh);
-            return fresh.requestId();
+        }
+        return requestId;
+    }
+
+    private PendingPrompt pendingForRetry(String session, String requestId) {
+        if (session == null || session.isBlank() || requestId == null || requestId.isBlank()) {
+            return null;
+        }
+        synchronized (pendingLock) {
+            LinkedHashMap<String, PendingPrompt> pending = pendingBySession.get(session);
+            if (pending == null) return null;
+            PendingPrompt candidate = pending.get(requestId);
+            if (candidate == null) return null;
+            if (remote.hasDurableEcho(session, requestId)) {
+                pending.remove(requestId);
+                if (pending.isEmpty()) pendingBySession.remove(session);
+                return null;
+            }
+            return candidate;
         }
     }
 
@@ -316,6 +361,22 @@ final class DshPromptController {
             }
         }
         if (found == null) {
+            return;
+        }
+        String current = sessionId.get();
+        PendingPrompt pending = pendingForRetry(current, DshJson.string(found, "requestId"));
+        if (pending != null) {
+            submitting = true;
+            cancelling = false;
+            errorSink.accept(null);
+            stateChanged.run();
+            scheduleSend(
+                    pending.wireText(),
+                    pending.images().deepCopy(),
+                    pending.mode(),
+                    "",
+                    List.of(),
+                    pending.requestId());
             return;
         }
         JsonObject action = new JsonObject();

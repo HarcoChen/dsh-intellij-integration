@@ -87,6 +87,8 @@ final class DshTraceDialog extends DialogWrapper {
         private final String sessionTitle;
         private final DshRuntimeService runtime;
         private final DshRemoteService remote;
+        private final java.util.function.Consumer<DshRemoteState.Snapshot> remoteListener =
+                this::onSnapshot;
         private final JBCefBrowser browser;
         private final JBCefJSQuery actionQuery;
         private final ExecutorService refresher;
@@ -138,7 +140,7 @@ final class DshTraceDialog extends DialogWrapper {
             browser.getComponent().setPreferredSize(new Dimension(1180, 760));
             browser.loadHTML(html());
             // Follow the session's live history stream instead of polling it.
-            remote.addListener(this::onSnapshot);
+            remote.addListener(remoteListener);
             remote.retainSession(sessionId);
             queueRefresh();
         }
@@ -1008,7 +1010,7 @@ final class DshTraceDialog extends DialogWrapper {
         @Override
         public void dispose() {
             disposed = true;
-            remote.removeListener(this::onSnapshot);
+            remote.removeListener(remoteListener);
             remote.releaseSession(sessionId);
             refresher.shutdownNow();
             Disposer.dispose(actionQuery);

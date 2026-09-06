@@ -17,7 +17,7 @@ import org.jetbrains.annotations.NotNull;
 @State(name = "DshSettings", storages = @Storage(StoragePathMacros.WORKSPACE_FILE))
 public final class DshSettingsState implements PersistentStateComponent<DshSettingsState> {
     public String command = defaultPackageManagerCommand();
-    public String commandArgs = "dlx @deepseek-ai/dsh web --no-open";
+    public String commandArgs = "dlx @deepseek-ai/dsh@0.1.2-rc.1 web --no-open";
     public String serverUrl = "";
     public int serverPort = 0;
     public boolean autoStart = true;

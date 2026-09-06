@@ -184,6 +184,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
                         remote,
                         operations,
                         () -> sessionId,
+                        () -> sessionView(sessionId),
                         this::catalogRows,
                         id -> {
                             sessionId = id;
@@ -429,12 +430,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
         JButton settings = new JButton(DshBundle.message("dsh.fallback.button.settings"));
         settings.addActionListener(event -> DshActions.openSettings(project));
         JButton diagnose = new JButton(DshBundle.message("dsh.fallback.button.diagnose"));
-        diagnose.addActionListener(
-                event ->
-                        DshTextDialog.show(
-                                project,
-                                DshBundle.message("dsh.diagnose.dialog.title"),
-                                runtime.diagnoseEnvironment() + "\n" + remote.diagnostics()));
+        diagnose.addActionListener(event -> showDiagnostics());
         JButton retryJcef = new JButton(DshBundle.message("dsh.fallback.button.retry.jcef"));
         retryJcef.addActionListener(event -> createWebview());
         actions.add(start);
@@ -617,10 +613,20 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
     }
 
     public void showDiagnostics() {
-        DshTextDialog.show(
-                project,
-                "DSH Environment",
-                runtime.diagnoseEnvironment() + "\n" + remote.diagnostics());
+        operations.execute(
+                () -> {
+                    String report = runtime.diagnoseEnvironment() + "\n" + remote.diagnostics();
+                    ApplicationManager.getApplication()
+                            .invokeLater(
+                                    () -> {
+                                        if (!disposed) {
+                                            DshTextDialog.show(
+                                                    project,
+                                                    DshBundle.message("dsh.diagnose.dialog.title"),
+                                                    report);
+                                        }
+                                    });
+                });
     }
 
     // ---------------------------------------------------------------------------

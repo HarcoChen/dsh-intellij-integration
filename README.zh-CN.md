@@ -39,7 +39,7 @@
 
 ### 托管本地 Runtime
 
-默认运行 `pnpm dlx @deepseek-ai/dsh web --no-open`，并支持已安装的 `dsh`、`npx` 回退和 localhost 就绪探测。Tools 菜单提供启动 / 停止 / 重启，`DSH: Open Web UI` 可以在浏览器里打开同一个会话。
+默认运行 `pnpm dlx @deepseek-ai/dsh@0.1.2-rc.1 web --no-open`，并支持已安装的 `dsh`、`npx` 回退和 localhost 就绪探测。Tools 菜单提供启动 / 停止 / 重启，`DSH: Open Web UI` 可以在浏览器里打开同一个会话。
 
 ### 安全的凭据管理
 
@@ -70,7 +70,7 @@ graph TD
 
 | 设置项 | 默认值 | 说明 |
 | --- | --- | --- |
-| 命令 / 参数 | `pnpm dlx @deepseek-ai/dsh web --no-open` | Runtime 的启动方式，也可以指向已安装的 `dsh` 或本地源码目录。 |
+| 命令 / 参数 | `pnpm dlx @deepseek-ai/dsh@0.1.2-rc.1 web --no-open` | Runtime 的启动方式，也可以指向已安装的 `dsh` 或本地源码目录。 |
 | 服务地址 / 端口 | `""` / `0` | 设置后直接连接已运行的 dsh web Runtime，不再本地启动。 |
 | 自动启动 | `true` | 项目打开时自动启动或连接 Runtime。 |
 | Runtime 版本 | `0.1.2-rc.1` | 托管 Remote 协议的锁定版本。 |

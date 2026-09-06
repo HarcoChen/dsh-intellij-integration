@@ -3,7 +3,9 @@ package top.harcochen.dsh.remote;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ExecutorService;
@@ -193,7 +195,6 @@ public final class DshRemoteConnection implements AutoCloseable {
     private void connectNow() {
         if (stopped || !started) return;
         generation = pendingGeneration.incrementAndGet();
-        backoffAttempt = 0;
         opening = new Opening();
         state.beginGeneration(generation, "connecting");
         publish();
@@ -214,13 +215,17 @@ public final class DshRemoteConnection implements AutoCloseable {
             }
         }
         mux.connect((int) generation);
-        timer.schedule(this::openingWatchdog, OPENING_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+        long scheduledGeneration = generation;
+        timer.schedule(
+                () -> openingWatchdog(scheduledGeneration),
+                OPENING_TIMEOUT_MS,
+                TimeUnit.MILLISECONDS);
     }
 
-    private void openingWatchdog() {
+    private void openingWatchdog(long gen) {
         executor.execute(
                 () -> {
-                    if (opening != null) {
+                    if (gen == generation && opening != null) {
                         teardown("Remote opening baseline timed out", true);
                     }
                 });
@@ -287,11 +292,14 @@ public final class DshRemoteConnection implements AutoCloseable {
             return;
         }
         String endpoint = DshRemoteContracts.SESSION_LIST;
+        long requestedGeneration = generation;
         unary.callAsync(endpoint, DshRemoteContracts.argsSessionList())
                 .whenComplete(
                         (value, error) ->
                                 executor.execute(
                                         () -> {
+                                            if (requestedGeneration != generation
+                                                    || opening == null) return;
                                             if (error != null) {
                                                 Throwable cause =
                                                         error.getCause() == null
@@ -317,6 +325,9 @@ public final class DshRemoteConnection implements AutoCloseable {
                         ? value.getAsJsonObject().getAsJsonArray("items")
                         : new JsonArray();
         state.applySessionList(items);
+        for (CatalogEmit emit : opening.catalogEmits) {
+            state.applyCatalogEmit(emit.event(), emit.args());
+        }
         // Rebuild the follows whose reference count is still above zero.
         for (Map.Entry<String, FollowLease> entry : follows.entrySet()) {
             openFollowStream(entry.getKey());
@@ -457,6 +468,13 @@ public final class DshRemoteConnection implements AutoCloseable {
                     () -> {
                         if (gen != generation) return;
                         if (event.startsWith("api-session/")) {
+                            if (opening != null) {
+                                opening.catalogEmits.add(
+                                        new CatalogEmit(
+                                                event,
+                                                args == null ? new JsonArray() : args.deepCopy()));
+                                return;
+                            }
                             if (state.applyCatalogEmit(event, args)) publish();
                             return;
                         }
@@ -673,7 +691,10 @@ public final class DshRemoteConnection implements AutoCloseable {
         boolean controlReady;
         String clientId;
         String hostHome;
+        final List<CatalogEmit> catalogEmits = new ArrayList<>();
     }
+
+    private record CatalogEmit(String event, JsonArray args) {}
 
     private static final class StreamLease {
         final DshRemoteMuxClient.StreamHandle handle;
