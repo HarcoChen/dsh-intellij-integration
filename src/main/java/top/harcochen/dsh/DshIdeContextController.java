@@ -588,6 +588,11 @@ final class DshIdeContextController {
         }
     }
 
+    /** Attach a pre-built one-shot context chip; used by the debug context capture. */
+    void attachCustomItem(JsonObject item) {
+        replaceContextItem(item);
+    }
+
     private void replaceContextItem(JsonObject item) {
         String kind = DshJson.string(item, "kind");
         String path = DshJson.string(item, "path");

@@ -85,6 +85,9 @@
             <add-to-group group-id="EditorTabPopupMenu" anchor="last" />
         </action>
         <action id="Dsh.InsertEditorReference" class="top.harcochen.dsh.action.DshInsertEditorReferenceAction" />
+        <action id="Dsh.ExplainDebugState" class="top.harcochen.dsh.action.DshExplainDebugStateAction">
+            <add-to-group group-id="XDebugger.ToolBar" anchor="last" />
+        </action>
         <action id="Dsh.ExplainDiff" class="top.harcochen.dsh.action.DshGitDiffTaskAction" />
         <action id="Dsh.FixDiff" class="top.harcochen.dsh.action.DshGitDiffTaskAction" />
         <action id="Dsh.ReviewDiff" class="top.harcochen.dsh.action.DshGitDiffTaskAction" />

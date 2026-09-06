@@ -65,6 +65,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
             ignored -> postStateLater();
     private final DshMarkdownRenderCache markdownRenderCache = new DshMarkdownRenderCache();
     private final DshIdeContextController ideContext;
+    private final DshDebugContextController debugContext;
     private final DshCodeActionController codeActions;
     private final DshSubagentController subagents;
     private final DshSessionStateStore sessionState;
@@ -118,6 +119,12 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
                         this::postStateLater,
                         this::notify,
                         this::postToWebview);
+        this.debugContext =
+                new DshDebugContextController(
+                        project,
+                        item -> ideContext.attachCustomItem(item),
+                        this::postToWebview,
+                        this::notify);
         this.codeActions = new DshCodeActionController(project, markdownRenderCache, this::notify);
         this.subagents =
                 new DshSubagentController(
@@ -534,6 +541,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
             case "askAboutResource" ->
                     askAboutResource(string(action, "path"), bool(action, "isDirectory", false));
             case "insertEditorReference" -> ideContext.insertCurrentFileReference();
+            case "explainDebugState" -> debugContext.explainDebugState();
             case "goalCreate", "goalEdit", "goalPause", "goalResume", "goalComplete", "goalClear" ->
                     goals.mutate(sessionId, action);
             case "refreshSubagents" -> subagents.refresh(sessionId);
