@@ -223,7 +223,7 @@ public final class DshRemoteConnection implements AutoCloseable {
     }
 
     private void openingWatchdog(long gen) {
-        executor.execute(
+        execute(
                 () -> {
                     if (gen == generation && opening != null) {
                         teardown("Remote opening baseline timed out", true);
@@ -296,7 +296,7 @@ public final class DshRemoteConnection implements AutoCloseable {
         unary.callAsync(endpoint, DshRemoteContracts.argsSessionList())
                 .whenComplete(
                         (value, error) ->
-                                executor.execute(
+                                execute(
                                         () -> {
                                             if (requestedGeneration != generation
                                                     || opening == null) return;
