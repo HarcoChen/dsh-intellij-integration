@@ -5,6 +5,7 @@ import com.intellij.openapi.options.ConfigurationException;
 import com.intellij.openapi.project.Project;
 import com.intellij.ui.components.JBCheckBox;
 import com.intellij.ui.components.JBLabel;
+import com.intellij.ui.components.JBTextArea;
 import com.intellij.ui.components.JBTextField;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
@@ -31,6 +32,7 @@ public final class DshSettingsConfigurable implements Configurable {
     private JBTextField maxContextBytes;
     private JBTextField npmRegistry;
     private JBTextField apiKeyEnv;
+    private JBTextArea agentStatusLabels;
     private JBCheckBox autoStart;
     private JBCheckBox persistSession;
     private JBCheckBox installWhenMissing;
@@ -67,6 +69,7 @@ public final class DshSettingsConfigurable implements Configurable {
         maxContextBytes = new JBTextField();
         npmRegistry = new JBTextField();
         apiKeyEnv = new JBTextField();
+        agentStatusLabels = new JBTextArea(4, 40);
         autoStart = new JBCheckBox(DshBundle.message("dsh.settings.auto.start.label"));
         persistSession = new JBCheckBox(DshBundle.message("dsh.settings.persist.session.label"));
         installWhenMissing =
@@ -114,6 +117,23 @@ public final class DshSettingsConfigurable implements Configurable {
                 DshBundle.message("dsh.settings.api.key.env.label"),
                 apiKeyEnv,
                 DshBundle.message("dsh.settings.api.key.env.tooltip"));
+        GridBagConstraints labelsConstraints = new GridBagConstraints();
+        labelsConstraints.gridx = 0;
+        labelsConstraints.gridy = GridBagConstraints.RELATIVE;
+        labelsConstraints.anchor = GridBagConstraints.NORTHWEST;
+        labelsConstraints.insets = new Insets(4, 0, 4, 12);
+        panel.add(
+                new JBLabel(DshBundle.message("dsh.settings.agent.status.labels.label") + ":"),
+                labelsConstraints);
+        agentStatusLabels.setToolTipText(
+                DshBundle.message("dsh.settings.agent.status.labels.tooltip"));
+        GridBagConstraints labelsField = new GridBagConstraints();
+        labelsField.gridx = 1;
+        labelsField.gridy = GridBagConstraints.RELATIVE;
+        labelsField.weightx = 1;
+        labelsField.fill = GridBagConstraints.HORIZONTAL;
+        labelsField.insets = new Insets(4, 0, 4, 0);
+        panel.add(agentStatusLabels, labelsField);
         addCheckbox(autoStart);
         addCheckbox(persistSession);
         addCheckbox(installWhenMissing);
@@ -180,6 +200,7 @@ public final class DshSettingsConfigurable implements Configurable {
                         != state.maxContextBytes
                 || !safe(npmRegistry.getText()).equals(safe(state.npmRegistry))
                 || !safe(apiKeyEnv.getText()).equals(safe(state.apiKeyEnv))
+                || !joinedLabels().equals(String.join("\n", state.agentStatusLabels))
                 || autoStart.isSelected() != state.autoStart
                 || persistSession.isSelected() != state.persistSession
                 || installWhenMissing.isSelected() != state.installWhenMissing
@@ -236,6 +257,7 @@ public final class DshSettingsConfigurable implements Configurable {
         state.maxContextBytes = context;
         state.npmRegistry = safe(npmRegistry.getText());
         state.apiKeyEnv = safe(apiKeyEnv.getText());
+        state.agentStatusLabels = parsedLabels();
         state.autoStart = autoStart.isSelected();
         state.persistSession = persistSession.isSelected();
         state.installWhenMissing = installWhenMissing.isSelected();
@@ -257,10 +279,24 @@ public final class DshSettingsConfigurable implements Configurable {
         maxContextBytes.setText(Integer.toString(state.maxContextBytes));
         npmRegistry.setText(state.npmRegistry);
         apiKeyEnv.setText(state.apiKeyEnv);
+        agentStatusLabels.setText(String.join("\n", state.agentStatusLabels));
         autoStart.setSelected(state.autoStart);
         persistSession.setSelected(state.persistSession);
         installWhenMissing.setSelected(state.installWhenMissing);
         enableCompaction.setSelected(state.enableCompaction);
+    }
+
+    private String joinedLabels() {
+        return String.join("\n", parsedLabels());
+    }
+
+    private java.util.List<String> parsedLabels() {
+        java.util.List<String> result = new java.util.ArrayList<>();
+        for (String line : safe(agentStatusLabels.getText()).split("\n", -1)) {
+            String candidate = line.trim();
+            if (!candidate.isEmpty() && candidate.length() <= 256) result.add(candidate);
+        }
+        return result;
     }
 
     private static int parseRequired(String value, String label, int minimum, int maximum)

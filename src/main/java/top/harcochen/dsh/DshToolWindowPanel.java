@@ -1050,14 +1050,35 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
         state.add("subagents", subagents.treeView(sessionId));
         JsonObject subagentPreviewState = subagents.previewView(sessionId);
         if (subagentPreviewState != null) state.add("subagentPreview", subagentPreviewState);
-        if (DshSettingsState.getInstance(project).agentStatusLabel != null
-                && !DshSettingsState.getInstance(project).agentStatusLabel.isBlank()) {
-            state.addProperty(
-                    "agentStatusLabel",
-                    DshSettingsState.getInstance(project).agentStatusLabel.trim());
+        String statusLabel = agentStatusLabelFor(sessionId, running);
+        if (statusLabel != null) {
+            state.addProperty("agentStatusLabel", statusLabel);
         }
         state.add("reasoningEffort", sessionActions.reasoningEffort(sessionId, view));
         return state;
+    }
+
+    /**
+     * Resolve the streaming status label: the fixed override first, then a per-session random pick
+     * from the candidate list while the agent is running, matching dsh-ide's agentStatusLabels.
+     */
+    private String agentStatusLabelFor(String session, boolean busy) {
+        DshSettingsState settings = DshSettingsState.getInstance(project);
+        String fixed = settings.agentStatusLabel;
+        if (fixed != null && !fixed.isBlank()) {
+            return fixed.trim();
+        }
+        java.util.List<String> candidates =
+                settings.agentStatusLabels == null
+                        ? java.util.List.of()
+                        : settings.agentStatusLabels;
+        if (!busy || session == null || session.isBlank() || candidates.isEmpty()) {
+            return null;
+        }
+        StringBuilder key = new StringBuilder();
+        for (String candidate : candidates) key.append(candidate).append('\0');
+        int seed = Math.abs((session + "\0" + key).hashCode());
+        return candidates.get(seed % candidates.size());
     }
 
     private static String statusMessage(

@@ -40,6 +40,18 @@ public final class DshSettingsState implements PersistentStateComponent<DshSetti
     public int maxContextBytes = 120_000;
     public String apiKeyEnv = "DEEPSEEK_API_KEY";
     public String agentStatusLabel = "";
+
+    /** Candidate labels shown while the agent is running; one is picked per session. */
+    public java.util.List<String> agentStatusLabels =
+            new java.util.ArrayList<>(
+                    java.util.List.of(
+                            "大肥鱼正在深潜…",
+                            "大肥鱼摆摆尾巴，想想办法…",
+                            "大肥鱼翻了个身，继续思考…",
+                            "大肥鱼正在吞吐上下文…",
+                            "大肥鱼在鱼缸里转圈…",
+                            "大肥鱼：这题我会…"));
+
     public boolean enableEffortKnob = true;
     public int balanceRefreshIntervalMs = 30_000;
 
@@ -71,6 +83,11 @@ public final class DshSettingsState implements PersistentStateComponent<DshSetti
         maxContextBytes = state.maxContextBytes;
         apiKeyEnv = state.apiKeyEnv;
         agentStatusLabel = state.agentStatusLabel;
+        agentStatusLabels =
+                new java.util.ArrayList<>(
+                        state.agentStatusLabels == null
+                                ? java.util.List.of()
+                                : state.agentStatusLabels);
         enableEffortKnob = state.enableEffortKnob;
         balanceRefreshIntervalMs = state.balanceRefreshIntervalMs;
     }
