@@ -6,7 +6,10 @@ import java.time.ZonedDateTime;
 
 final class DshDeepSeekPricing {
 
-    enum Period { PEAK, OFF_PEAK }
+    enum Period {
+        PEAK,
+        OFF_PEAK
+    }
 
     private static final ZoneOffset BEIJING = ZoneOffset.ofHours(8);
     private static final Instant WEEKEND_OFF_PEAK_EFFECTIVE =

@@ -6,17 +6,16 @@ import com.intellij.openapi.project.Project;
 import com.intellij.ui.components.JBCheckBox;
 import com.intellij.ui.components.JBLabel;
 import com.intellij.ui.components.JBTextField;
-import org.jetbrains.annotations.Nls;
-import org.jetbrains.annotations.Nullable;
-
+import java.awt.GridBagConstraints;
+import java.awt.GridBagLayout;
+import java.awt.Insets;
 import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
 import javax.swing.JComponent;
 import javax.swing.JPanel;
-import java.awt.GridBagConstraints;
-import java.awt.GridBagLayout;
-import java.awt.Insets;
+import org.jetbrains.annotations.Nls;
+import org.jetbrains.annotations.Nullable;
 
 /** Settings page exposed under Settings | Tools | DeepSeek Harness. */
 public final class DshSettingsConfigurable implements Configurable {
@@ -29,7 +28,6 @@ public final class DshSettingsConfigurable implements Configurable {
     private JBTextField runtimeVersion;
     private JBTextField startupTimeout;
     private JBTextField requestTimeout;
-    private JBTextField pollInterval;
     private JBTextField maxContextBytes;
     private JBTextField npmRegistry;
     private JBTextField apiKeyEnv;
@@ -64,24 +62,53 @@ public final class DshSettingsConfigurable implements Configurable {
         runtimeVersion = new JBTextField();
         startupTimeout = new JBTextField();
         requestTimeout = new JBTextField();
-        pollInterval = new JBTextField();
         maxContextBytes = new JBTextField();
         npmRegistry = new JBTextField();
         apiKeyEnv = new JBTextField();
         autoStart = new JBCheckBox(DshBundle.message("dsh.settings.auto.start.label"));
-        installWhenMissing = new JBCheckBox(DshBundle.message("dsh.settings.install.when.missing.label"));
+        installWhenMissing =
+                new JBCheckBox(DshBundle.message("dsh.settings.install.when.missing.label"));
 
-        addRow(DshBundle.message("dsh.settings.command.label"), command, DshBundle.message("dsh.settings.command.tooltip"));
-        addRow(DshBundle.message("dsh.settings.command.args.label"), commandArgs, DshBundle.message("dsh.settings.command.args.tooltip"));
-        addRow(DshBundle.message("dsh.settings.server.url.label"), serverUrl, DshBundle.message("dsh.settings.server.url.tooltip"));
-        addRow(DshBundle.message("dsh.settings.server.port.label"), serverPort, DshBundle.message("dsh.settings.server.port.tooltip"));
-        addRow(DshBundle.message("dsh.settings.runtime.version.label"), runtimeVersion, DshBundle.message("dsh.settings.runtime.version.tooltip"));
-        addRow(DshBundle.message("dsh.settings.startup.timeout.label"), startupTimeout, DshBundle.message("dsh.settings.startup.timeout.tooltip"));
-        addRow(DshBundle.message("dsh.settings.request.timeout.label"), requestTimeout, DshBundle.message("dsh.settings.request.timeout.tooltip"));
-        addRow(DshBundle.message("dsh.settings.poll.interval.label"), pollInterval, DshBundle.message("dsh.settings.poll.interval.tooltip"));
-        addRow(DshBundle.message("dsh.settings.max.context.bytes.label"), maxContextBytes, DshBundle.message("dsh.settings.max.context.bytes.tooltip"));
-        addRow(DshBundle.message("dsh.settings.npm.registry.label"), npmRegistry, DshBundle.message("dsh.settings.npm.registry.tooltip"));
-        addRow(DshBundle.message("dsh.settings.api.key.env.label"), apiKeyEnv, DshBundle.message("dsh.settings.api.key.env.tooltip"));
+        addRow(
+                DshBundle.message("dsh.settings.command.label"),
+                command,
+                DshBundle.message("dsh.settings.command.tooltip"));
+        addRow(
+                DshBundle.message("dsh.settings.command.args.label"),
+                commandArgs,
+                DshBundle.message("dsh.settings.command.args.tooltip"));
+        addRow(
+                DshBundle.message("dsh.settings.server.url.label"),
+                serverUrl,
+                DshBundle.message("dsh.settings.server.url.tooltip"));
+        addRow(
+                DshBundle.message("dsh.settings.server.port.label"),
+                serverPort,
+                DshBundle.message("dsh.settings.server.port.tooltip"));
+        addRow(
+                DshBundle.message("dsh.settings.runtime.version.label"),
+                runtimeVersion,
+                DshBundle.message("dsh.settings.runtime.version.tooltip"));
+        addRow(
+                DshBundle.message("dsh.settings.startup.timeout.label"),
+                startupTimeout,
+                DshBundle.message("dsh.settings.startup.timeout.tooltip"));
+        addRow(
+                DshBundle.message("dsh.settings.request.timeout.label"),
+                requestTimeout,
+                DshBundle.message("dsh.settings.request.timeout.tooltip"));
+        addRow(
+                DshBundle.message("dsh.settings.max.context.bytes.label"),
+                maxContextBytes,
+                DshBundle.message("dsh.settings.max.context.bytes.tooltip"));
+        addRow(
+                DshBundle.message("dsh.settings.npm.registry.label"),
+                npmRegistry,
+                DshBundle.message("dsh.settings.npm.registry.tooltip"));
+        addRow(
+                DshBundle.message("dsh.settings.api.key.env.label"),
+                apiKeyEnv,
+                DshBundle.message("dsh.settings.api.key.env.tooltip"));
         addCheckbox(autoStart);
         addCheckbox(installWhenMissing);
 
@@ -138,10 +165,12 @@ public final class DshSettingsConfigurable implements Configurable {
                 || !safe(serverUrl.getText()).equals(safe(state.serverUrl))
                 || parseOr(serverPort.getText(), 0) != state.serverPort
                 || !safe(runtimeVersion.getText()).equals(safe(state.runtimeVersion))
-                || parseOr(startupTimeout.getText(), state.startupTimeoutMs) != state.startupTimeoutMs
-                || parseOr(requestTimeout.getText(), state.requestTimeoutMs) != state.requestTimeoutMs
-                || parseOr(pollInterval.getText(), state.pollIntervalMs) != state.pollIntervalMs
-                || parseOr(maxContextBytes.getText(), state.maxContextBytes) != state.maxContextBytes
+                || parseOr(startupTimeout.getText(), state.startupTimeoutMs)
+                        != state.startupTimeoutMs
+                || parseOr(requestTimeout.getText(), state.requestTimeoutMs)
+                        != state.requestTimeoutMs
+                || parseOr(maxContextBytes.getText(), state.maxContextBytes)
+                        != state.maxContextBytes
                 || !safe(npmRegistry.getText()).equals(safe(state.npmRegistry))
                 || !safe(apiKeyEnv.getText()).equals(safe(state.apiKeyEnv))
                 || autoStart.isSelected() != state.autoStart
@@ -151,20 +180,42 @@ public final class DshSettingsConfigurable implements Configurable {
     @Override
     public void apply() throws ConfigurationException {
         DshSettingsState state = DshSettingsState.getInstance(project);
-        int port = parseRequired(serverPort.getText(), DshBundle.message("dsh.settings.server.port.label"), 0, 65_535);
+        int port =
+                parseRequired(
+                        serverPort.getText(),
+                        DshBundle.message("dsh.settings.server.port.label"),
+                        0,
+                        65_535);
         String version = safe(runtimeVersion.getText());
         if (version.isBlank() || !version.matches("[A-Za-z0-9.-]+")) {
-            throw new ConfigurationException(DshBundle.message("dsh.settings.error.runtime.version"));
+            throw new ConfigurationException(
+                    DshBundle.message("dsh.settings.error.runtime.version"));
         }
-        int startup = parseRequired(startupTimeout.getText(), DshBundle.message("dsh.settings.startup.timeout.label"), 1_000, 600_000);
-        int request = parseRequired(requestTimeout.getText(), DshBundle.message("dsh.settings.request.timeout.label"), 10_000, 3_600_000);
-        int poll = parseRequired(pollInterval.getText(), DshBundle.message("dsh.settings.poll.interval.label"), 100, 60_000);
-        int context = parseRequired(maxContextBytes.getText(), DshBundle.message("dsh.settings.max.context.bytes.label"), 1_000, 1_000_000);
+        int startup =
+                parseRequired(
+                        startupTimeout.getText(),
+                        DshBundle.message("dsh.settings.startup.timeout.label"),
+                        1_000,
+                        600_000);
+        int request =
+                parseRequired(
+                        requestTimeout.getText(),
+                        DshBundle.message("dsh.settings.request.timeout.label"),
+                        10_000,
+                        3_600_000);
+        int context =
+                parseRequired(
+                        maxContextBytes.getText(),
+                        DshBundle.message("dsh.settings.max.context.bytes.label"),
+                        1_000,
+                        1_000_000);
         if (safe(command.getText()).isBlank()) {
             throw new ConfigurationException(DshBundle.message("dsh.settings.error.command.empty"));
         }
-        if (!safe(apiKeyEnv.getText()).isBlank() && !safe(apiKeyEnv.getText()).matches("[A-Za-z_][A-Za-z0-9_]*")) {
-            throw new ConfigurationException(DshBundle.message("dsh.settings.error.api.key.env.invalid"));
+        if (!safe(apiKeyEnv.getText()).isBlank()
+                && !safe(apiKeyEnv.getText()).matches("[A-Za-z_][A-Za-z0-9_]*")) {
+            throw new ConfigurationException(
+                    DshBundle.message("dsh.settings.error.api.key.env.invalid"));
         }
         state.command = safe(command.getText());
         state.commandArgs = safe(commandArgs.getText());
@@ -173,7 +224,6 @@ public final class DshSettingsConfigurable implements Configurable {
         state.runtimeVersion = version;
         state.startupTimeoutMs = startup;
         state.requestTimeoutMs = request;
-        state.pollIntervalMs = poll;
         state.maxContextBytes = context;
         state.npmRegistry = safe(npmRegistry.getText());
         state.apiKeyEnv = safe(apiKeyEnv.getText());
@@ -193,7 +243,6 @@ public final class DshSettingsConfigurable implements Configurable {
         runtimeVersion.setText(safe(state.runtimeVersion));
         startupTimeout.setText(Integer.toString(state.startupTimeoutMs));
         requestTimeout.setText(Integer.toString(state.requestTimeoutMs));
-        pollInterval.setText(Integer.toString(state.pollIntervalMs));
         maxContextBytes.setText(Integer.toString(state.maxContextBytes));
         npmRegistry.setText(state.npmRegistry);
         apiKeyEnv.setText(state.apiKeyEnv);
@@ -208,7 +257,8 @@ public final class DshSettingsConfigurable implements Configurable {
             if (parsed < minimum || parsed > maximum) throw new NumberFormatException();
             return parsed;
         } catch (NumberFormatException error) {
-            throw new ConfigurationException(DshBundle.message("dsh.settings.error.range", label, minimum, maximum));
+            throw new ConfigurationException(
+                    DshBundle.message("dsh.settings.error.range", label, minimum, maximum));
         }
     }
 

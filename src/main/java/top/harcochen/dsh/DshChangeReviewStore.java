@@ -4,7 +4,6 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.intellij.openapi.diagnostic.Logger;
-
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -29,12 +28,11 @@ import java.util.regex.Pattern;
 /**
  * Git-backed before/after snapshots of every file a turn changed.
  *
- * Unlike {@link DshToolDiff}, which rebuilds one call's diff from the hunks the
- * Runtime recorded, this store answers the coarser question — what did the whole
- * turn do to the working tree — and it answers it with Git itself. The capture
- * writes trees through a private index and object directory, so it never
- * touches the user's index, stash, HEAD, or reflog; the repository is only ever
- * read from, through {@code GIT_ALTERNATE_OBJECT_DIRECTORIES}.
+ * <p>Unlike {@link DshToolDiff}, which rebuilds one call's diff from the hunks the Runtime
+ * recorded, this store answers the coarser question — what did the whole turn do to the working
+ * tree — and it answers it with Git itself. The capture writes trees through a private index and
+ * object directory, so it never touches the user's index, stash, HEAD, or reflog; the repository is
+ * only ever read from, through {@code GIT_ALTERNATE_OBJECT_DIRECTORIES}.
  */
 final class DshChangeReviewStore {
     private static final Logger LOG = Logger.getInstance(DshChangeReviewStore.class);
@@ -66,6 +64,7 @@ final class DshChangeReviewStore {
         private String oldMode;
         private String newMode;
         private boolean restorable;
+
         /** Content hash sampled at capture; a later mismatch means the user edited the file. */
         private String newWorkingHash;
     }
@@ -89,11 +88,12 @@ final class DshChangeReviewStore {
         private final String cwd;
         private final Set<String> seen = new LinkedHashSet<>();
         private final Map<Integer, ChangeReview> reviews = new LinkedHashMap<>();
+
         /**
-         * Whether the first history page has been folded. Its turns are replay,
-         * not live: their before-trees are long gone, so capturing against
-         * today's working tree would invent an empty or bogus review. Only
-         * events that appear after this baseline are real turn boundaries.
+         * Whether the first history page has been folded. Its turns are replay, not live: their
+         * before-trees are long gone, so capturing against today's working tree would invent an
+         * empty or bogus review. Only events that appear after this baseline are real turn
+         * boundaries.
          */
         private boolean baselined;
 
@@ -114,9 +114,9 @@ final class DshChangeReviewStore {
     }
 
     /**
-     * Fold one history page: a {@code turn/start} opens a capture and a
-     * {@code turn/end} closes it. Each event is acted on once, keyed by seq, so
-     * a repeated poll of the same page cannot re-snapshot a settled turn.
+     * Fold one history page: a {@code turn/start} opens a capture and a {@code turn/end} closes it.
+     * Each event is acted on once, keyed by seq, so a repeated poll of the same page cannot
+     * re-snapshot a settled turn.
      */
     void observe(String sessionId, String cwd, JsonObject history) {
         if (disposed || sessionId == null || cwd == null || cwd.isBlank()) return;
@@ -126,8 +126,10 @@ final class DshChangeReviewStore {
             // A session that moved to another directory is not this store's.
             if (!session.cwd.equals(cwd)) return;
         }
-        JsonArray events = history != null && history.has("events") && history.get("events").isJsonArray()
-                ? history.getAsJsonArray("events") : new JsonArray();
+        JsonArray events =
+                history != null && history.has("events") && history.get("events").isJsonArray()
+                        ? history.getAsJsonArray("events")
+                        : new JsonArray();
         boolean wasBaselined;
         synchronized (this) {
             wasBaselined = session.baselined;
@@ -135,12 +137,16 @@ final class DshChangeReviewStore {
         for (JsonElement candidate : events) {
             if (!candidate.isJsonObject()) continue;
             JsonObject entry = candidate.getAsJsonObject();
-            JsonObject event = entry.has("event") && entry.get("event").isJsonObject()
-                    ? entry.getAsJsonObject("event") : entry;
+            JsonObject event =
+                    entry.has("event") && entry.get("event").isJsonObject()
+                            ? entry.getAsJsonObject("event")
+                            : entry;
             String type = string(event, "type");
             if (!"turn/start".equals(type) && !"turn/end".equals(type)) continue;
-            JsonObject data = event.has("data") && event.get("data").isJsonObject()
-                    ? event.getAsJsonObject("data") : new JsonObject();
+            JsonObject data =
+                    event.has("data") && event.get("data").isJsonObject()
+                            ? event.getAsJsonObject("data")
+                            : new JsonObject();
             int turn = integer(data, "turn");
             long seq = number(event, "seq");
             if (turn <= 0 || seq < 0) continue;
@@ -153,14 +159,15 @@ final class DshChangeReviewStore {
                 if (start) session.reviews.put(turn, new ChangeReview(turn));
             }
             onUpdate.run();
-            operations.execute(() -> {
-                try {
-                    if (start) captureBefore(sessionId, turn);
-                    else captureAfter(sessionId, turn);
-                } catch (Exception error) {
-                    failReview(sessionId, turn, error);
-                }
-            });
+            operations.execute(
+                    () -> {
+                        try {
+                            if (start) captureBefore(sessionId, turn);
+                            else captureAfter(sessionId, turn);
+                        } catch (Exception error) {
+                            failReview(sessionId, turn, error);
+                        }
+                    });
         }
         if (!wasBaselined) {
             synchronized (this) {
@@ -198,13 +205,18 @@ final class DshChangeReviewStore {
         return result;
     }
 
-    /** Both sides of one changed file, as text, or null when it is binary. */
-    record FileSides(String beforeText, String afterText, String title, boolean binary) {
-    }
+    /**
+     * Both sides of one changed file, as text, or null when it is binary.
+     *
+     * <p>{@code title} is localized display text and is not a path; {@code path} is the repository
+     * path the change lands on, which is what file-type detection needs.
+     */
+    record FileSides(
+            String beforeText, String afterText, String title, String path, boolean binary) {}
 
     /**
-     * Read both blobs of one changed file. A NUL byte on either side means the
-     * change is binary, which no text diff can honestly display.
+     * Read both blobs of one changed file. A NUL byte on either side means the change is binary,
+     * which no text diff can honestly display.
      */
     FileSides sides(String sessionId, int turn, String fileId) throws Exception {
         ChangeReview review;
@@ -218,24 +230,41 @@ final class DshChangeReviewStore {
                 }
             }
             if (file == null || review.git == null || !"ready".equals(review.state)) {
-                throw new IllegalStateException(DshBundle.message("dsh.change.review.change.unavailable"));
+                throw new IllegalStateException(
+                        DshBundle.message("dsh.change.review.change.unavailable"));
             }
         }
         byte[] before = readBlob(review.git, file.oldBlob);
         byte[] after = readBlob(review.git, file.newBlob);
-        String title = "renamed".equals(file.status)
-                ? DshBundle.message("dsh.change.review.turn.prefix", turn) + " " + file.oldPath + " → " + file.path
-                : DshBundle.message("dsh.change.review.turn.prefix", turn) + " " + file.path;
-        if (hasNul(before) || hasNul(after)) return new FileSides(null, null, title, true);
-        return new FileSides(new String(before, StandardCharsets.UTF_8),
-                new String(after, StandardCharsets.UTF_8), title, false);
+        String title =
+                "renamed".equals(file.status)
+                        ? DshBundle.message("dsh.change.review.turn.prefix", turn)
+                                + " "
+                                + file.oldPath
+                                + " → "
+                                + file.path
+                        : DshBundle.message("dsh.change.review.turn.prefix", turn)
+                                + " "
+                                + file.path;
+        if (hasNul(before) || hasNul(after)) {
+            return new FileSides(null, null, title, file.path, true);
+        }
+        return new FileSides(
+                new String(before, StandardCharsets.UTF_8),
+                new String(after, StandardCharsets.UTF_8),
+                title,
+                file.path,
+                false);
     }
 
     /** Whether a turn is in a state where restore is even offered. */
     synchronized boolean isRestorable(String sessionId, int turn) {
         SessionReviews session = sessionId == null ? null : sessions.get(sessionId);
         ChangeReview review = session == null ? null : session.reviews.get(turn);
-        if (review == null || !"ready".equals(review.state) || review.restored || review.files.isEmpty()) return false;
+        if (review == null
+                || !"ready".equals(review.state)
+                || review.restored
+                || review.files.isEmpty()) return false;
         for (ChangeFile file : review.files) {
             if (!file.restorable) return false;
         }
@@ -252,15 +281,17 @@ final class DshChangeReviewStore {
     /**
      * Put every file this turn changed back to its before-image.
      *
-     * The working tree is checked for drift twice — once before the blobs are
-     * read and again immediately before anything is written — so a file edited
-     * while the confirmation dialog was open is never silently overwritten.
+     * <p>The working tree is checked for drift twice — once before the blobs are read and again
+     * immediately before anything is written — so a file edited while the confirmation dialog was
+     * open is never silently overwritten.
      */
     void restore(String sessionId, int turn) throws Exception {
         ChangeReview review;
         synchronized (this) {
             review = review(sessionId, turn);
-            if (!isRestorable(sessionId, turn)) throw new IllegalStateException(DshBundle.message("dsh.change.review.cannot.restore"));
+            if (!isRestorable(sessionId, turn))
+                throw new IllegalStateException(
+                        DshBundle.message("dsh.change.review.cannot.restore"));
         }
         List<String> conflicts = conflicts(review);
         if (!conflicts.isEmpty()) throw new IllegalStateException(conflictMessage(conflicts));
@@ -294,7 +325,8 @@ final class DshChangeReviewStore {
                 Map.Entry<String, SessionReviews> entry = iterator.next();
                 if (live.contains(entry.getKey())) continue;
                 for (ChangeReview review : entry.getValue().reviews.values()) {
-                    if (review.git != null && tempRoots.remove(review.git.tempRoot)) orphaned.add(review.git.tempRoot);
+                    if (review.git != null && tempRoots.remove(review.git.tempRoot))
+                        orphaned.add(review.git.tempRoot);
                 }
                 iterator.remove();
             }
@@ -332,12 +364,25 @@ final class DshChangeReviewStore {
         synchronized (this) {
             SessionReviews session = sessions.get(sessionId);
             review = session == null ? null : session.reviews.get(turn);
-            if (review == null || !"capturing".equals(review.state) || review.git == null
+            if (review == null
+                    || !"capturing".equals(review.state)
+                    || review.git == null
                     || review.beforeTree == null) return;
         }
         String afterTree = captureTree(review.git);
-        byte[] raw = runGit(review.git, List.of(
-                "diff", "--raw", "-z", "-M", "--no-abbrev", review.beforeTree, afterTree, "--", "."));
+        byte[] raw =
+                runGit(
+                        review.git,
+                        List.of(
+                                "diff",
+                                "--raw",
+                                "-z",
+                                "-M",
+                                "--no-abbrev",
+                                review.beforeTree,
+                                afterTree,
+                                "--",
+                                "."));
         List<ChangeFile> files = parseRawDiff(raw);
         synchronized (this) {
             review.afterTree = afterTree;
@@ -351,8 +396,8 @@ final class DshChangeReviewStore {
     }
 
     /**
-     * Parse {@code git diff --raw -z -M}. The NUL-separated stream carries one
-     * header per change, followed by one path — or two for a rename.
+     * Parse {@code git diff --raw -z -M}. The NUL-separated stream carries one header per change,
+     * followed by one path — or two for a rename.
      */
     private static List<ChangeFile> parseRawDiff(byte[] output) {
         String[] fields = new String(output, StandardCharsets.UTF_8).split("\0", -1);
@@ -362,29 +407,38 @@ final class DshChangeReviewStore {
             String header = fields[index++];
             if (header == null || header.isEmpty()) continue;
             Matcher match = RAW_HEADER.matcher(header);
-            if (!match.matches()) throw new IllegalStateException(DshBundle.message("dsh.change.review.unsupported.record"));
+            if (!match.matches())
+                throw new IllegalStateException(
+                        DshBundle.message("dsh.change.review.unsupported.record"));
             String oldMode = match.group(1);
             String newMode = match.group(2);
             String oldBlob = match.group(3);
             String newBlob = match.group(4);
             String kind = match.group(5);
-            if (index >= fields.length) throw new IllegalStateException(DshBundle.message("dsh.change.review.no.path"));
+            if (index >= fields.length)
+                throw new IllegalStateException(DshBundle.message("dsh.change.review.no.path"));
             String firstPath = fields[index++];
-            if (firstPath.isEmpty()) throw new IllegalStateException(DshBundle.message("dsh.change.review.no.path"));
+            if (firstPath.isEmpty())
+                throw new IllegalStateException(DshBundle.message("dsh.change.review.no.path"));
             String secondPath = null;
             if ("R".equals(kind)) {
                 if (index >= fields.length || fields[index].isEmpty()) {
-                    throw new IllegalStateException(DshBundle.message("dsh.change.review.invalid.rename"));
+                    throw new IllegalStateException(
+                            DshBundle.message("dsh.change.review.invalid.rename"));
                 }
                 secondPath = fields[index++];
             }
-            String status = switch (kind) {
-                case "A" -> "added";
-                case "M", "T" -> "modified";
-                case "D" -> "deleted";
-                case "R" -> "renamed";
-                default -> throw new IllegalStateException(DshBundle.message("dsh.change.review.unsupported.type", kind));
-            };
+            String status =
+                    switch (kind) {
+                        case "A" -> "added";
+                        case "M", "T" -> "modified";
+                        case "D" -> "deleted";
+                        case "R" -> "renamed";
+                        default ->
+                                throw new IllegalStateException(
+                                        DshBundle.message(
+                                                "dsh.change.review.unsupported.type", kind));
+                    };
             ChangeFile file = new ChangeFile();
             file.status = status;
             file.path = secondPath == null ? firstPath : secondPath;
@@ -395,17 +449,18 @@ final class DshChangeReviewStore {
             file.newMode = newMode;
             // A symlink or gitlink on either side cannot be restored by writing
             // a regular file, so it is shown but never offered for restore.
-            file.restorable = (isNullBlob(oldBlob) || REGULAR_MODES.contains(oldMode))
-                    && (isNullBlob(newBlob) || REGULAR_MODES.contains(newMode));
+            file.restorable =
+                    (isNullBlob(oldBlob) || REGULAR_MODES.contains(oldMode))
+                            && (isNullBlob(newBlob) || REGULAR_MODES.contains(newMode));
             files.add(file);
         }
         return files;
     }
 
     /**
-     * Snapshot the working tree as a Git tree object. The private index means
-     * {@code add -A} never touches the user's staged state, and a repository
-     * without a HEAD (a fresh {@code git init}) starts from the empty tree.
+     * Snapshot the working tree as a Git tree object. The private index means {@code add -A} never
+     * touches the user's staged state, and a repository without a HEAD (a fresh {@code git init})
+     * starts from the empty tree.
      */
     private String captureTree(GitContext git) throws Exception {
         try {
@@ -423,10 +478,22 @@ final class DshChangeReviewStore {
         String root;
         String objectPath;
         try {
-            root = new String(runGitIn(realCwd, Map.of(), List.of("rev-parse", "--show-toplevel")),
-                    StandardCharsets.UTF_8).trim();
-            objectPath = new String(runGitIn(realCwd, Map.of(), List.of("rev-parse", "--git-path", "objects")),
-                    StandardCharsets.UTF_8).trim();
+            root =
+                    new String(
+                                    runGitIn(
+                                            realCwd,
+                                            Map.of(),
+                                            List.of("rev-parse", "--show-toplevel")),
+                                    StandardCharsets.UTF_8)
+                            .trim();
+            objectPath =
+                    new String(
+                                    runGitIn(
+                                            realCwd,
+                                            Map.of(),
+                                            List.of("rev-parse", "--git-path", "objects")),
+                                    StandardCharsets.UTF_8)
+                            .trim();
         } catch (Exception notARepository) {
             return null;
         }
@@ -434,7 +501,8 @@ final class DshChangeReviewStore {
         synchronized (this) {
             if (disposed) {
                 deleteRecursively(tempRoot);
-                throw new IllegalStateException(DshBundle.message("dsh.change.review.review.unavailable"));
+                throw new IllegalStateException(
+                        DshBundle.message("dsh.change.review.review.unavailable"));
             }
             tempRoots.add(tempRoot);
         }
@@ -463,7 +531,9 @@ final class DshChangeReviewStore {
     private ChangeReview review(String sessionId, int turn) {
         SessionReviews session = sessionId == null ? null : sessions.get(sessionId);
         ChangeReview review = session == null ? null : session.reviews.get(turn);
-        if (review == null) throw new IllegalStateException(DshBundle.message("dsh.change.review.review.unavailable"));
+        if (review == null)
+            throw new IllegalStateException(
+                    DshBundle.message("dsh.change.review.review.unavailable"));
         return review;
     }
 
@@ -473,38 +543,45 @@ final class DshChangeReviewStore {
         }
         Path candidate = review.git.cwd.resolve(relativePath).normalize();
         if (!candidate.startsWith(review.git.cwd)) {
-            throw new IllegalStateException(DshBundle.message("dsh.change.review.outside.workspace"));
+            throw new IllegalStateException(
+                    DshBundle.message("dsh.change.review.outside.workspace"));
         }
         return candidate;
     }
 
     /**
-     * Refuse to follow a symlinked or non-directory parent. Restore writes
-     * files, and a swapped parent directory would redirect that write outside
-     * the workspace even though the resolved path looked contained.
+     * Refuse to follow a symlinked or non-directory parent. Restore writes files, and a swapped
+     * parent directory would redirect that write outside the workspace even though the resolved
+     * path looked contained.
      */
     private void assertSafeParents(ChangeReview review, String relativePath) throws IOException {
         Path target = resolvePath(review, relativePath);
         Path current = target.getParent();
         while (current != null && !current.equals(review.git.cwd)) {
             if (Files.exists(current, LinkOption.NOFOLLOW_LINKS)) {
-                if (Files.isSymbolicLink(current) || !Files.isDirectory(current, LinkOption.NOFOLLOW_LINKS)) {
-                    throw new IllegalStateException(DshBundle.message("dsh.change.review.not.real.directory", relativePath));
+                if (Files.isSymbolicLink(current)
+                        || !Files.isDirectory(current, LinkOption.NOFOLLOW_LINKS)) {
+                    throw new IllegalStateException(
+                            DshBundle.message(
+                                    "dsh.change.review.not.real.directory", relativePath));
                 }
             }
             current = current.getParent();
         }
     }
 
-    private boolean matchesFile(ChangeReview review, String relativePath, String blob, String mode) throws Exception {
+    private boolean matchesFile(ChangeReview review, String relativePath, String blob, String mode)
+            throws Exception {
         assertSafeParents(review, relativePath);
         Path target = resolvePath(review, relativePath);
         if (!Files.exists(target, LinkOption.NOFOLLOW_LINKS)) return false;
-        if (Files.isSymbolicLink(target) || !Files.isRegularFile(target, LinkOption.NOFOLLOW_LINKS)) return false;
+        if (Files.isSymbolicLink(target) || !Files.isRegularFile(target, LinkOption.NOFOLLOW_LINKS))
+            return false;
         if (isExecutableMode(mode) != isExecutable(target)) return false;
         String expected = null;
         for (ChangeFile file : review.files) {
-            if (file.path.equals(relativePath) && file.newBlob.equals(blob)) expected = file.newWorkingHash;
+            if (file.path.equals(relativePath) && file.newBlob.equals(blob))
+                expected = file.newWorkingHash;
         }
         return expected != null && expected.equals(workingHash(Files.readAllBytes(target)));
     }
@@ -521,37 +598,52 @@ final class DshChangeReviewStore {
             if ("deleted".equals(file.status)) {
                 valid = isAbsent(review, file.path);
             } else if ("renamed".equals(file.status)) {
-                valid = file.oldPath != null && isAbsent(review, file.oldPath)
-                        && matchesFile(review, file.path, file.newBlob, file.newMode);
+                valid =
+                        file.oldPath != null
+                                && isAbsent(review, file.oldPath)
+                                && matchesFile(review, file.path, file.newBlob, file.newMode);
             } else {
                 valid = matchesFile(review, file.path, file.newBlob, file.newMode);
             }
             if (!valid) {
-                conflicts.add("renamed".equals(file.status) && file.oldPath != null
-                        ? file.oldPath + " → " + file.path : file.path);
+                conflicts.add(
+                        "renamed".equals(file.status) && file.oldPath != null
+                                ? file.oldPath + " → " + file.path
+                                : file.path);
             }
         }
         return conflicts;
     }
 
     /**
-     * Sample each changed file at capture time. A blob that no longer matches
-     * means the workspace moved under the capture, which invalidates the whole
-     * review rather than half of it.
+     * Sample each changed file at capture time. A blob that no longer matches means the workspace
+     * moved under the capture, which invalidates the whole review rather than half of it.
      */
     private void captureWorkingHashes(ChangeReview review) throws Exception {
-        if (review.git == null) throw new IllegalStateException(DshBundle.message("dsh.change.review.review.unavailable"));
+        if (review.git == null)
+            throw new IllegalStateException(
+                    DshBundle.message("dsh.change.review.review.unavailable"));
         for (ChangeFile file : review.files) {
             if (isNullBlob(file.newBlob) || !REGULAR_MODES.contains(file.newMode)) continue;
             assertSafeParents(review, file.path);
             Path target = resolvePath(review, file.path);
-            if (!Files.isRegularFile(target, LinkOption.NOFOLLOW_LINKS) || Files.isSymbolicLink(target)) {
+            if (!Files.isRegularFile(target, LinkOption.NOFOLLOW_LINKS)
+                    || Files.isSymbolicLink(target)) {
                 throw new IllegalStateException(
                         DshBundle.message("dsh.change.review.not.regular.file", file.path));
             }
             byte[] content = Files.readAllBytes(target);
-            String currentBlob = new String(runGit(review.git,
-                    List.of("hash-object", "--path=" + file.path, "--", file.path)), StandardCharsets.UTF_8).trim();
+            String currentBlob =
+                    new String(
+                                    runGit(
+                                            review.git,
+                                            List.of(
+                                                    "hash-object",
+                                                    "--path=" + file.path,
+                                                    "--",
+                                                    file.path)),
+                                    StandardCharsets.UTF_8)
+                            .trim();
             if (!currentBlob.equals(file.newBlob)) {
                 throw new IllegalStateException(
                         DshBundle.message("dsh.change.review.workspace.changed", review.turn));
@@ -562,9 +654,17 @@ final class DshChangeReviewStore {
 
     private static String conflictMessage(List<String> conflicts) {
         List<String> shown = conflicts.subList(0, Math.min(5, conflicts.size()));
-        String remaining = conflicts.size() > 5 ? " " + DshBundle.message("dsh.change.review.restore.conflict.more", conflicts.size() - 5) : "";
+        String remaining =
+                conflicts.size() > 5
+                        ? " "
+                                + DshBundle.message(
+                                        "dsh.change.review.restore.conflict.more",
+                                        conflicts.size() - 5)
+                        : "";
         return DshBundle.message("dsh.change.review.restore.conflict")
-                + " " + String.join(", ", shown) + remaining;
+                + " "
+                + String.join(", ", shown)
+                + remaining;
     }
 
     private Map<String, byte[]> prepareRestore(ChangeReview review) throws Exception {
@@ -573,9 +673,15 @@ final class DshChangeReviewStore {
             if ("added".equals(file.status)) continue;
             // --filters replays the repository's clean/smudge rules, so the
             // restored bytes match what a checkout of that blob would produce.
-            contents.put(file.id, runGit(review.git, List.of(
-                    "cat-file", "--filters", "--path=" + (file.oldPath == null ? file.path : file.oldPath),
-                    file.oldBlob)));
+            contents.put(
+                    file.id,
+                    runGit(
+                            review.git,
+                            List.of(
+                                    "cat-file",
+                                    "--filters",
+                                    "--path=" + (file.oldPath == null ? file.path : file.oldPath),
+                                    file.oldBlob)));
         }
         return contents;
     }
@@ -597,9 +703,12 @@ final class DshChangeReviewStore {
         }
     }
 
-    private void writeOldFile(ChangeReview review, String relativePath, ChangeFile file, byte[] content)
+    private void writeOldFile(
+            ChangeReview review, String relativePath, ChangeFile file, byte[] content)
             throws Exception {
-        if (content == null) throw new IllegalStateException(DshBundle.message("dsh.change.review.restore.unavailable"));
+        if (content == null)
+            throw new IllegalStateException(
+                    DshBundle.message("dsh.change.review.restore.unavailable"));
         assertSafeParents(review, relativePath);
         Path target = resolvePath(review, relativePath);
         Files.createDirectories(target.getParent());
@@ -609,9 +718,12 @@ final class DshChangeReviewStore {
 
     private static void applyMode(Path target, String mode) {
         try {
-            Set<PosixFilePermission> permissions = new LinkedHashSet<>(Set.of(
-                    PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE,
-                    PosixFilePermission.GROUP_READ, PosixFilePermission.OTHERS_READ));
+            Set<PosixFilePermission> permissions =
+                    new LinkedHashSet<>(
+                            Set.of(
+                                    PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE,
+                                    PosixFilePermission.GROUP_READ,
+                                            PosixFilePermission.OTHERS_READ));
             if (isExecutableMode(mode)) {
                 permissions.add(PosixFilePermission.OWNER_EXECUTE);
                 permissions.add(PosixFilePermission.GROUP_EXECUTE);
@@ -629,7 +741,8 @@ final class DshChangeReviewStore {
 
     private static boolean isExecutable(Path target) {
         try {
-            return Files.getPosixFilePermissions(target).contains(PosixFilePermission.OWNER_EXECUTE);
+            return Files.getPosixFilePermissions(target)
+                    .contains(PosixFilePermission.OWNER_EXECUTE);
         } catch (UnsupportedOperationException | IOException ignored) {
             return false;
         }
@@ -662,7 +775,8 @@ final class DshChangeReviewStore {
         return runGitIn(git.cwd, git.env, args);
     }
 
-    private static byte[] runGitIn(Path cwd, Map<String, String> env, List<String> args) throws Exception {
+    private static byte[] runGitIn(Path cwd, Map<String, String> env, List<String> args)
+            throws Exception {
         List<String> command = new ArrayList<>();
         command.add("git");
         command.addAll(args);
@@ -673,7 +787,8 @@ final class DshChangeReviewStore {
         Process process = builder.start();
         byte[] stdout;
         String stderr;
-        try (InputStream out = process.getInputStream(); InputStream err = process.getErrorStream()) {
+        try (InputStream out = process.getInputStream();
+                InputStream err = process.getErrorStream()) {
             stdout = readAll(out, 32 * 1024 * 1024);
             stderr = new String(readAll(err, 1024 * 1024), StandardCharsets.UTF_8);
         }
@@ -682,8 +797,13 @@ final class DshChangeReviewStore {
             throw new IllegalStateException("git " + args.get(0) + " timed out");
         }
         if (process.exitValue() != 0) {
-            throw new IllegalStateException("git " + args.get(0) + " failed: "
-                    + (stderr.isBlank() ? "exit code " + process.exitValue() : stderr.trim()));
+            throw new IllegalStateException(
+                    "git "
+                            + args.get(0)
+                            + " failed: "
+                            + (stderr.isBlank()
+                                    ? "exit code " + process.exitValue()
+                                    : stderr.trim()));
         }
         return stdout;
     }
@@ -693,7 +813,8 @@ final class DshChangeReviewStore {
         byte[] chunk = new byte[8192];
         int read;
         while ((read = stream.read(chunk)) >= 0) {
-            if (buffer.size() + read > limit) throw new IOException("git produced more output than DSH can buffer");
+            if (buffer.size() + read > limit)
+                throw new IOException("git produced more output than DSH can buffer");
             buffer.write(chunk, 0, read);
         }
         return buffer.toByteArray();
@@ -701,13 +822,15 @@ final class DshChangeReviewStore {
 
     private void deleteRecursively(Path root) {
         try (var paths = Files.walk(root)) {
-            paths.sorted(java.util.Comparator.reverseOrder()).forEach(path -> {
-                try {
-                    Files.deleteIfExists(path);
-                } catch (IOException ignored) {
-                    // Best effort: a leftover temp directory is harmless.
-                }
-            });
+            paths.sorted(java.util.Comparator.reverseOrder())
+                    .forEach(
+                            path -> {
+                                try {
+                                    Files.deleteIfExists(path);
+                                } catch (IOException ignored) {
+                                    // Best effort: a leftover temp directory is harmless.
+                                }
+                            });
         } catch (IOException error) {
             LOG.debug("DSH change review cleanup failed", error);
         }
@@ -715,13 +838,18 @@ final class DshChangeReviewStore {
 
     private static String string(JsonObject object, String key) {
         return object != null && object.has(key) && object.get(key).isJsonPrimitive()
-                ? object.get(key).getAsString() : null;
+                ? object.get(key).getAsString()
+                : null;
     }
 
     private static int integer(JsonObject object, String key) {
         try {
-            return object != null && object.has(key) && object.get(key).isJsonPrimitive()
-                    && object.get(key).getAsJsonPrimitive().isNumber() ? object.get(key).getAsInt() : 0;
+            return object != null
+                            && object.has(key)
+                            && object.get(key).isJsonPrimitive()
+                            && object.get(key).getAsJsonPrimitive().isNumber()
+                    ? object.get(key).getAsInt()
+                    : 0;
         } catch (RuntimeException ignored) {
             return 0;
         }
@@ -729,8 +857,12 @@ final class DshChangeReviewStore {
 
     private static long number(JsonObject object, String key) {
         try {
-            return object != null && object.has(key) && object.get(key).isJsonPrimitive()
-                    && object.get(key).getAsJsonPrimitive().isNumber() ? object.get(key).getAsLong() : -1;
+            return object != null
+                            && object.has(key)
+                            && object.get(key).isJsonPrimitive()
+                            && object.get(key).getAsJsonPrimitive().isNumber()
+                    ? object.get(key).getAsLong()
+                    : -1;
         } catch (RuntimeException ignored) {
             return -1;
         }

@@ -4,7 +4,6 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonPrimitive;
-
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -16,20 +15,23 @@ import java.util.TreeMap;
 public final class DshMessageProjector {
     private static final String IDE_CONTEXT_MARKER = "\n\n<ide_context>\n";
 
-    private DshMessageProjector() {
-    }
+    private DshMessageProjector() {}
 
     public static Projection project(JsonObject history, String agentStatusLabel) {
-        JsonArray source = history != null && history.has("events") && history.get("events").isJsonArray()
-                ? history.getAsJsonArray("events") : new JsonArray();
+        JsonArray source =
+                history != null && history.has("events") && history.get("events").isJsonArray()
+                        ? history.getAsJsonArray("events")
+                        : new JsonArray();
         List<JsonObject> events = new ArrayList<>();
         for (JsonElement candidate : source) {
             if (candidate.isJsonObject()) events.add(candidate.getAsJsonObject());
         }
-        events.sort(Comparator.comparingLong(entry -> {
-            JsonObject nested = object(entry, "event");
-            return nested == null ? eventSeq(entry) : eventSeq(nested);
-        }));
+        events.sort(
+                Comparator.comparingLong(
+                        entry -> {
+                            JsonObject nested = object(entry, "event");
+                            return nested == null ? eventSeq(entry) : eventSeq(nested);
+                        }));
 
         TreeMap<Long, JsonObject> rows = new TreeMap<>();
         Map<String, Long> rowKeys = new LinkedHashMap<>();
@@ -52,7 +54,11 @@ public final class DshMessageProjector {
             if (type.equals("user/message")) {
                 JsonObject message = object(data, "message");
                 if (message == null) message = data;
-                String text = visibleText(message.has("content") ? message.get("content") : message.get("text"));
+                String text =
+                        visibleText(
+                                message.has("content")
+                                        ? message.get("content")
+                                        : message.get("text"));
                 if (!text.isBlank()) {
                     JsonObject row = message("event:" + seq, "user", text, time, seq, "committed");
                     addImages(row, message.has("content") ? message.get("content") : null);
@@ -80,16 +86,19 @@ public final class DshMessageProjector {
                         }
                     }
                     if (chunkText != null) {
-                        if ("reasoning-delta".equals(chunkType) || "reasoning".equals(chunkType)) partial.reasoning.append(chunkText);
+                        if ("reasoning-delta".equals(chunkType) || "reasoning".equals(chunkType))
+                            partial.reasoning.append(chunkText);
                         else partial.text.append(chunkText);
                     }
                 }
                 removeRow(rows, rowKeys, key);
-                JsonObject row = message(key, "assistant", partial.text.toString(), time, seq, "streaming");
+                JsonObject row =
+                        message(key, "assistant", partial.text.toString(), time, seq, "streaming");
                 if (partial.reasoning.length() > 0) {
                     row.addProperty("reasoning", partial.reasoning.toString());
                     row.addProperty("reasoningState", "streaming");
-                    row.addProperty("renderedReasoningHtml", markdownHtml(partial.reasoning.toString()));
+                    row.addProperty(
+                            "renderedReasoningHtml", markdownHtml(partial.reasoning.toString()));
                 }
                 row.addProperty("renderedHtml", markdownHtml(partial.text.toString()));
                 rows.put(seq, row);
@@ -107,9 +116,15 @@ public final class DshMessageProjector {
                 String partialKey = "partial:" + turn + ":" + step;
                 removeRow(rows, rowKeys, partialKey);
                 Partial partial = partials.remove(partialKey);
-                String text = visibleText(message.has("content") ? message.get("content") : message.get("text"));
-                String reasoning = reasoningText(message.has("content") ? message.get("content") : null);
-                if (reasoning.isBlank() && partial != null) reasoning = partial.reasoning.toString();
+                String text =
+                        visibleText(
+                                message.has("content")
+                                        ? message.get("content")
+                                        : message.get("text"));
+                String reasoning =
+                        reasoningText(message.has("content") ? message.get("content") : null);
+                if (reasoning.isBlank() && partial != null)
+                    reasoning = partial.reasoning.toString();
                 String key = "event:" + seq;
                 JsonObject row = message(key, "assistant", text, time, seq, "committed");
                 addImages(row, message.has("content") ? message.get("content") : null);
@@ -146,13 +161,34 @@ public final class DshMessageProjector {
                 }
                 if (callId == null) callId = "call-" + seq;
                 Long existing = toolRows.get(callId);
-                JsonObject row = existing == null ? toolRow("tool:" + callId, time, seq, callId, data, entry, "completed", null)
-                        : rows.get(existing);
-                if (row == null) row = toolRow("tool:" + callId, time, seq, callId, data, entry, "completed", null);
+                JsonObject row =
+                        existing == null
+                                ? toolRow(
+                                        "tool:" + callId,
+                                        time,
+                                        seq,
+                                        callId,
+                                        data,
+                                        entry,
+                                        "completed",
+                                        null)
+                                : rows.get(existing);
+                if (row == null)
+                    row =
+                            toolRow(
+                                    "tool:" + callId,
+                                    time,
+                                    seq,
+                                    callId,
+                                    data,
+                                    entry,
+                                    "completed",
+                                    null);
                 boolean failed = data.has("error") && !data.get("error").isJsonNull();
                 row.getAsJsonObject("tool").addProperty("status", failed ? "failed" : "completed");
                 String result = presentationText(data, entry);
-                if (!result.isBlank()) row.getAsJsonObject("tool").addProperty(failed ? "error" : "result", result);
+                if (!result.isBlank())
+                    row.getAsJsonObject("tool").addProperty(failed ? "error" : "result", result);
                 if (existing == null) {
                     rows.put(seq, row);
                     rowKeys.put("tool:" + callId, seq);
@@ -169,8 +205,10 @@ public final class DshMessageProjector {
                 activeTurn = integer(data, "turn", activeTurn);
                 JsonObject reason = object(data, "reason");
                 String reasonKind = reason == null ? null : string(reason, "kind");
-                if ("aborted".equals(reasonKind) || "interrupted".equals(reasonKind)) turnPhase = "cancelled";
-                else if (reasonKind != null && !"completed".equals(reasonKind)) turnPhase = "failed";
+                if ("aborted".equals(reasonKind) || "interrupted".equals(reasonKind))
+                    turnPhase = "cancelled";
+                else if (reasonKind != null && !"completed".equals(reasonKind))
+                    turnPhase = "failed";
                 else turnPhase = "completed";
                 turnDetail = reasonKind;
             }
@@ -178,11 +216,24 @@ public final class DshMessageProjector {
 
         JsonArray messages = new JsonArray();
         for (JsonObject row : rows.values()) messages.add(row);
-        return new Projection(messages, activeTurn, turnPhase, turnDetail, "running".equals(turnPhase), agentStatusLabel);
+        return new Projection(
+                messages,
+                activeTurn,
+                turnPhase,
+                turnDetail,
+                "running".equals(turnPhase),
+                agentStatusLabel);
     }
 
-    private static JsonObject toolRow(String key, long time, long seq, String callId, JsonObject data,
-                                      JsonObject entry, String status, String ignored) {
+    private static JsonObject toolRow(
+            String key,
+            long time,
+            long seq,
+            String callId,
+            JsonObject data,
+            JsonObject entry,
+            String status,
+            String ignored) {
         JsonObject row = message(key, "tool", "", time, seq, "committed");
         JsonObject tool = new JsonObject();
         tool.addProperty("callId", callId);
@@ -190,7 +241,9 @@ public final class DshMessageProjector {
         JsonObject view = object(entry, "view");
         JsonObject viewValue = view == null ? null : object(view, "view");
         String title = viewValue == null ? null : string(viewValue, "title");
-        tool.addProperty("title", title == null || title.isBlank() ? stringOr(data, "name", "Tool call") : title);
+        tool.addProperty(
+                "title",
+                title == null || title.isBlank() ? stringOr(data, "name", "Tool call") : title);
         tool.addProperty("status", status);
         String args = presentationText(data, entry);
         if (!args.isBlank()) tool.addProperty("args", args);
@@ -214,7 +267,8 @@ public final class DshMessageProjector {
     private static void collectImages(JsonElement value, JsonArray result, int depth) {
         if (value == null || value.isJsonNull() || depth > 16) return;
         if (value.isJsonArray()) {
-            for (JsonElement child : value.getAsJsonArray()) collectImages(child, result, depth + 1);
+            for (JsonElement child : value.getAsJsonArray())
+                collectImages(child, result, depth + 1);
             return;
         }
         if (!value.isJsonObject()) return;
@@ -222,7 +276,8 @@ public final class DshMessageProjector {
         String type = string(object, "type");
         String attachmentId = string(object, "attachmentId");
         String mediaType = string(object, "mediaType");
-        if (("image".equals(type) || attachmentId != null) && attachmentId != null
+        if (("image".equals(type) || attachmentId != null)
+                && attachmentId != null
                 && isImageMediaType(mediaType)) {
             JsonObject image = new JsonObject();
             image.addProperty("attachmentId", attachmentId);
@@ -237,8 +292,10 @@ public final class DshMessageProjector {
     }
 
     private static boolean isImageMediaType(String value) {
-        return "image/png".equals(value) || "image/jpeg".equals(value)
-                || "image/webp".equals(value) || "image/gif".equals(value);
+        return "image/png".equals(value)
+                || "image/jpeg".equals(value)
+                || "image/webp".equals(value)
+                || "image/gif".equals(value);
     }
 
     private static String presentationText(JsonObject data, JsonObject entry) {
@@ -262,7 +319,8 @@ public final class DshMessageProjector {
         return oneLine(String.join(" · ", pieces), 2_400);
     }
 
-    private static JsonObject message(String id, String role, String text, long time, long seq, String state) {
+    private static JsonObject message(
+            String id, String role, String text, long time, long seq, String state) {
         JsonObject row = new JsonObject();
         row.addProperty("id", id);
         row.addProperty("role", role);
@@ -273,7 +331,8 @@ public final class DshMessageProjector {
         return row;
     }
 
-    private static void removeRow(TreeMap<Long, JsonObject> rows, Map<String, Long> keys, String key) {
+    private static void removeRow(
+            TreeMap<Long, JsonObject> rows, Map<String, Long> keys, String key) {
         Long seq = keys.remove(key);
         if (seq != null) rows.remove(seq);
     }
@@ -292,7 +351,8 @@ public final class DshMessageProjector {
         return result.toString();
     }
 
-    private static void collectText(JsonElement value, StringBuilder output, boolean reasoning, int depth) {
+    private static void collectText(
+            JsonElement value, StringBuilder output, boolean reasoning, int depth) {
         if (value == null || value.isJsonNull() || depth > 16) return;
         if (value.isJsonPrimitive()) {
             JsonPrimitive primitive = value.getAsJsonPrimitive();
@@ -300,7 +360,8 @@ public final class DshMessageProjector {
             return;
         }
         if (value.isJsonArray()) {
-            for (JsonElement child : value.getAsJsonArray()) collectText(child, output, reasoning, depth + 1);
+            for (JsonElement child : value.getAsJsonArray())
+                collectText(child, output, reasoning, depth + 1);
             return;
         }
         JsonObject object = value.getAsJsonObject();
@@ -317,7 +378,8 @@ public final class DshMessageProjector {
     public static String markdownHtml(String value) {
         if (value == null || value.isEmpty()) return "";
         String escaped = escapeHtml(value);
-        escaped = escaped.replaceAll("(?s)```([\\w+#.-]*)\\n(.*?)```", "<pre><code>$2</code></pre>");
+        escaped =
+                escaped.replaceAll("(?s)```([\\w+#.-]*)\\n(.*?)```", "<pre><code>$2</code></pre>");
         escaped = escaped.replaceAll("`([^`]+)`", "<code>$1</code>");
         escaped = escaped.replaceAll("\\*\\*([^*]+)\\*\\*", "<strong>$1</strong>");
         escaped = escaped.replaceAll("(?m)^### (.+)$", "<h3>$1</h3>");
@@ -328,8 +390,11 @@ public final class DshMessageProjector {
     }
 
     private static String escapeHtml(String value) {
-        return value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-                .replace("\"", "&quot;").replace("'", "&#39;");
+        return value.replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
+                .replace("\"", "&quot;")
+                .replace("'", "&#39;");
     }
 
     private static long eventSeq(JsonObject event) {
@@ -338,7 +403,9 @@ public final class DshMessageProjector {
 
     private static long number(JsonObject object, String key, long fallback) {
         try {
-            return object.has(key) && object.get(key).isJsonPrimitive() ? object.get(key).getAsLong() : fallback;
+            return object.has(key) && object.get(key).isJsonPrimitive()
+                    ? object.get(key).getAsLong()
+                    : fallback;
         } catch (RuntimeException ignored) {
             return fallback;
         }
@@ -350,11 +417,15 @@ public final class DshMessageProjector {
     }
 
     private static JsonObject object(JsonObject parent, String key) {
-        return parent != null && parent.has(key) && parent.get(key).isJsonObject() ? parent.getAsJsonObject(key) : null;
+        return parent != null && parent.has(key) && parent.get(key).isJsonObject()
+                ? parent.getAsJsonObject(key)
+                : null;
     }
 
     private static String string(JsonObject parent, String key) {
-        return parent != null && parent.has(key) && parent.get(key).isJsonPrimitive() ? parent.get(key).getAsString() : null;
+        return parent != null && parent.has(key) && parent.get(key).isJsonPrimitive()
+                ? parent.get(key).getAsString()
+                : null;
     }
 
     private static String stringOr(JsonObject parent, String key, String fallback) {
@@ -364,12 +435,15 @@ public final class DshMessageProjector {
 
     private static String oneLine(String value, int limit) {
         String normalized = value == null ? "" : value.replaceAll("\\s+", " ").trim();
-        return normalized.length() <= limit ? normalized : normalized.substring(0, Math.max(0, limit - 1)) + "…";
+        return normalized.length() <= limit
+                ? normalized
+                : normalized.substring(0, Math.max(0, limit - 1)) + "…";
     }
 
     private static String redactArguments(String value) {
         return value.replaceAll(
-                "(?i)([\\\"']?(?:api[-_]?key|auth(?:orization)?|credential|password|secret|token)[\\\"']?\\s*[:=]\\s*)([\\\"']?)([^,}\\s\\\"']+)([\\\"']?)",
+                "(?i)([\\\"']?(?:api[-_]?key|auth(?:orization)?|credential|password|secret|token)"
+                        + "[\\\"']?\\s*[:=]\\s*)([\\\"']?)([^,}\\s\\\"']+)([\\\"']?)",
                 "$1$2[redacted]$4");
     }
 
@@ -393,8 +467,13 @@ public final class DshMessageProjector {
         public final boolean running;
         public final String agentStatusLabel;
 
-        private Projection(JsonArray messages, int turn, String phase, String detail,
-                           boolean running, String agentStatusLabel) {
+        private Projection(
+                JsonArray messages,
+                int turn,
+                String phase,
+                String detail,
+                boolean running,
+                String agentStatusLabel) {
             this.messages = messages;
             this.turn = turn;
             this.phase = phase;

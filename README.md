@@ -40,7 +40,7 @@ Select code and right-click: `DSH: Ask About Selection`, or explain / fix / revi
 
 ### Managed local Runtime
 
-The plugin runs `pnpm dlx @deepseek-ai/dsh web --no-open` by default, falls back to an installed `dsh` or `npx`, and probes localhost until the server is ready. Every launch is pinned to the **Runtime version** setting, so an upstream release never reaches you before this plugin supports it; blank or `latest` opts back into tracking the newest release. Start / stop / restart actions are available from the Tools menu, and `DSH: Open Web UI` opens the same session in a browser.
+The plugin runs `pnpm dlx @deepseek-ai/dsh@0.1.2-rc.1 web --no-open` by default, falls back to an installed `dsh` or `npx`, and probes localhost until the server is ready. Every launch is pinned to the **Runtime version** setting, so an upstream release never reaches you before this plugin supports it; blank or `latest` opts back into tracking the newest release. Start / stop / restart actions are available from the Tools menu, and `DSH: Open Web UI` opens the same session in a browser.
 
 ### Safe credential handling
 
@@ -71,10 +71,10 @@ Open **Settings | Tools | DeepSeek Harness**.
 
 | Setting | Default | What it does |
 | --- | --- | --- |
-| Command / Args | `pnpm dlx @deepseek-ai/dsh web --no-open` | How the Runtime is launched; point it at an installed `dsh` or a local checkout instead. |
+| Command / Args | `pnpm dlx @deepseek-ai/dsh@0.1.2-rc.1 web --no-open` | How the Runtime is launched; point it at an installed `dsh` or a local checkout instead. |
 | Server URL / Port | `""` / `0` | Connect to an already running dsh web Runtime instead of launching one. |
 | Auto start | `true` | Start or connect to the Runtime when the project opens. |
-| Runtime version | `0.1.1-rc.2` | Locked version of the managed Runtime. |
+| Runtime version | `0.1.2-rc.1` | Locked version of the managed Remote protocol. |
 | npm registry | `https://registry.npmmirror.com` | Registry mirror used as a download fallback. |
 | Timeouts | `30s` startup, `600s` request | How long to wait for startup and individual RPC calls. |
 | Context bytes | `120000` | Maximum UTF-8 bytes of `<ide_context>` included per prompt. |
@@ -83,6 +83,8 @@ Open **Settings | Tools | DeepSeek Harness**.
 ## Build from source
 
 ```bash
+./gradlew format         # apply the repository's Java formatting rules
+./gradlew lint           # verify formatting and run Checkstyle
 ./gradlew verifyPlugin   # structure and compatibility checks
 ./gradlew buildPlugin    # produce the installable zip
 ```

@@ -7,7 +7,6 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonNull;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonPrimitive;
-
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -22,10 +21,13 @@ import java.util.regex.Pattern;
 
 /** Projects raw Harness history into the bounded ledger model used by dsh-ide's Trace view. */
 final class DshTraceProjector {
-    private static final Gson PRETTY_GSON = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
-    private static final Pattern SENSITIVE_KEY = Pattern.compile(
-            "api[-_]?key|authorization|cookie|credential|password|secret|access[-_]?token|refresh[-_]?token|bearer[-_]?token|auth[-_]?token",
-            Pattern.CASE_INSENSITIVE);
+    private static final Gson PRETTY_GSON =
+            new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
+    private static final Pattern SENSITIVE_KEY =
+            Pattern.compile(
+                    "api[-_]?key|authorization|cookie|credential|password|secret|"
+                            + "access[-_]?token|refresh[-_]?token|bearer[-_]?token|auth[-_]?token",
+                    Pattern.CASE_INSENSITIVE);
     private static final int INLINE_LIMIT = 240;
     private static final int PREVIEW_LIMIT = 1_200;
     private static final int RAW_STRING_LIMIT = 8_192;
@@ -33,8 +35,7 @@ final class DshTraceProjector {
     private static final int MAX_OBJECT_KEYS = 200;
     private static final int MAX_DEPTH = 10;
 
-    private DshTraceProjector() {
-    }
+    private DshTraceProjector() {}
 
     static Projection project(JsonObject history) {
         List<Entry> entries = entries(history);
@@ -59,7 +60,8 @@ final class DshTraceProjector {
                 }
                 case "tool/result" -> {
                     String callId = toolResultCallId(entry);
-                    if (callId != null) results.computeIfAbsent(callId, ignored -> new ArrayList<>()).add(entry);
+                    if (callId != null)
+                        results.computeIfAbsent(callId, ignored -> new ArrayList<>()).add(entry);
                 }
                 case "step/start" -> {
                     if (location != null) stepStarts.putIfAbsent(location, entry);
@@ -87,8 +89,7 @@ final class DshTraceProjector {
                 case "assistant/message" -> {
                     if (location != null) assistantSteps.add(location);
                 }
-                default -> {
-                }
+                default -> {}
             }
         }
 
@@ -101,7 +102,12 @@ final class DshTraceProjector {
                 String callId = string(data(entry), "subCallId");
                 if (callId != null && subStarts.containsKey(callId)) continue;
                 if (callId != null) {
-                    Row row = subtoolRow(null, entry, calls, subtoolDepth(callId, subStarts, subSettles));
+                    Row row =
+                            subtoolRow(
+                                    null,
+                                    entry,
+                                    calls,
+                                    subtoolDepth(callId, subStarts, subSettles));
                     addRow(rows, seqToRowId, row, List.of(entry));
                     continue;
                 }
@@ -110,8 +116,17 @@ final class DshTraceProjector {
                 String callId = string(data(entry), "subCallId");
                 if (callId != null) {
                     Entry settle = subSettles.get(callId);
-                    Row row = subtoolRow(entry, settle, calls, subtoolDepth(callId, subStarts, subSettles));
-                    addRow(rows, seqToRowId, row, settle == null ? List.of(entry) : List.of(entry, settle));
+                    Row row =
+                            subtoolRow(
+                                    entry,
+                                    settle,
+                                    calls,
+                                    subtoolDepth(callId, subStarts, subSettles));
+                    addRow(
+                            rows,
+                            seqToRowId,
+                            row,
+                            settle == null ? List.of(entry) : List.of(entry, settle));
                     continue;
                 }
             }
@@ -132,36 +147,54 @@ final class DshTraceProjector {
                     List<Entry> sources = new ArrayList<>();
                     sources.add(entry);
                     sources.addAll(results.getOrDefault(callId, List.of()));
-                    addRow(rows, seqToRowId, toolRow(entry, results.getOrDefault(callId, List.of())), sources);
+                    addRow(
+                            rows,
+                            seqToRowId,
+                            toolRow(entry, results.getOrDefault(callId, List.of())),
+                            sources);
                     continue;
                 }
             }
             if ("assistant/message".equals(entry.type())) {
                 String key = stepKey(data(entry));
                 ChunkGroup group = key == null ? null : chunks.get(key);
-                addRow(rows, seqToRowId, assistantRow(entry, group, key == null ? null : stepStarts.get(key)),
+                addRow(
+                        rows,
+                        seqToRowId,
+                        assistantRow(entry, group, key == null ? null : stepStarts.get(key)),
                         group == null ? List.of(entry) : joined(entry, group.entries));
                 continue;
             }
-            addRow(rows, seqToRowId, genericRow(entry, turnEnds, stepEnds, compactionEnds), List.of(entry));
+            addRow(
+                    rows,
+                    seqToRowId,
+                    genericRow(entry, turnEnds, stepEnds, compactionEnds),
+                    List.of(entry));
         }
 
         for (Map.Entry<String, ChunkGroup> item : chunks.entrySet()) {
             if (assistantSteps.contains(item.getKey())) continue;
-            Row row = streamingAssistantRow(item.getKey(), item.getValue(), stepStarts.get(item.getKey()));
+            Row row =
+                    streamingAssistantRow(
+                            item.getKey(), item.getValue(), stepStarts.get(item.getKey()));
             addRow(rows, seqToRowId, row, item.getValue().entries);
         }
-        rows.sort(Comparator.comparingLong((Row row) -> longValue(row.view, "seq", Long.MAX_VALUE))
-                .thenComparing(row -> stringOr(row.view, "id", "")));
+        rows.sort(
+                Comparator.comparingLong((Row row) -> longValue(row.view, "seq", Long.MAX_VALUE))
+                        .thenComparing(row -> stringOr(row.view, "id", "")));
         return new Projection(rows, projectionItems(history), seqToRowId, entries.size());
     }
 
     /**
-     * Refresh only the independently changing projection cells while retaining
-     * the event-derived ledger rows and sequence index.
+     * Refresh only the independently changing projection cells while retaining the event-derived
+     * ledger rows and sequence index.
      */
     static Projection withProjectionItems(Projection current, JsonObject history) {
-        return new Projection(current.rows(), projectionItems(history), current.seqToRowId(), current.totalEvents());
+        return new Projection(
+                current.rows(),
+                projectionItems(history),
+                current.seqToRowId(),
+                current.totalEvents());
     }
 
     private static List<Entry> entries(JsonObject history) {
@@ -182,8 +215,11 @@ final class DshTraceProjector {
         return result;
     }
 
-    private static Row genericRow(Entry entry, Map<String, Entry> turnEnds, Map<String, Entry> stepEnds,
-                                  Map<String, Entry> compactionEnds) {
+    private static Row genericRow(
+            Entry entry,
+            Map<String, Entry> turnEnds,
+            Map<String, Entry> stepEnds,
+            Map<String, Entry> compactionEnds) {
         JsonObject data = data(entry);
         Long turn = integer(data, "turn");
         Long step = integer(data, "step");
@@ -206,13 +242,16 @@ final class DshTraceProjector {
                 JsonObject reason = object(data, "reason");
                 String kind = stringOr(reason, "kind", "unknown");
                 summary = "Turn " + valueOrQuestion(turn) + " ended · " + kind;
-                if ("error".equals(kind)) error = errorMessage(reason == null ? null : reason.get("error"));
+                if ("error".equals(kind))
+                    error = errorMessage(reason == null ? null : reason.get("error"));
                 else if ("blocked".equals(kind)) error = "Turn blocked";
             }
             case "step/start" -> {
                 category = "boundary";
-                summary = "Step " + valueOrQuestion(turn) + "." + valueOrQuestion(step) + " started";
-                duration = duration(entry, stepKey(data) == null ? null : stepEnds.get(stepKey(data)));
+                summary =
+                        "Step " + valueOrQuestion(turn) + "." + valueOrQuestion(step) + " started";
+                duration =
+                        duration(entry, stepKey(data) == null ? null : stepEnds.get(stepKey(data)));
             }
             case "step/end" -> {
                 category = "boundary";
@@ -225,9 +264,18 @@ final class DshTraceProjector {
                 String sourceKind = string(source, "kind");
                 String text = contentText(message.get("content"), 6_000);
                 JsonObject surfaceOp = object(entry.event, "surfaceOp");
-                category = "replace".equals(string(surfaceOp, "op")) ? "compaction"
-                        : "user".equals(sourceKind) || sourceKind == null ? "user" : "context";
-                summary = oneLine(text.isBlank() ? "[" + stringOr(source, "kind", "user") + "]" : text, 500);
+                category =
+                        "replace".equals(string(surfaceOp, "op"))
+                                ? "compaction"
+                                : "user".equals(sourceKind) || sourceKind == null
+                                        ? "user"
+                                        : "context";
+                summary =
+                        oneLine(
+                                text.isBlank()
+                                        ? "[" + stringOr(source, "kind", "user") + "]"
+                                        : text,
+                                500);
                 if (sourceKind != null) extra.add(new Field("Source", sourceKind));
             }
             case "request/header" -> {
@@ -237,7 +285,12 @@ final class DshTraceProjector {
                 String provider = string(config, "provider");
                 String model = string(config, "model");
                 JsonArray tools = array(header, "tools");
-                summary = "Request header" + route(provider, model) + " · " + (tools == null ? 0 : tools.size()) + " tools";
+                summary =
+                        "Request header"
+                                + route(provider, model)
+                                + " · "
+                                + (tools == null ? 0 : tools.size())
+                                + " tools";
                 if (provider != null) extra.add(new Field("Provider", provider));
                 if (model != null) extra.add(new Field("Model", model));
             }
@@ -267,11 +320,16 @@ final class DshTraceProjector {
                         duration = duration(entry, id == null ? null : compactionEnds.get(id));
                         summary = "Compaction started" + (id == null ? "" : " · " + id);
                     } else if ("compaction/summary".equals(type)) {
-                        summary = "Compaction summary · " + oneLine(contentText(data.get("summary"), 2_000), 400);
+                        summary =
+                                "Compaction summary · "
+                                        + oneLine(contentText(data.get("summary"), 2_000), 400);
                         tokens = tokenUsage(data.get("usage"));
                     } else if ("compaction/end".equals(type)) {
                         error = errorMessage(data.get("error"));
-                        summary = error == null ? "Compaction completed" : "Compaction failed · " + error;
+                        summary =
+                                error == null
+                                        ? "Compaction completed"
+                                        : "Compaction failed · " + error;
                     }
                 } else if (type.startsWith("tool/code-dispatch")) {
                     category = "subtool";
@@ -280,7 +338,16 @@ final class DshTraceProjector {
             }
         }
         if (summary == null || summary.isBlank()) summary = type;
-        JsonObject view = baseView("event:" + entry.seq(), entry.seq(), type, category, summary, entry.time(), turn, step);
+        JsonObject view =
+                baseView(
+                        "event:" + entry.seq(),
+                        entry.seq(),
+                        type,
+                        category,
+                        summary,
+                        entry.time(),
+                        turn,
+                        step);
         if (duration != null) view.addProperty("durationMs", duration);
         if (error != null) view.addProperty("error", error);
         if (tokens != null) view.add("tokens", tokens);
@@ -294,10 +361,29 @@ final class DshTraceProjector {
         Long turn = integer(data, "turn");
         Long step = integer(data, "step");
         String finalText = contentText(message.get("content"), 10_000);
-        String streamed = chunks == null ? "" : String.join("\n", chunks.reasoning, chunks.text).trim();
-        String summary = oneLine(!finalText.isBlank() ? finalText : (!streamed.isBlank() ? streamed : "Assistant message"), 500);
-        JsonObject view = baseView("assistant:" + valueOrQuestion(turn) + ":" + valueOrQuestion(step) + ":" + entry.seq(),
-                entry.seq(), "assistant/message", "assistant", summary, entry.time(), turn, step);
+        String streamed =
+                chunks == null ? "" : String.join("\n", chunks.reasoning, chunks.text).trim();
+        String summary =
+                oneLine(
+                        !finalText.isBlank()
+                                ? finalText
+                                : (!streamed.isBlank() ? streamed : "Assistant message"),
+                        500);
+        JsonObject view =
+                baseView(
+                        "assistant:"
+                                + valueOrQuestion(turn)
+                                + ":"
+                                + valueOrQuestion(step)
+                                + ":"
+                                + entry.seq(),
+                        entry.seq(),
+                        "assistant/message",
+                        "assistant",
+                        summary,
+                        entry.time(),
+                        turn,
+                        step);
         Long duration = duration(stepStart, entry);
         if (duration != null) view.addProperty("durationMs", duration);
         JsonObject usage = tokenUsage(data.get("usage"));
@@ -311,7 +397,9 @@ final class DshTraceProjector {
         if (model != null) extra.add(new Field("Model", model));
         if (chunks != null) {
             extra.add(new Field("Stream events", Integer.toString(chunks.entries.size())));
-            if (stepStart != null && chunks.firstTokenTime != null && chunks.firstTokenTime >= stepStart.time()) {
+            if (stepStart != null
+                    && chunks.firstTokenTime != null
+                    && chunks.firstTokenTime >= stepStart.time()) {
                 extra.add(new Field("TTFT", (chunks.firstTokenTime - stepStart.time()) + " ms"));
             }
         }
@@ -333,10 +421,24 @@ final class DshTraceProjector {
         JsonObject data = data(first);
         Long turn = integer(data, "turn");
         Long step = integer(data, "step");
-        String summary = oneLine(!chunks.text.isBlank() ? chunks.text
-                : (!chunks.reasoning.isBlank() ? chunks.reasoning : chunks.entries.size() + " stream chunks"), 500);
-        JsonObject view = baseView("assistant-stream:" + key, first.seq(), "assistant/chunk", "assistant",
-                summary, first.time(), turn, step);
+        String summary =
+                oneLine(
+                        !chunks.text.isBlank()
+                                ? chunks.text
+                                : (!chunks.reasoning.isBlank()
+                                        ? chunks.reasoning
+                                        : chunks.entries.size() + " stream chunks"),
+                        500);
+        JsonObject view =
+                baseView(
+                        "assistant-stream:" + key,
+                        first.seq(),
+                        "assistant/chunk",
+                        "assistant",
+                        summary,
+                        first.time(),
+                        turn,
+                        step);
         view.addProperty("endSeq", last.seq());
         if (chunks.usage != null) view.add("tokens", chunks.usage);
         JsonObject raw = new JsonObject();
@@ -345,7 +447,9 @@ final class DshTraceProjector {
         raw.add("events", events);
         List<Field> extra = new ArrayList<>();
         extra.add(new Field("Stream events", Integer.toString(chunks.entries.size())));
-        if (stepStart != null && chunks.firstTokenTime != null && chunks.firstTokenTime >= stepStart.time()) {
+        if (stepStart != null
+                && chunks.firstTokenTime != null
+                && chunks.firstTokenTime >= stepStart.time()) {
             extra.add(new Field("TTFT", (chunks.firstTokenTime - stepStart.time()) + " ms"));
         }
         return row(view, raw, List.of(chunks.text, chunks.reasoning), extra);
@@ -370,13 +474,21 @@ final class DshTraceProjector {
         if (title == null) title = name;
         String presentation = presentationSummary(callView);
         String resultPresentation = presentationSummary(resultView);
-        if (resultPresentation != null && !resultPresentation.isBlank()) resultText = resultPresentation;
+        if (resultPresentation != null && !resultPresentation.isBlank())
+            resultText = resultPresentation;
         Long turn = integer(callData != null ? callData : resultData, "turn");
         Long step = integer(callData != null ? callData : resultData, "step");
         String summary = oneLine(title + (resultText.isBlank() ? "" : " · " + resultText), 500);
-        JsonObject view = baseView("tool:" + callId, anchor.seq(),
-                result == null ? "tool/call" : "tool/call → tool/result", "tool", summary,
-                anchor.time(), turn, step);
+        JsonObject view =
+                baseView(
+                        "tool:" + callId,
+                        anchor.seq(),
+                        result == null ? "tool/call" : "tool/call → tool/result",
+                        "tool",
+                        summary,
+                        anchor.time(),
+                        turn,
+                        step);
         view.addProperty("callId", callId);
         if (result != null) view.addProperty("endSeq", result.seq());
         Long duration = duration(call, result);
@@ -393,10 +505,15 @@ final class DshTraceProjector {
         JsonArray resultArray = new JsonArray();
         for (Entry item : results) resultArray.add(raw(item));
         raw.add("results", resultArray);
-        return row(view, raw, List.of(name, args == null ? "" : args, resultText, error == null ? "" : error), List.of());
+        return row(
+                view,
+                raw,
+                List.of(name, args == null ? "" : args, resultText, error == null ? "" : error),
+                List.of());
     }
 
-    private static Row subtoolRow(Entry start, Entry settle, Map<String, Entry> rootCalls, int depth) {
+    private static Row subtoolRow(
+            Entry start, Entry settle, Map<String, Entry> rootCalls, int depth) {
         Entry anchor = start == null ? settle : start;
         if (anchor == null) return null;
         JsonObject startData = start == null ? null : data(start);
@@ -409,19 +526,32 @@ final class DshTraceProjector {
         String name = stringOr(data, "name", "subtool");
         String args = data.has("arguments") ? inlineJson(data.get("arguments"), 800) : null;
         String result = settleData == null ? "" : contentText(settleData.get("content"), 6_000);
-        String error = settleData != null && bool(settleData, "isError")
-                ? (result.isBlank() ? "Subtool failed" : oneLine(result, 500)) : null;
+        String error =
+                settleData != null && bool(settleData, "isError")
+                        ? (result.isBlank() ? "Subtool failed" : oneLine(result, 500))
+                        : null;
         Long turn = integer(data, "turn");
         Long step = integer(data, "step");
-        if ((turn == null || step == null) && rootCallId != null && rootCalls.containsKey(rootCallId)) {
+        if ((turn == null || step == null)
+                && rootCallId != null
+                && rootCalls.containsKey(rootCallId)) {
             JsonObject rootData = data(rootCalls.get(rootCallId));
             if (turn == null) turn = integer(rootData, "turn");
             if (step == null) step = integer(rootData, "step");
         }
         String summary = oneLine(name + (result.isBlank() ? "" : " · " + result), 500);
-        JsonObject view = baseView("subtool:" + callId, anchor.seq(),
-                settle == null ? "tool/code-dispatch-start" : "tool/code-dispatch-start → tool/code-dispatch",
-                "subtool", summary, anchor.time(), turn, step);
+        JsonObject view =
+                baseView(
+                        "subtool:" + callId,
+                        anchor.seq(),
+                        settle == null
+                                ? "tool/code-dispatch-start"
+                                : "tool/code-dispatch-start → tool/code-dispatch",
+                        "subtool",
+                        summary,
+                        anchor.time(),
+                        turn,
+                        step);
         view.addProperty("depth", Math.max(1, Math.min(depth, 256)));
         view.addProperty("callId", callId);
         if (parentCallId != null) view.addProperty("parentCallId", parentCallId);
@@ -437,10 +567,15 @@ final class DshTraceProjector {
         JsonObject raw = new JsonObject();
         if (start != null) raw.add("start", start.event.deepCopy());
         if (settle != null) raw.add("result", settle.event.deepCopy());
-        return row(view, raw, List.of(name, args == null ? "" : args, result, error == null ? "" : error), List.of());
+        return row(
+                view,
+                raw,
+                List.of(name, args == null ? "" : args, result, error == null ? "" : error),
+                List.of());
     }
 
-    private static int subtoolDepth(String callId, Map<String, Entry> starts, Map<String, Entry> settles) {
+    private static int subtoolDepth(
+            String callId, Map<String, Entry> starts, Map<String, Entry> settles) {
         Set<String> visited = new HashSet<>();
         String cursor = callId;
         int depth = 0;
@@ -448,7 +583,10 @@ final class DshTraceProjector {
             Entry source = starts.containsKey(cursor) ? starts.get(cursor) : settles.get(cursor);
             String parent = source == null ? null : string(data(source), "parentCallId");
             depth++;
-            cursor = parent != null && (starts.containsKey(parent) || settles.containsKey(parent)) ? parent : null;
+            cursor =
+                    parent != null && (starts.containsKey(parent) || settles.containsKey(parent))
+                            ? parent
+                            : null;
         }
         return Math.max(1, depth);
     }
@@ -461,10 +599,20 @@ final class DshTraceProjector {
         if (values == null) return result;
         for (Map.Entry<String, JsonElement> item : values.entrySet()) {
             String preview = oneLine(safeJson(item.getValue(), PREVIEW_LIMIT), PREVIEW_LIMIT);
-            List<Field> fields = List.of(new Field("Projection", item.getKey()), new Field("Watermark seq", Long.toString(seq)));
-            result.add(new ProjectionItem("projection:" + item.getKey(), item.getKey(), seq, preview,
-                    (item.getKey() + "\n" + safeJson(item.getValue(), 8_000)).toLowerCase(Locale.ROOT),
-                    item.getValue().deepCopy(), fields));
+            List<Field> fields =
+                    List.of(
+                            new Field("Projection", item.getKey()),
+                            new Field("Watermark seq", Long.toString(seq)));
+            result.add(
+                    new ProjectionItem(
+                            "projection:" + item.getKey(),
+                            item.getKey(),
+                            seq,
+                            preview,
+                            (item.getKey() + "\n" + safeJson(item.getValue(), 8_000))
+                                    .toLowerCase(Locale.ROOT),
+                            item.getValue().deepCopy(),
+                            fields));
         }
         result.sort(Comparator.comparing(ProjectionItem::key));
         return result;
@@ -479,27 +627,35 @@ final class DshTraceProjector {
         group.entries.add(entry);
         String type = string(chunk, "type");
         String text = string(chunk, "text");
-        if ("text-delta".equals(type) && text != null) group.text = truncate(group.text + text, 16_000);
-        else if ("reasoning-delta".equals(type) && text != null) group.reasoning = truncate(group.reasoning + text, 16_000);
+        if ("text-delta".equals(type) && text != null)
+            group.text = truncate(group.text + text, 16_000);
+        else if ("reasoning-delta".equals(type) && text != null)
+            group.reasoning = truncate(group.reasoning + text, 16_000);
         else if ("tool-call-delta".equals(type)) {
             String delta = string(chunk, "argumentsDelta");
             if (delta != null) group.text = truncate(group.text + delta, 16_000);
-        } else if ("usage".equals(type)) group.usage = addUsage(group.usage, tokenUsage(chunk.get("usage")));
-        if (group.firstTokenTime == null && ((text != null && !text.isEmpty()) || string(chunk, "argumentsDelta") != null)) {
+        } else if ("usage".equals(type))
+            group.usage = addUsage(group.usage, tokenUsage(chunk.get("usage")));
+        if (group.firstTokenTime == null
+                && ((text != null && !text.isEmpty()) || string(chunk, "argumentsDelta") != null)) {
             group.firstTokenTime = entry.time();
         }
     }
 
-    private static Row row(JsonObject view, JsonElement raw, List<String> searchParts, List<Field> extra) {
+    private static Row row(
+            JsonObject view, JsonElement raw, List<String> searchParts, List<Field> extra) {
         List<Field> fields = new ArrayList<>();
         fields.add(new Field("Event", stringOr(view, "eventType", "")));
         String sequence = Long.toString(longValue(view, "seq", 0));
         if (view.has("endSeq")) sequence += " → " + longValue(view, "endSeq", 0);
         fields.add(new Field("Sequence", sequence));
         fields.add(new Field("Time", Instant.ofEpochMilli(longValue(view, "time", 0)).toString()));
-        if (view.has("durationMs")) fields.add(new Field("Duration", longValue(view, "durationMs", 0) + " ms"));
-        if (view.has("turn")) fields.add(new Field("Turn", Long.toString(longValue(view, "turn", 0))));
-        if (view.has("step")) fields.add(new Field("Step", Long.toString(longValue(view, "step", 0))));
+        if (view.has("durationMs"))
+            fields.add(new Field("Duration", longValue(view, "durationMs", 0) + " ms"));
+        if (view.has("turn"))
+            fields.add(new Field("Turn", Long.toString(longValue(view, "turn", 0))));
+        if (view.has("step"))
+            fields.add(new Field("Step", Long.toString(longValue(view, "step", 0))));
         if (view.has("callId")) fields.add(new Field("Call ID", stringOr(view, "callId", "")));
         if (view.has("error")) fields.add(new Field("Error", stringOr(view, "error", "")));
         fields.addAll(extra);
@@ -508,8 +664,15 @@ final class DshTraceProjector {
         return new Row(view, search.toString().toLowerCase(Locale.ROOT), raw, fields);
     }
 
-    private static JsonObject baseView(String id, long seq, String type, String category, String summary,
-                                       long time, Long turn, Long step) {
+    private static JsonObject baseView(
+            String id,
+            long seq,
+            String type,
+            String category,
+            String summary,
+            long time,
+            Long turn,
+            Long step) {
         JsonObject view = new JsonObject();
         view.addProperty("id", id);
         view.addProperty("seq", seq);
@@ -520,7 +683,9 @@ final class DshTraceProjector {
         if (turn != null) view.addProperty("turn", turn);
         if (step != null) view.addProperty("step", step);
         view.addProperty("depth", "subtool".equals(category) ? 1 : 0);
-        view.addProperty("groupId", turn == null ? "session" : "turn:" + turn + (step == null ? "" : "/step:" + step));
+        view.addProperty(
+                "groupId",
+                turn == null ? "session" : "turn:" + turn + (step == null ? "" : "/step:" + step));
         return view;
     }
 
@@ -540,7 +705,8 @@ final class DshTraceProjector {
         if (value == null || value.isJsonNull()) return JsonNull.INSTANCE;
         if (value.isJsonPrimitive()) {
             JsonPrimitive primitive = value.getAsJsonPrimitive();
-            if (primitive.isString()) return new JsonPrimitive(truncate(primitive.getAsString(), RAW_STRING_LIMIT));
+            if (primitive.isString())
+                return new JsonPrimitive(truncate(primitive.getAsString(), RAW_STRING_LIMIT));
             return primitive.deepCopy();
         }
         if (depth >= MAX_DEPTH) return new JsonPrimitive("[depth limit]");
@@ -548,7 +714,8 @@ final class DshTraceProjector {
             JsonArray output = new JsonArray();
             JsonArray input = value.getAsJsonArray();
             int count = Math.min(input.size(), MAX_ARRAY_ITEMS);
-            for (int index = 0; index < count; index++) output.add(sanitize(input.get(index), depth + 1));
+            for (int index = 0; index < count; index++)
+                output.add(sanitize(input.get(index), depth + 1));
             if (input.size() > count) output.add("[" + (input.size() - count) + " more items]");
             return output;
         }
@@ -556,18 +723,24 @@ final class DshTraceProjector {
         int count = 0;
         for (Map.Entry<String, JsonElement> entry : value.getAsJsonObject().entrySet()) {
             if (count++ >= MAX_OBJECT_KEYS) break;
-            output.add(entry.getKey(), SENSITIVE_KEY.matcher(entry.getKey()).find()
-                    ? new JsonPrimitive("[redacted]") : sanitize(entry.getValue(), depth + 1));
+            output.add(
+                    entry.getKey(),
+                    SENSITIVE_KEY.matcher(entry.getKey()).find()
+                            ? new JsonPrimitive("[redacted]")
+                            : sanitize(entry.getValue(), depth + 1));
         }
         if (value.getAsJsonObject().size() > MAX_OBJECT_KEYS) {
-            output.addProperty("[truncated]", (value.getAsJsonObject().size() - MAX_OBJECT_KEYS) + " more keys");
+            output.addProperty(
+                    "[truncated]",
+                    (value.getAsJsonObject().size() - MAX_OBJECT_KEYS) + " more keys");
         }
         return output;
     }
 
     private static String contentText(JsonElement value, int limit) {
         if (value == null || value.isJsonNull()) return "";
-        if (value.isJsonPrimitive() && value.getAsJsonPrimitive().isString()) return truncate(value.getAsString(), limit);
+        if (value.isJsonPrimitive() && value.getAsJsonPrimitive().isString())
+            return truncate(value.getAsString(), limit);
         if (!value.isJsonArray()) return "";
         StringBuilder output = new StringBuilder();
         for (JsonElement candidate : value.getAsJsonArray()) {
@@ -576,8 +749,10 @@ final class DshTraceProjector {
             String type = string(part, "type");
             String text = null;
             if (("text".equals(type) || "reasoning".equals(type))) text = string(part, "text");
-            else if ("tool-call".equals(type)) text = stringOr(part, "name", "tool") + "(" + stringOr(part, "arguments", "") + ")";
-            else if ("tool-result".equals(type)) text = contentText(part.get("content"), limit - output.length());
+            else if ("tool-call".equals(type))
+                text = stringOr(part, "name", "tool") + "(" + stringOr(part, "arguments", "") + ")";
+            else if ("tool-result".equals(type))
+                text = contentText(part.get("content"), limit - output.length());
             else if ("image".equals(type)) text = "[image]";
             else if (type != null) text = "[" + type + "]";
             if (text != null && !text.isBlank()) {
@@ -590,7 +765,9 @@ final class DshTraceProjector {
 
     private static JsonElement messageContent(JsonObject data) {
         JsonObject message = object(data, "message");
-        return message != null && message.has("content") ? message.get("content") : data.get("content");
+        return message != null && message.has("content")
+                ? message.get("content")
+                : data.get("content");
     }
 
     private static String toolResultCallId(Entry entry) {
@@ -616,7 +793,9 @@ final class DshTraceProjector {
             if (!text.isBlank()) return text;
         }
         String text = contentText(data.get("content"), 6_000);
-        return text.isBlank() && message != null ? contentText(message.get("content"), 6_000) : text;
+        return text.isBlank() && message != null
+                ? contentText(message.get("content"), 6_000)
+                : text;
     }
 
     private static String toolResultError(Entry entry) {
@@ -625,8 +804,11 @@ final class DshTraceProjector {
         if (error != null) return error;
         JsonObject message = object(data, "message");
         JsonArray content = array(message, "content");
-        if (content != null && !content.isEmpty() && content.get(0).isJsonObject()
-                && bool(content.get(0).getAsJsonObject(), "isError")) return oneLine(toolResultText(entry), 500);
+        if (content != null
+                && !content.isEmpty()
+                && content.get(0).isJsonObject()
+                && bool(content.get(0).getAsJsonObject(), "isError"))
+            return oneLine(toolResultText(entry), 500);
         return bool(data, "isError") ? oneLine(toolResultText(entry), 500) : null;
     }
 
@@ -639,7 +821,8 @@ final class DshTraceProjector {
     private static String presentationSummary(JsonObject view) {
         if (view == null) return null;
         List<String> pieces = new ArrayList<>();
-        for (String key : List.of("title", "description", "cwd", "output", "path", "url", "answer")) {
+        for (String key :
+                List.of("title", "description", "cwd", "output", "path", "url", "answer")) {
             String value = string(view, key);
             if (value != null && !value.isBlank()) pieces.add(value);
         }
@@ -674,9 +857,15 @@ final class DshTraceProjector {
         if (next == null) return previous;
         if (previous == null) return next.deepCopy();
         JsonObject result = new JsonObject();
-        for (String key : List.of("inputTokens", "outputTokens", "cacheReadTokens", "cacheWriteTokens", "reasoningTokens")) {
-            if (previous.has(key) || next.has(key)) result.addProperty(key,
-                    longValue(previous, key, 0) + longValue(next, key, 0));
+        for (String key :
+                List.of(
+                        "inputTokens",
+                        "outputTokens",
+                        "cacheReadTokens",
+                        "cacheWriteTokens",
+                        "reasoningTokens")) {
+            if (previous.has(key) || next.has(key))
+                result.addProperty(key, longValue(previous, key, 0) + longValue(next, key, 0));
         }
         return result;
     }
@@ -710,7 +899,8 @@ final class DshTraceProjector {
         return result;
     }
 
-    private static void addRow(List<Row> rows, Map<Long, String> map, Row row, List<Entry> sources) {
+    private static void addRow(
+            List<Row> rows, Map<Long, String> map, Row row, List<Entry> sources) {
         if (row == null) return;
         rows.add(row);
         String id = stringOr(row.view, "id", "");
@@ -735,7 +925,10 @@ final class DshTraceProjector {
 
     private static String route(String provider, String model) {
         if (provider == null && model == null) return " · unknown route";
-        return " · " + (provider == null ? "" : provider) + (provider != null && model != null ? "/" : "") + (model == null ? "" : model);
+        return " · "
+                + (provider == null ? "" : provider)
+                + (provider != null && model != null ? "/" : "")
+                + (model == null ? "" : model);
     }
 
     private static String valueOrQuestion(Long value) {
@@ -753,16 +946,22 @@ final class DshTraceProjector {
     }
 
     private static JsonObject object(JsonObject parent, String key) {
-        return parent != null && parent.has(key) && parent.get(key).isJsonObject() ? parent.getAsJsonObject(key) : null;
+        return parent != null && parent.has(key) && parent.get(key).isJsonObject()
+                ? parent.getAsJsonObject(key)
+                : null;
     }
 
     private static JsonArray array(JsonObject parent, String key) {
-        return parent != null && parent.has(key) && parent.get(key).isJsonArray() ? parent.getAsJsonArray(key) : null;
+        return parent != null && parent.has(key) && parent.get(key).isJsonArray()
+                ? parent.getAsJsonArray(key)
+                : null;
     }
 
     private static String string(JsonObject parent, String key) {
         try {
-            return parent != null && parent.has(key) && parent.get(key).isJsonPrimitive() ? parent.get(key).getAsString() : null;
+            return parent != null && parent.has(key) && parent.get(key).isJsonPrimitive()
+                    ? parent.get(key).getAsString()
+                    : null;
         } catch (RuntimeException ignored) {
             return null;
         }
@@ -775,7 +974,9 @@ final class DshTraceProjector {
 
     private static Long integer(JsonObject parent, String key) {
         try {
-            return parent != null && parent.has(key) && parent.get(key).isJsonPrimitive() ? parent.get(key).getAsLong() : null;
+            return parent != null && parent.has(key) && parent.get(key).isJsonPrimitive()
+                    ? parent.get(key).getAsLong()
+                    : null;
         } catch (RuntimeException ignored) {
             return null;
         }
@@ -788,25 +989,33 @@ final class DshTraceProjector {
 
     private static boolean bool(JsonObject parent, String key) {
         try {
-            return parent != null && parent.has(key) && parent.get(key).isJsonPrimitive() && parent.get(key).getAsBoolean();
+            return parent != null
+                    && parent.has(key)
+                    && parent.get(key).isJsonPrimitive()
+                    && parent.get(key).getAsBoolean();
         } catch (RuntimeException ignored) {
             return false;
         }
     }
 
-    record Field(String label, String value) {
-    }
+    record Field(String label, String value) {}
 
-    record Row(JsonObject view, String searchText, JsonElement raw, List<Field> fields) {
-    }
+    record Row(JsonObject view, String searchText, JsonElement raw, List<Field> fields) {}
 
-    record ProjectionItem(String id, String key, long seq, String valuePreview, String searchText,
-                          JsonElement raw, List<Field> fields) {
-    }
+    record ProjectionItem(
+            String id,
+            String key,
+            long seq,
+            String valuePreview,
+            String searchText,
+            JsonElement raw,
+            List<Field> fields) {}
 
-    record Projection(List<Row> rows, List<ProjectionItem> projections, Map<Long, String> seqToRowId,
-                      int totalEvents) {
-    }
+    record Projection(
+            List<Row> rows,
+            List<ProjectionItem> projections,
+            Map<Long, String> seqToRowId,
+            int totalEvents) {}
 
     private record Entry(JsonObject wrapper, JsonObject event) {
         long seq() {
