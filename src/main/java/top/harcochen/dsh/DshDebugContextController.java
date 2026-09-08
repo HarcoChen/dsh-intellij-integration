@@ -18,8 +18,11 @@ import com.intellij.xdebugger.frame.XValuePlace;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import javax.swing.Icon;
 
@@ -45,16 +48,19 @@ final class DshDebugContextController {
                     + "|credential|authorization|cookie|session)";
 
     private final Project project;
+    private final ExecutorService captureExecutor;
     private final Consumer<JsonObject> chipSink;
     private final Consumer<JsonObject> webviewMessage;
     private final Consumer<String> notifier;
 
     DshDebugContextController(
             Project project,
+            ExecutorService captureExecutor,
             Consumer<JsonObject> chipSink,
             Consumer<JsonObject> webviewMessage,
             Consumer<String> notifier) {
         this.project = project;
+        this.captureExecutor = captureExecutor;
         this.chipSink = chipSink;
         this.webviewMessage = webviewMessage;
         this.notifier = notifier;
@@ -74,16 +80,16 @@ final class DshDebugContextController {
                             }
                             Capture capture = new Capture(session);
                             capture.start();
-                            java.util.concurrent.CompletableFuture.runAsync(
+                            CompletableFuture.runAsync(
                                     () -> {
                                         String content = capture.awaitContent();
                                         ApplicationManager.getApplication()
                                                 .invokeLater(
                                                         () -> {
-                                                            if (content == null) return;
                                                             attach(content);
                                                         });
-                                    });
+                                    },
+                                    captureExecutor);
                         });
     }
 
@@ -114,7 +120,10 @@ final class DshDebugContextController {
 
     private final class Capture {
         private final XDebugSession session;
-        private final CountDownLatch done = new CountDownLatch(2);
+        private final CountDownLatch framesDone = new CountDownLatch(1);
+        private final CountDownLatch variablesDone = new CountDownLatch(1);
+        private final AtomicBoolean framesFinished = new AtomicBoolean();
+        private final AtomicBoolean variablesFinished = new AtomicBoolean();
         private final List<String> frameLines = new ArrayList<>();
         private final List<String> variableLines = new ArrayList<>();
         private volatile String selectedFrameLabel;
@@ -131,8 +140,7 @@ final class DshDebugContextController {
                 captureVariables(current);
                 excerpt = sourceExcerpt(current);
             } else {
-                done.countDown();
-                done.countDown();
+                finishVariables();
             }
         }
 
@@ -140,7 +148,7 @@ final class DshDebugContextController {
             XExecutionStack stack = activeStack();
             if (stack == null) {
                 frameLines.add("(unavailable)");
-                done.countDown();
+                finishFrames();
                 return;
             }
             try {
@@ -173,7 +181,7 @@ final class DshDebugContextController {
                                                                 : " " + location);
                                     }
                                 }
-                                if (last) done.countDown();
+                                if (last) finishFrames();
                             }
 
                             @Override
@@ -181,6 +189,7 @@ final class DshDebugContextController {
                                 synchronized (frameLines) {
                                     frameLines.add("(unavailable: " + errorMessage + ")");
                                 }
+                                finishFrames();
                             }
 
                             @Override
@@ -191,28 +200,28 @@ final class DshDebugContextController {
             } catch (RuntimeException error) {
                 LOG.debug("Unable to read debug stack frames", error);
                 frameLines.add("(unavailable: " + error.getMessage() + ")");
-                done.countDown();
+                finishFrames();
             }
         }
 
         private void captureVariables(XStackFrame frame) {
             try {
-                frame.computeChildren(new CollectingNode(variableLines, done));
+                frame.computeChildren(new CollectingNode(variableLines, this::finishVariables));
             } catch (RuntimeException error) {
                 LOG.debug("Unable to read debug variables", error);
-                variableLines.add("(unavailable: " + error.getMessage() + ")");
-                done.countDown();
+                synchronized (variableLines) {
+                    variableLines.add("(unavailable: " + error.getMessage() + ")");
+                }
+                finishVariables();
             }
         }
 
         /** Assemble the snapshot; runs off the EDT after the latch settles. */
         String awaitContent() {
-            boolean complete = false;
-            try {
-                complete = done.await(CAPTURE_TIMEOUT_SECONDS, TimeUnit.SECONDS);
-            } catch (InterruptedException error) {
-                Thread.currentThread().interrupt();
-            }
+            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(CAPTURE_TIMEOUT_SECONDS);
+            boolean framesComplete = awaitUntil(framesDone, deadline);
+            boolean variablesComplete = awaitUntil(variablesDone, deadline);
+            boolean complete = framesComplete && variablesComplete;
             StringBuilder builder = new StringBuilder();
             builder.append("Debug context (untrusted, read-only IDE snapshot):\n");
             builder.append("Session: ").append(session.getSessionName()).append('\n');
@@ -248,6 +257,25 @@ final class DshDebugContextController {
                                 "Capture notes:\n- capture timed out; some debugger data is missing\n");
             }
             return truncate(builder.toString(), MAX_CONTENT_BYTES);
+        }
+
+        private boolean awaitUntil(CountDownLatch latch, long deadline) {
+            long remaining = deadline - System.nanoTime();
+            if (remaining <= 0) return latch.getCount() == 0;
+            try {
+                return latch.await(remaining, TimeUnit.NANOSECONDS);
+            } catch (InterruptedException error) {
+                Thread.currentThread().interrupt();
+                return false;
+            }
+        }
+
+        private void finishFrames() {
+            if (framesFinished.compareAndSet(false, true)) framesDone.countDown();
+        }
+
+        private void finishVariables() {
+            if (variablesFinished.compareAndSet(false, true)) variablesDone.countDown();
         }
 
         private XExecutionStack activeStack() {
@@ -315,12 +343,12 @@ final class DshDebugContextController {
      */
     private static final class CollectingNode implements XCompositeNode, XValueNode {
         private final List<String> lines;
-        private final CountDownLatch done;
+        private final Runnable onComplete;
         private int collected;
 
-        CollectingNode(List<String> lines, CountDownLatch done) {
+        CollectingNode(List<String> lines, Runnable onComplete) {
             this.lines = lines;
-            this.done = done;
+            this.onComplete = onComplete;
         }
 
         @Override
@@ -337,7 +365,7 @@ final class DshDebugContextController {
             }
             collected += count;
             if (last || collected >= MAX_VARIABLES) {
-                done.countDown();
+                onComplete.run();
             }
         }
 
@@ -457,7 +485,7 @@ final class DshDebugContextController {
             synchronized (lines) {
                 lines.add("  (unavailable: " + errorMessage + ")");
             }
-            done.countDown();
+            onComplete.run();
         }
 
         @Override
@@ -475,7 +503,7 @@ final class DshDebugContextController {
             synchronized (lines) {
                 lines.add("  " + text);
             }
-            done.countDown();
+            onComplete.run();
         }
 
         @Override

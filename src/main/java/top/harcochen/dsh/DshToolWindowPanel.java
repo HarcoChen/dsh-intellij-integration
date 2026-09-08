@@ -122,6 +122,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
         this.debugContext =
                 new DshDebugContextController(
                         project,
+                        operations,
                         item -> ideContext.attachCustomItem(item),
                         this::postToWebview,
                         this::notify);
