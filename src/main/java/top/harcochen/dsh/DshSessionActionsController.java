@@ -6,13 +6,25 @@ import com.google.gson.JsonObject;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.ui.DialogWrapper;
 import com.intellij.openapi.ui.Messages;
+import java.awt.BorderLayout;
+import java.awt.Dimension;
+import java.awt.FontMetrics;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
+import javax.swing.AbstractAction;
+import javax.swing.JComponent;
+import javax.swing.JLabel;
+import javax.swing.JList;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.KeyStroke;
+import javax.swing.ListSelectionModel;
 import top.harcochen.dsh.remote.DshRemoteService;
 import top.harcochen.dsh.remote.DshRemoteState;
 
@@ -361,14 +373,13 @@ final class DshSessionActionsController {
     }
 
     private void chooseModel(String session, List<String> labels, List<ModelChoice> choices) {
-        int selected =
-                Messages.showChooseDialog(
+        ModelChooserDialog dialog =
+                new ModelChooserDialog(
                         project,
                         DshBundle.message("dsh.model.select.message"),
                         DshBundle.message("dsh.model.select.title"),
-                        Messages.getQuestionIcon(),
-                        labels.toArray(new String[0]),
-                        labels.get(0));
+                        labels);
+        int selected = dialog.showAndGet() ? dialog.selectedIndex() : -1;
         if (selected >= 0 && selected < choices.size()) {
             ModelChoice choice = choices.get(selected);
             operations.execute(() -> selectModel(session, choice.provider(), choice.model(), null));
@@ -481,4 +492,60 @@ final class DshSessionActionsController {
     }
 
     private record ModelChoice(String provider, String model) {}
+
+    /** Model picker with enough horizontal space for provider/model identifiers. */
+    private static final class ModelChooserDialog extends DialogWrapper {
+        private final JList<String> list;
+        private final JScrollPane scroll;
+        private final String message;
+
+        ModelChooserDialog(Project project, String message, String title, List<String> labels) {
+            super(project);
+            this.message = message;
+            list = new JList<>(labels.toArray(new String[0]));
+            list.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+            list.setSelectedIndex(0);
+            list.getInputMap().put(KeyStroke.getKeyStroke("ENTER"), "choose-model");
+            list.getActionMap()
+                    .put(
+                            "choose-model",
+                            new AbstractAction() {
+                                @Override
+                                public void actionPerformed(java.awt.event.ActionEvent event) {
+                                    doOKAction();
+                                }
+                            });
+            scroll = new JScrollPane(list);
+            scroll.setPreferredSize(preferredSize(list, labels));
+            setTitle(title);
+            setResizable(true);
+            init();
+        }
+
+        @Override
+        protected JComponent createCenterPanel() {
+            JPanel panel = new JPanel(new BorderLayout(0, 8));
+            panel.add(new JLabel(message), BorderLayout.NORTH);
+            panel.add(scroll, BorderLayout.CENTER);
+            return panel;
+        }
+
+        @Override
+        public JComponent getPreferredFocusedComponent() {
+            return list;
+        }
+
+        int selectedIndex() {
+            return list.getSelectedIndex();
+        }
+
+        private static Dimension preferredSize(JList<String> list, List<String> labels) {
+            FontMetrics metrics = list.getFontMetrics(list.getFont());
+            int longest = labels.stream().mapToInt(metrics::stringWidth).max().orElse(0);
+            int width = Math.max(560, Math.min(1100, longest + 72));
+            int rows = Math.min(Math.max(labels.size(), 1), 12);
+            int height = Math.max(260, Math.min(520, rows * metrics.getHeight() + 64));
+            return new Dimension(width, height);
+        }
+    }
 }

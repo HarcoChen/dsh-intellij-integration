@@ -46,6 +46,8 @@ public final class DshRemoteContracts {
     public static final String WORKSPACE_CREATE = "workspace/create";
     public static final String WORKSPACE_RENAME = "workspace/rename";
     public static final String WORKSPACE_DELETE = "workspace/delete";
+    public static final String WORKSPACE_INSERT_BEFORE = "workspace/insertBefore";
+    public static final String WORKSPACE_INSERT_SESSION_BEFORE = "workspace/insertSessionBefore";
     public static final String WORKSPACE_ARCHIVE_SESSION = "workspace/archiveSession";
     public static final String AGENT_PRESETS_LIST = "agentPresets/list";
     public static final String AGENT_PRESETS_SELECT = "agentPresets/select";
@@ -54,6 +56,7 @@ public final class DshRemoteContracts {
     public static final String AGENT_PRESETS_DELETE = "agentPresets/deletePreset";
     public static final String SETTINGS_DESCRIBE = "settings/describe";
     public static final String SETTINGS_MUTATE = "settings/mutate";
+    public static final String SETTINGS_UPDATE = "settings/update";
     public static final String SETTINGS_OPEN_DOCUMENT = "settings/openSettingsDocument";
     public static final String SETTINGS_OPEN_PRESET_DIRECTORY = "settings/openAgentPresetDirectory";
     public static final String GOALS_CREATE = "goals/create";
@@ -416,6 +419,29 @@ public final class DshRemoteContracts {
         return withRequest(request);
     }
 
+    /** `workspace/insertBefore(request)`; the before id is omitted to move to the front. */
+    public static JsonObject argsWorkspaceInsertBefore(
+            String workspaceId, String beforeWorkspaceId) {
+        JsonObject request = new JsonObject();
+        request.addProperty("workspaceId", workspaceId);
+        if (beforeWorkspaceId != null && !beforeWorkspaceId.isBlank()) {
+            request.addProperty("beforeWorkspaceId", beforeWorkspaceId);
+        }
+        return withRequest(request);
+    }
+
+    /** `workspace/insertSessionBefore(request)`; the before id is omitted to move to the front. */
+    public static JsonObject argsWorkspaceInsertSessionBefore(
+            String workspaceId, String sessionId, String beforeSessionId) {
+        JsonObject request = new JsonObject();
+        request.addProperty("workspaceId", workspaceId);
+        request.addProperty("sessionId", sessionId);
+        if (beforeSessionId != null && !beforeSessionId.isBlank()) {
+            request.addProperty("beforeSessionId", beforeSessionId);
+        }
+        return withRequest(request);
+    }
+
     /** `workspace/archiveSession(request)` with `{request:{sessionId}}`. */
     public static JsonObject argsWorkspaceArchiveSession(String sessionId) {
         JsonObject request = new JsonObject();
@@ -458,6 +484,14 @@ public final class DshRemoteContracts {
     public static JsonObject argsSettingsOpenPresetDirectory(String agentPreset) {
         JsonObject args = new JsonObject();
         args.addProperty("agentPreset", agentPreset);
+        return args;
+    }
+
+    /** `settings/update(ns, patch)`; the patch object is applied wholesale to the namespace. */
+    public static JsonObject argsSettingsUpdate(String ns, JsonObject patch) {
+        JsonObject args = new JsonObject();
+        args.addProperty("ns", ns);
+        args.add("patch", patch == null ? new JsonObject() : patch.deepCopy());
         return args;
     }
 

@@ -65,6 +65,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
             ignored -> postStateLater();
     private final DshMarkdownRenderCache markdownRenderCache = new DshMarkdownRenderCache();
     private final DshIdeContextController ideContext;
+    private final DshDebugContextController debugContext;
     private final DshCodeActionController codeActions;
     private final DshSubagentController subagents;
     private final DshSessionStateStore sessionState;
@@ -95,6 +96,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
     private volatile JsonArray messages = new JsonArray();
     private volatile DshMessageProjector.Projection projection;
     private volatile String lastError;
+    private volatile JsonObject pendingComposerUpdate;
 
     public DshToolWindowPanel(@NotNull Project project) {
         super(new BorderLayout());
@@ -117,6 +119,12 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
                         this::postStateLater,
                         this::notify,
                         this::postToWebview);
+        this.debugContext =
+                new DshDebugContextController(
+                        project,
+                        item -> ideContext.attachCustomItem(item),
+                        this::postToWebview,
+                        this::notify);
         this.codeActions = new DshCodeActionController(project, markdownRenderCache, this::notify);
         this.subagents =
                 new DshSubagentController(
@@ -193,6 +201,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
                         () -> {
                             sessionId = null;
                             pendingAgentPreset = null;
+                            DshSettingsState.getInstance(project).lastSessionId = "";
                         },
                         this::refreshAfterMutation,
                         this::postStateLater,
@@ -256,6 +265,9 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
         }
         chooseSessionIfNecessary(current);
         String selected = sessionId;
+        if (selected != null && !selected.isBlank()) {
+            persistSelectedSession();
+        }
         if (selected != null && !selected.isBlank() && !selected.equals(followedSession)) {
             releaseFollowedSession();
             remote.retainSession(selected);
@@ -457,6 +469,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
         if ("ready".equals(type)) {
             webviewReady = true;
             postStateLater();
+            flushPendingComposerUpdate();
             subagents.refresh(sessionId);
             return;
         }
@@ -472,6 +485,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
                 newSessionDraft = true;
                 pendingAgentPreset = null;
                 lastError = null;
+                DshSettingsState.getInstance(project).lastSessionId = "";
                 subagents.reset();
                 postStateLater();
             }
@@ -523,9 +537,11 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
             case "setPermissionPreset" ->
                     sessionActions.setPermissionPreset(string(action, "value"));
             case "setPlanMode" -> setPlanMode(bool(action, "active", false));
-            case "openTerminalCommandPicker" ->
-                    notify(
-                            "Recent terminal command capture is not available in this IntelliJ build.");
+            case "prefillGitDiff" -> prefillGitDiffTask(string(action, "kind"));
+            case "askAboutResource" ->
+                    askAboutResource(string(action, "path"), bool(action, "isDirectory", false));
+            case "insertEditorReference" -> ideContext.insertCurrentFileReference();
+            case "explainDebugState" -> debugContext.explainDebugState();
             case "goalCreate", "goalEdit", "goalPause", "goalResume", "goalComplete", "goalClear" ->
                     goals.mutate(sessionId, action);
             case "refreshSubagents" -> subagents.refresh(sessionId);
@@ -585,6 +601,163 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
         sessionActions.setPlanMode(active);
     }
 
+    /** Dispatch a structured action from IDE menus, as if it came from the webview. */
+    public void runAction(JsonElement value) {
+        receiveAction(value);
+    }
+
+    /** Replace the composer text; queued until the webview is ready, like dsh-ide. */
+    public void setComposerText(String text) {
+        queueComposerUpdate("setText", text);
+    }
+
+    /** Insert text at the composer caret; queued until the webview is ready. */
+    public void insertComposerText(String text) {
+        queueComposerUpdate("insertText", text + " ");
+    }
+
+    private void queueComposerUpdate(String type, String text) {
+        if (text == null || text.isBlank()) {
+            return;
+        }
+        JsonObject update = new JsonObject();
+        update.addProperty("type", type);
+        update.addProperty("text", text);
+        pendingComposerUpdate = update;
+        DshActions.openToolWindow(project);
+        flushPendingComposerUpdate();
+    }
+
+    private void flushPendingComposerUpdate() {
+        if (!webviewReady) {
+            return;
+        }
+        JsonObject update = pendingComposerUpdate;
+        pendingComposerUpdate = null;
+        if (update != null) {
+            postToWebview(update);
+        }
+    }
+
+    /**
+     * Attach the working-tree Git diff as a one-shot context chip and prefill the composer with the
+     * requested task prompt, mirroring dsh-ide's git diff quick tasks.
+     */
+    private void prefillGitDiffTask(String kind) {
+        operations.execute(
+                () -> {
+                    String base = project.getBasePath();
+                    if (base == null) {
+                        notify(DshBundle.message("dsh.git.diff.no.project"));
+                        return;
+                    }
+                    String content;
+                    boolean failed = false;
+                    try {
+                        ProcessBuilder builder =
+                                new ProcessBuilder("git", "diff", "--no-ext-diff", "--unified=3");
+                        builder.directory(Path.of(base).toFile());
+                        builder.redirectErrorStream(false);
+                        Process process = builder.start();
+                        String output;
+                        try (var reader =
+                                new java.io.BufferedReader(
+                                        new java.io.InputStreamReader(
+                                                process.getInputStream(),
+                                                java.nio.charset.StandardCharsets.UTF_8))) {
+                            StringBuilder collected = new StringBuilder();
+                            char[] buffer = new char[8192];
+                            int read;
+                            while ((read = reader.read(buffer)) >= 0)
+                                collected.append(buffer, 0, read);
+                            output = collected.toString();
+                        }
+                        if (!process.waitFor(10, java.util.concurrent.TimeUnit.SECONDS)) {
+                            process.destroyForcibly();
+                            failed = true;
+                        }
+                        if (failed || process.exitValue() != 0) failed = true;
+                        if (failed) {
+                            notify(
+                                    DshBundle.message(
+                                            "dsh.git.diff.failed", "git diff exited non-zero"));
+                            return;
+                        }
+                        content =
+                                output.isBlank() ? DshBundle.message("dsh.git.diff.empty") : output;
+                    } catch (java.io.IOException | InterruptedException error) {
+                        if (error instanceof InterruptedException)
+                            Thread.currentThread().interrupt();
+                        notify(
+                                DshBundle.message(
+                                        "dsh.git.diff.failed",
+                                        error.getMessage() == null
+                                                ? "git diff"
+                                                : error.getMessage()));
+                        return;
+                    }
+                    int cap =
+                            Math.min(
+                                    DshSettingsState.getInstance(project).maxContextBytes, 300_000);
+                    String[] limited = truncateUtf8(content, cap);
+                    String finalKind = kind == null ? "explain" : kind;
+                    ApplicationManager.getApplication()
+                            .invokeLater(
+                                    () -> {
+                                        if (disposed) return;
+                                        ideContext.attachGitDiff(
+                                                limited[0], Boolean.parseBoolean(limited[1]));
+                                        setComposerText(
+                                                DshBundle.message(
+                                                        "dsh.git.diff.task." + finalKind));
+                                    });
+                });
+    }
+
+    /** UTF-8-safe truncation; returns {text, truncated}. */
+    private static String[] truncateUtf8(String value, int maxBytes) {
+        if (value.getBytes(java.nio.charset.StandardCharsets.UTF_8).length <= maxBytes) {
+            return new String[] {value, "false"};
+        }
+        StringBuilder builder = new StringBuilder();
+        int bytes = 0;
+        for (int offset = 0; offset < value.length(); ) {
+            int codePoint = value.codePointAt(offset);
+            int width = utf8Width(codePoint);
+            if (bytes + width > maxBytes) break;
+            builder.appendCodePoint(codePoint);
+            bytes += width;
+            offset += Character.charCount(codePoint);
+        }
+        return new String[] {builder.toString(), "true"};
+    }
+
+    private static int utf8Width(int codePoint) {
+        if (codePoint < 0x80) return 1;
+        if (codePoint < 0x800) return 2;
+        if (codePoint < 0x10000) return 3;
+        return 4;
+    }
+
+    /** Prefill a workspace-scoped prompt about one project resource, like dsh-ide. */
+    private void askAboutResource(String relativePath, boolean directory) {
+        String cleaned = relativePath == null ? "" : relativePath.replace('\\', '/');
+        if (cleaned.isBlank() || cleaned.contains("..")) {
+            notify(DshBundle.message("dsh.ask.resource.outside"));
+            return;
+        }
+        String type =
+                DshBundle.message(
+                        directory ? "dsh.ask.resource.directory" : "dsh.ask.resource.file");
+        setComposerText(
+                String.join(
+                        "\n",
+                        DshBundle.message("dsh.ask.resource.prompt"),
+                        DshBundle.message("dsh.ask.resource.root") + ": " + project.getBasePath(),
+                        DshBundle.message("dsh.ask.resource.target") + ": " + cleaned,
+                        DshBundle.message("dsh.ask.resource.type") + ": " + type));
+    }
+
     /** Keep the JCEF page as an untrusted action sender, matching dsh-ide's boundary. */
     public void submitPromptFromIde(String instruction) {
         JsonObject action = new JsonObject();
@@ -599,6 +772,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
         sessionId = null;
         newSessionDraft = true;
         pendingAgentPreset = null;
+        DshSettingsState.getInstance(project).lastSessionId = "";
         lastError = null;
         projection = DshMessageProjector.Projection.empty();
         messages = new JsonArray();
@@ -678,6 +852,17 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
     private void chooseSessionIfNecessary(DshRemoteState.Snapshot current) {
         if (newSessionDraft) return;
         if (sessionId != null && containsSession(current, sessionId)) return;
+        // Restore the persisted session first, mirroring dsh-ide's
+        // persistSession: what you had open is what you get back, even when it
+        // is a blank draft. The follow stream dies quietly if the session was
+        // deleted elsewhere, and the catalog fallback below takes over.
+        if (DshSettingsState.getInstance(project).persistSession) {
+            String persisted = DshSettingsState.getInstance(project).lastSessionId;
+            if (persisted != null && !persisted.isBlank() && containsSession(current, persisted)) {
+                sessionId = persisted;
+                return;
+            }
+        }
         // Do not auto-select a blank session. dsh-ide creates the session only
         // when the first prompt is sent, which keeps an opened tool window quiet.
         for (JsonElement candidate : current.catalog) {
@@ -690,6 +875,17 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
                     return;
                 }
             }
+        }
+    }
+
+    /** Persist the selected session so the next project open can restore it. */
+    private void persistSelectedSession() {
+        String current = sessionId;
+        DshSettingsState settings = DshSettingsState.getInstance(project);
+        if (!settings.persistSession) return;
+        String saved = settings.lastSessionId;
+        if (current != null && !current.isBlank() && !current.equals(saved)) {
+            settings.lastSessionId = current;
         }
     }
 
@@ -862,14 +1058,35 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
         state.add("subagents", subagents.treeView(sessionId));
         JsonObject subagentPreviewState = subagents.previewView(sessionId);
         if (subagentPreviewState != null) state.add("subagentPreview", subagentPreviewState);
-        if (DshSettingsState.getInstance(project).agentStatusLabel != null
-                && !DshSettingsState.getInstance(project).agentStatusLabel.isBlank()) {
-            state.addProperty(
-                    "agentStatusLabel",
-                    DshSettingsState.getInstance(project).agentStatusLabel.trim());
+        String statusLabel = agentStatusLabelFor(sessionId, running);
+        if (statusLabel != null) {
+            state.addProperty("agentStatusLabel", statusLabel);
         }
         state.add("reasoningEffort", sessionActions.reasoningEffort(sessionId, view));
         return state;
+    }
+
+    /**
+     * Resolve the streaming status label: the fixed override first, then a per-session random pick
+     * from the candidate list while the agent is running, matching dsh-ide's agentStatusLabels.
+     */
+    private String agentStatusLabelFor(String session, boolean busy) {
+        DshSettingsState settings = DshSettingsState.getInstance(project);
+        String fixed = settings.agentStatusLabel;
+        if (fixed != null && !fixed.isBlank()) {
+            return fixed.trim();
+        }
+        java.util.List<String> candidates =
+                settings.agentStatusLabels == null
+                        ? java.util.List.of()
+                        : settings.agentStatusLabels;
+        if (!busy || session == null || session.isBlank() || candidates.isEmpty()) {
+            return null;
+        }
+        StringBuilder key = new StringBuilder();
+        for (String candidate : candidates) key.append(candidate).append('\0');
+        int seed = Math.abs((session + "\0" + key).hashCode());
+        return candidates.get(seed % candidates.size());
     }
 
     private static String statusMessage(

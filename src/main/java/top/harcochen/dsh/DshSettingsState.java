@@ -21,7 +21,18 @@ public final class DshSettingsState implements PersistentStateComponent<DshSetti
     public String serverUrl = "";
     public int serverPort = 0;
     public boolean autoStart = true;
+
+    /** Whether the selected session id survives IDE restarts. */
+    public boolean persistSession = true;
+
+    /** Last selected session for this project; empty when nothing is pinned. */
+    public String lastSessionId = "";
+
     public boolean installWhenMissing = true;
+
+    /** Enable the compaction command by injecting a launcher patch into web-profile launches. */
+    public boolean enableCompaction = true;
+
     public String runtimeVersion = "0.1.2-rc.1";
     public String npmRegistry = "https://registry.npmmirror.com";
     public int startupTimeoutMs = 30_000;
@@ -29,6 +40,18 @@ public final class DshSettingsState implements PersistentStateComponent<DshSetti
     public int maxContextBytes = 120_000;
     public String apiKeyEnv = "DEEPSEEK_API_KEY";
     public String agentStatusLabel = "";
+
+    /** Candidate labels shown while the agent is running; one is picked per session. */
+    public java.util.List<String> agentStatusLabels =
+            new java.util.ArrayList<>(
+                    java.util.List.of(
+                            "大肥鱼正在深潜…",
+                            "大肥鱼摆摆尾巴，想想办法…",
+                            "大肥鱼翻了个身，继续思考…",
+                            "大肥鱼正在吞吐上下文…",
+                            "大肥鱼在鱼缸里转圈…",
+                            "大肥鱼：这题我会…"));
+
     public boolean enableEffortKnob = true;
     public int balanceRefreshIntervalMs = 30_000;
 
@@ -49,7 +72,10 @@ public final class DshSettingsState implements PersistentStateComponent<DshSetti
         serverUrl = state.serverUrl;
         serverPort = state.serverPort;
         autoStart = state.autoStart;
+        persistSession = state.persistSession;
+        lastSessionId = state.lastSessionId;
         installWhenMissing = state.installWhenMissing;
+        enableCompaction = state.enableCompaction;
         runtimeVersion = state.runtimeVersion;
         npmRegistry = state.npmRegistry;
         startupTimeoutMs = state.startupTimeoutMs;
@@ -57,6 +83,11 @@ public final class DshSettingsState implements PersistentStateComponent<DshSetti
         maxContextBytes = state.maxContextBytes;
         apiKeyEnv = state.apiKeyEnv;
         agentStatusLabel = state.agentStatusLabel;
+        agentStatusLabels =
+                new java.util.ArrayList<>(
+                        state.agentStatusLabels == null
+                                ? java.util.List.of()
+                                : state.agentStatusLabels);
         enableEffortKnob = state.enableEffortKnob;
         balanceRefreshIntervalMs = state.balanceRefreshIntervalMs;
     }
