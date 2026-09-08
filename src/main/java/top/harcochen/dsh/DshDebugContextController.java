@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
+import java.util.regex.Pattern;
 import javax.swing.Icon;
 
 /**
@@ -40,9 +41,11 @@ final class DshDebugContextController {
     private static final int MAX_SOURCE_LINE_CHARS = 600;
     private static final int MAX_CONTENT_BYTES = 180_000;
     private static final long CAPTURE_TIMEOUT_SECONDS = 6;
-    private static final String SENSITIVE_VARIABLE_NAME =
-            "(?:password|passwd|secret|token|api[-_ ]?key|access[-_ ]?key|private[-_ ]?key"
-                    + "|credential|authorization|cookie|session)";
+    private static final Pattern SENSITIVE_VARIABLE_NAME =
+            Pattern.compile(
+                    "(?:password|passwd|secret|token|api[-_ ]?key|access[-_ ]?key|private[-_ ]?key"
+                            + "|credential|authorization|cookie|session)",
+                    Pattern.CASE_INSENSITIVE);
 
     private final Project project;
     private final Consumer<JsonObject> chipSink;
@@ -343,8 +346,7 @@ final class DshDebugContextController {
 
         private void collect(String name, XValue value) {
             if (value == null) return;
-            if (name != null
-                    && name.toLowerCase(java.util.Locale.ROOT).matches(SENSITIVE_VARIABLE_NAME)) {
+            if (name != null && SENSITIVE_VARIABLE_NAME.matcher(name).find()) {
                 synchronized (lines) {
                     lines.add("  " + name + " = <redacted>");
                 }
