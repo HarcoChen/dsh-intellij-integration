@@ -8,6 +8,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -720,14 +721,16 @@ public final class DshRuntimeService implements Disposable {
      * proceeds without it.
      */
     private String writeCompactionPatch() {
-        Path patch =
-                Path.of(
-                        System.getProperty("java.io.tmpdir"),
-                        "dsh-intellij-" + ProcessHandle.current().pid() + "-compaction.patch.yml");
         try {
-            java.nio.file.Files.writeString(
+            Path patch =
+                    Files.createTempFile(
+                            Path.of(System.getProperty("java.io.tmpdir")),
+                            "dsh-intellij-",
+                            "-compaction.patch.yml");
+            Files.writeString(
                     patch,
                     "- id: compaction-basic\n  disabled: false\n\n- id: command-compact\n  disabled: false\n",
+                    StandardCharsets.UTF_8,
                     java.nio.file.StandardOpenOption.CREATE,
                     java.nio.file.StandardOpenOption.TRUNCATE_EXISTING,
                     java.nio.file.StandardOpenOption.WRITE);
