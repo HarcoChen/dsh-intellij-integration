@@ -31,6 +31,18 @@ import top.harcochen.dsh.DshSettingsState;
 public final class DshRemoteService implements Disposable {
     private static final Logger LOG = Logger.getInstance(DshRemoteService.class);
 
+    /** Temporary DeepSeek model exposed by the official endpoint before catalog refresh. */
+    private static final String FORCED_DEEPSEEK_PROVIDER = "deepseek-official";
+
+    private static final String FORCED_DEEPSEEK_MODEL_ID = "deepseek-v4.1-flash-expires-on-0910";
+
+    /** Keep the temporary route visible through 2026-09-10, then stop advertising it. */
+    private static final long FORCED_DEEPSEEK_MODEL_LAST_VISIBLE_AT =
+            java.time.Instant.parse("2026-09-11T00:00:00Z").toEpochMilli();
+
+    private static final String FORCED_DEEPSEEK_MODEL_DESCRIPTION =
+            "Temporary text-only route; available through 2026-09-10.";
+
     public static final String PHASE_STOPPED = "stopped";
     public static final String PHASE_CONNECTING = "connecting";
     public static final String PHASE_CONNECTED = "connected";
@@ -290,9 +302,11 @@ public final class DshRemoteService implements Disposable {
     }
 
     public JsonObject modelCatalog() throws DshRemoteException {
-        return objectValue(
-                unary.call(
-                        DshRemoteContracts.SESSION_MODEL_CATALOG, DshRemoteContracts.argsEmpty()));
+        return appendTemporaryDeepSeekModel(
+                objectValue(
+                        unary.call(
+                                DshRemoteContracts.SESSION_MODEL_CATALOG,
+                                DshRemoteContracts.argsEmpty())));
     }
 
     public void selectModel(String sessionId, String provider, String model, String reasoningEffort)
@@ -699,6 +713,70 @@ public final class DshRemoteService implements Disposable {
 
     private static JsonObject objectValue(JsonElement value) {
         return value != null && value.isJsonObject() ? value.getAsJsonObject() : new JsonObject();
+    }
+
+    /**
+     * Advertise the temporary official DeepSeek route until the Runtime catalog catches up.
+     *
+     * <p>The route is intentionally added only to an existing provider group. The Runtime remains
+     * authoritative for provider availability, while this compatibility shim makes the model
+     * selectable by older editor integrations during the short catalog propagation window.
+     */
+    private static JsonObject appendTemporaryDeepSeekModel(JsonObject catalog) {
+        if (System.currentTimeMillis() >= FORCED_DEEPSEEK_MODEL_LAST_VISIBLE_AT
+                || catalog == null
+                || !catalog.has("groups")
+                || !catalog.get("groups").isJsonArray()) {
+            return catalog;
+        }
+
+        for (JsonElement groupElement : catalog.getAsJsonArray("groups")) {
+            if (!groupElement.isJsonObject()) continue;
+            JsonObject group = groupElement.getAsJsonObject();
+            if (!FORCED_DEEPSEEK_PROVIDER.equals(stringOf(group, "id"))) continue;
+            if (!group.has("models") || !group.get("models").isJsonArray()) continue;
+
+            JsonArray models = group.getAsJsonArray("models");
+            for (JsonElement modelElement : models) {
+                if (modelElement.isJsonObject()
+                        && FORCED_DEEPSEEK_MODEL_ID.equals(
+                                stringOf(modelElement.getAsJsonObject(), "id"))) {
+                    return catalog;
+                }
+            }
+
+            JsonObject temporaryModel = new JsonObject();
+            temporaryModel.addProperty("id", FORCED_DEEPSEEK_MODEL_ID);
+            temporaryModel.addProperty("name", FORCED_DEEPSEEK_MODEL_ID);
+            temporaryModel.addProperty("description", FORCED_DEEPSEEK_MODEL_DESCRIPTION);
+            JsonObject reasoning = copyReasoningMetadata(models);
+            if (reasoning != null) temporaryModel.add("reasoning", reasoning);
+            models.add(temporaryModel);
+            return catalog;
+        }
+        return catalog;
+    }
+
+    /** Reuse the provider's configured reasoning choices for the temporary route. */
+    private static JsonObject copyReasoningMetadata(JsonArray models) {
+        for (JsonElement modelElement : models) {
+            if (!modelElement.isJsonObject()) continue;
+            JsonObject model = modelElement.getAsJsonObject();
+            if (!model.has("reasoning") || !model.get("reasoning").isJsonObject()) continue;
+            JsonObject source = model.getAsJsonObject("reasoning");
+            if (!source.has("efforts")
+                    || !source.get("efforts").isJsonArray()
+                    || source.getAsJsonArray("efforts").isEmpty()) {
+                continue;
+            }
+            JsonObject copy = new JsonObject();
+            copy.add("efforts", source.getAsJsonArray("efforts").deepCopy());
+            if (source.has("defaultEffort")) {
+                copy.add("defaultEffort", source.get("defaultEffort").deepCopy());
+            }
+            return copy;
+        }
+        return null;
     }
 
     private static JsonArray arrayOrEmpty(JsonObject value, String key) {
