@@ -139,7 +139,7 @@ final class DshDebugContextController {
         private void captureFrames() {
             XExecutionStack stack = activeStack();
             if (stack == null) {
-                frameLines.add("(unavailable)");
+                addFrameLine("(unavailable)");
                 done.countDown();
                 return;
             }
@@ -153,13 +153,13 @@ final class DshDebugContextController {
                                 XStackFrame current = session.getCurrentStackFrame();
                                 int count = Math.min(frames.size(), MAX_STACK_FRAMES);
                                 if (count == 0) {
-                                    frameLines.add("(unavailable)");
+                                    addFrameLine("(unavailable)");
                                 }
                                 for (int index = 0; index < count; index++) {
                                     XStackFrame frame = frames.get(index);
                                     String location = locationOf(frame);
                                     String marker = frame == current ? "*" : " ";
-                                    frameLines.add(
+                                    addFrameLine(
                                             marker
                                                     + " #"
                                                     + index
@@ -178,9 +178,7 @@ final class DshDebugContextController {
 
                             @Override
                             public void errorOccurred(String errorMessage) {
-                                synchronized (frameLines) {
-                                    frameLines.add("(unavailable: " + errorMessage + ")");
-                                }
+                                addFrameLine("(unavailable: " + errorMessage + ")");
                             }
 
                             @Override
@@ -190,8 +188,14 @@ final class DshDebugContextController {
                         });
             } catch (RuntimeException error) {
                 LOG.debug("Unable to read debug stack frames", error);
-                frameLines.add("(unavailable: " + error.getMessage() + ")");
+                addFrameLine("(unavailable: " + error.getMessage() + ")");
                 done.countDown();
+            }
+        }
+
+        private void addFrameLine(String line) {
+            synchronized (frameLines) {
+                frameLines.add(line);
             }
         }
 
