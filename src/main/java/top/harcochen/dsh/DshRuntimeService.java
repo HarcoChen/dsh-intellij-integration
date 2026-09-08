@@ -742,12 +742,13 @@ public final class DshRuntimeService implements Disposable {
     private static int webProfileIndex(List<String> args) {
         for (int index = 0; index < args.size(); index++) {
             String argument = args.get(index);
-            if (argument.equals("web")
-                    || argument.equals("--profile=web")
-                    || (argument.equals("--profile")
-                            && index + 1 < args.size()
-                            && args.get(index + 1).equals("web"))) {
+            if (argument.equals("web") || argument.equals("--profile=web")) {
                 return index;
+            }
+            if (argument.equals("--profile")
+                    && index + 1 < args.size()
+                    && args.get(index + 1).equals("web")) {
+                return index + 1;
             }
         }
         return -1;
