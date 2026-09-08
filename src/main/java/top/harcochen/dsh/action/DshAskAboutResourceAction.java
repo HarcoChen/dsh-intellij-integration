@@ -1,6 +1,8 @@
 package top.harcochen.dsh.action;
 
 import com.google.gson.JsonObject;
+import com.intellij.notification.NotificationGroupManager;
+import com.intellij.notification.NotificationType;
 import com.intellij.openapi.actionSystem.ActionUpdateThread;
 import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.actionSystem.CommonDataKeys;
@@ -25,7 +27,12 @@ public final class DshAskAboutResourceAction extends DumbAwareAction {
             Path base = Path.of(project.getBasePath()).normalize();
             Path candidate = Path.of(file.getPath()).normalize();
             if (!candidate.startsWith(base)) {
-                DshBundle.message("dsh.ask.resource.outside");
+                NotificationGroupManager.getInstance()
+                        .getNotificationGroup("DeepSeek Harness")
+                        .createNotification(
+                                DshBundle.message("dsh.ask.resource.outside"),
+                                NotificationType.WARNING)
+                        .notify(project);
                 return;
             }
             relative = base.relativize(candidate).toString().replace('\\', '/');
