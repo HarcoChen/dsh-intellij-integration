@@ -40,6 +40,7 @@ public final class DshRemoteState {
 
     // ---- session catalog -----------------------------------------------------
     private final Map<String, JsonObject> catalogBySession = new LinkedHashMap<>();
+    private boolean sessionListBaselineReceived;
 
     // ---- workspace registry --------------------------------------------------
     private final Map<String, JsonObject> workspacesById = new LinkedHashMap<>();
@@ -69,6 +70,7 @@ public final class DshRemoteState {
         this.phase = phase;
         this.message = null;
         catalogBySession.clear();
+        sessionListBaselineReceived = false;
         controlBySession.clear();
         pendingControlBaseline = null;
         workspacesById.clear();
@@ -87,6 +89,7 @@ public final class DshRemoteState {
     /** Apply the `session/list` baseline. Items are stored raw. */
     void applySessionList(JsonArray items) {
         catalogBySession.clear();
+        sessionListBaselineReceived = true;
         if (items != null) {
             for (JsonElement candidate : items) {
                 if (!candidate.isJsonObject()) continue;
@@ -292,7 +295,7 @@ public final class DshRemoteState {
                             ? value.getAsJsonObject("projections")
                             : new JsonObject();
             controlBySession.clear();
-            if (catalogBySession.isEmpty()) {
+            if (!sessionListBaselineReceived) {
                 // The catalog baseline has not arrived yet; hold the baseline and
                 // apply it when session/list lands (applySessionList).
                 pendingControlBaseline = frame.deepCopy();

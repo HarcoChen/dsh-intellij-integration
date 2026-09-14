@@ -7,6 +7,7 @@ import com.intellij.openapi.diagnostic.Logger;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -106,13 +107,12 @@ final class DshPromptController {
                                     try {
                                         errorSink.accept(null);
                                         runtime.startAsync().join();
+                                        if (!Objects.equals(sessionId.get(), selected)) {
+                                            throw new IllegalStateException(
+                                                    DshBundle.message("dsh.plan.session.changed"));
+                                        }
                                         String current = selected;
                                         if (current == null || current.isBlank()) {
-                                            if (sessionId.get() != null) {
-                                                throw new IllegalStateException(
-                                                        DshBundle.message(
-                                                                "dsh.plan.session.changed"));
-                                            }
                                             current = sessionProvider.ensure();
                                         }
                                         ensureCommandCatalog(current);
