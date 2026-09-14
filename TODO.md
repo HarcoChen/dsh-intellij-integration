@@ -65,6 +65,10 @@ These items track the post-0.2.1 functionality found in the adjacent `dsh-ide` c
 item is complete only when the IntelliJ host action, Harness RPC/projection boundary, WebView
 action validation, and the user-visible failure path are wired together.
 
+- [x] Composer usage controls: hover the context ring to inspect context composition and token statistics;
+  click the model name to open the native model chooser. Keyboard focus opens the statistics,
+  Escape dismisses them, and the panel stays inside narrow WebView viewports.
+
 - [ ] Message checkpoints: fork from a finalized message, restore code to that message, or fork and restore together.
 - [x] Plan Mode: consume the public `plan` projection and expose `/plan` plus a composer toggle.
   - [x] Serialize composer toggles and use bare `/plan` so enabling the mode does not submit `on` as a task.
