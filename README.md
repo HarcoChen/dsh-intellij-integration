@@ -52,6 +52,13 @@ Review file edits in the IDE's own diff viewer. For supported tool diff cards, D
 
 Use **DSH: Ask About Selection** for an open-ended question, or the **DSH** context menu for explain / fix / review / documentation tasks. The context picker also supports attaching the current unstaged Git diff. Editor context is bounded by the configurable byte limit.
 
+### Plan before implementing
+
+Use the composer's **Plan** toggle or `/plan` to enter plan mode; `/plan off` leaves it.
+The toggle changes the session mode without sending a task or consuming attached IDE context.
+When the agent submits a plan for review, approve it or provide feedback with **Continue planning**.
+The subagent tree and preview show active and completed execution time when the Runtime supplies it.
+
 ### Keep the Runtime close to your tools
 
 The plugin manages local Runtime startup, shutdown, and restart, with `pnpm`, an installed `dsh`, and `npx` launch options. Package-manager launches use the configured Runtime version. You can also connect to an existing Runtime or open its Web UI in a browser.

@@ -23669,6 +23669,7 @@
     "Recent terminal command": "\u6700\u8FD1\u7684\u7EC8\u7AEF\u547D\u4EE4",
     "The connected dsh server does not expose the /compact command. Update dsh or enable the command-compact package.": "\u5F53\u524D\u8FDE\u63A5\u7684 dsh server \u672A\u63D0\u4F9B /compact command\u3002\u8BF7\u66F4\u65B0 dsh \u6216\u542F\u7528 command-compact package\u3002",
     "Compacting": "\u6B63\u5728\u538B\u7F29",
+    "Show context breakdown": "显示上下文统计",
     "Select the current session model": "\u9009\u62E9\u5F53\u524D\u4F1A\u8BDD\u6A21\u578B",
     "Select reasoning effort": "\u9009\u62E9\u63A8\u7406\u5F3A\u5EA6",
     "Select agent mode": "\u9009\u62E9 Agent \u6A21\u5F0F",
@@ -23677,7 +23678,7 @@
     "Plan mode on, click to turn off": "Plan \u6A21\u5F0F\u5DF2\u5F00\u542F\uFF0C\u70B9\u51FB\u5173\u95ED",
     "Plan mode on \u2014 click to turn off (/plan off)": "Plan \u6A21\u5F0F\u5DF2\u5F00\u542F \u2014 \u70B9\u51FB\u5173\u95ED\uFF08/plan off\uFF09",
     "Plan mode off, click to turn on": "Plan \u6A21\u5F0F\u5DF2\u5173\u95ED\uFF0C\u70B9\u51FB\u5F00\u542F",
-    "Plan mode off \u2014 click to turn on (/plan on)": "Plan \u6A21\u5F0F\u5DF2\u5173\u95ED \u2014 \u70B9\u51FB\u5F00\u542F\uFF08/plan on\uFF09",
+    "Plan mode off \u2014 click to turn on (/plan)": "Plan \u6A21\u5F0F\u5DF2\u5173\u95ED \u2014 \u70B9\u51FB\u5F00\u542F\uFF08/plan\uFF09",
     "Toggle focus mode": "\u5207\u6362 Focus \u6A21\u5F0F",
     "Open the current session trace": "\u6253\u5F00\u5F53\u524D\u4F1A\u8BDD Trace",
     "Stop the dsh runtime": "\u505C\u6B62 dsh \u8FD0\u884C\u65F6",
@@ -26086,22 +26087,44 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
     return /* @__PURE__ */ import_react25.default.createElement("div", { className: "dsh-token-chart-row", title }, /* @__PURE__ */ import_react25.default.createElement("span", { className: "dsh-token-chart-label" }, label), /* @__PURE__ */ import_react25.default.createElement("span", { className: "dsh-token-chart-track" }, /* @__PURE__ */ import_react25.default.createElement("span", { className: `dsh-token-chart-fill ${kind}`, style: { width: `${width}%` } })), /* @__PURE__ */ import_react25.default.createElement("span", { className: "dsh-token-chart-value" }, tokens === void 0 ? "--" : compactTokens(tokens), suffix ? /* @__PURE__ */ import_react25.default.createElement("small", null, suffix) : null));
   }
   function TokenUsageBar({ usage }) {
-    const [open, setOpen] = (0, import_react25.useState)(false);
-    const rootRef = (0, import_react25.useRef)(null);
+    const [hovered, setHovered] = (0, import_react25.useState)(false);
+    const [focused, setFocused] = (0, import_react25.useState)(false);
+    const anchorRef = (0, import_react25.useRef)(null);
+    const panelRef = (0, import_react25.useRef)(null);
+    const [panelLeft, setPanelLeft] = (0, import_react25.useState)(0);
+    const open = hovered || focused;
+    (0, import_react25.useLayoutEffect)(() => {
+      if (!open || !usage) return;
+      const anchor = anchorRef.current;
+      const panel = panelRef.current;
+      if (!anchor || !panel) return;
+      const position = () => {
+        const bounds = anchor.getBoundingClientRect();
+        const margin = 8;
+        const rightmost = Math.max(margin, document.documentElement.clientWidth - panel.offsetWidth - margin);
+        const left = Math.max(margin, Math.min(bounds.left, rightmost));
+        setPanelLeft(left - bounds.left);
+      };
+      position();
+      const observer = new ResizeObserver(position);
+      observer.observe(panel);
+      if (anchor.parentElement?.parentElement) observer.observe(anchor.parentElement.parentElement);
+      window.addEventListener("resize", position);
+      return () => {
+        observer.disconnect();
+        window.removeEventListener("resize", position);
+      };
+    }, [open, usage]);
     (0, import_react25.useEffect)(() => {
       if (!open) return;
-      const onPointerDown = (event) => {
-        if (rootRef.current && !rootRef.current.contains(event.target)) {
-          setOpen(false);
+      const onEscape = (event) => {
+        if (event.key === "Escape") {
+          setHovered(false);
+          setFocused(false);
         }
       };
-      const onEscape = (event) => {
-        if (event.key === "Escape") setOpen(false);
-      };
-      document.addEventListener("mousedown", onPointerDown);
       document.addEventListener("keydown", onEscape);
       return () => {
-        document.removeEventListener("mousedown", onPointerDown);
         document.removeEventListener("keydown", onEscape);
       };
     }, [open]);
@@ -26123,110 +26146,140 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
     ) : 1;
     const breakdownTotal = breakdown ? breakdown.systemTokens + breakdown.toolsTokens + breakdown.messageTokens : 0;
     const breakdownMaximum = Math.max(1, breakdownTotal);
-    return /* @__PURE__ */ import_react25.default.createElement("section", { className: "dsh-usage", "aria-label": t("Token and context usage"), ref: rootRef }, /* @__PURE__ */ import_react25.default.createElement(
-      "button",
-      {
-        type: "button",
-        className: "dsh-usage-summary",
-        "aria-expanded": open,
-        title: t("Open token statistics"),
-        onClick: () => setOpen((current) => !current)
-      },
-      /* @__PURE__ */ import_react25.default.createElement(UsageRing, { percent: occupancy, size: "small", severity }),
-      /* @__PURE__ */ import_react25.default.createElement("span", { className: "dsh-usage-summary-route" }, /* @__PURE__ */ import_react25.default.createElement("strong", null, routeLabel)),
-      /* @__PURE__ */ import_react25.default.createElement("span", { className: "dsh-usage-summary-context" }, occupied === void 0 ? "--" : compactTokens(occupied), " / ", capacity === void 0 ? "--" : compactTokens(capacity))
-    ), open ? /* @__PURE__ */ import_react25.default.createElement("div", { className: "dsh-usage-panel", role: "dialog", "aria-label": t("Token statistics") }, /* @__PURE__ */ import_react25.default.createElement("div", { className: "dsh-usage-panel-head" }, /* @__PURE__ */ import_react25.default.createElement("div", null, /* @__PURE__ */ import_react25.default.createElement("strong", null, t("Token statistics")), /* @__PURE__ */ import_react25.default.createElement("span", null, routeLabel, " \xB7 effort ", route.reasoningEffort || t("Default"))), /* @__PURE__ */ import_react25.default.createElement(
-      "button",
-      {
-        type: "button",
-        className: "dsh-icon-button",
-        title: t("Close"),
-        onClick: () => setOpen(false)
-      },
-      /* @__PURE__ */ import_react25.default.createElement(CloseIcon, null)
-    )), /* @__PURE__ */ import_react25.default.createElement(
+    return /* @__PURE__ */ import_react25.default.createElement("section", { className: "dsh-usage", "aria-label": t("Token and context usage") }, /* @__PURE__ */ import_react25.default.createElement(
       "div",
       {
-        className: "dsh-usage-context-stat",
-        title: t("Estimate based on the latest provider usage and current Surface changes")
+        className: "dsh-usage-context",
+        ref: anchorRef,
+        onMouseEnter: () => setHovered(true),
+        onMouseLeave: () => setHovered(false),
+        onFocus: () => setFocused(true),
+        onBlur: (event) => {
+          if (!event.currentTarget.contains(event.relatedTarget)) {
+            setFocused(false);
+          }
+        }
       },
-      /* @__PURE__ */ import_react25.default.createElement(UsageRing, { percent: occupancy, size: "large", severity }),
-      /* @__PURE__ */ import_react25.default.createElement("div", null, /* @__PURE__ */ import_react25.default.createElement("span", null, t("Context usage \xB7 estimated")), /* @__PURE__ */ import_react25.default.createElement("strong", null, occupied === void 0 ? "--" : compactTokens(occupied), /* @__PURE__ */ import_react25.default.createElement("small", null, " / ", capacity === void 0 ? "--" : compactTokens(capacity))))
-    ), breakdown ? /* @__PURE__ */ import_react25.default.createElement("div", { className: "dsh-token-chart", "aria-label": t("Context composition") }, /* @__PURE__ */ import_react25.default.createElement("div", { className: "dsh-token-chart-head" }, /* @__PURE__ */ import_react25.default.createElement("span", null, t("What fills the context")), /* @__PURE__ */ import_react25.default.createElement("span", null, t("Harness estimate"))), /* @__PURE__ */ import_react25.default.createElement(
-      ChartRow,
-      {
-        label: t("System prompt"),
-        tokens: breakdown.systemTokens,
-        maximum: breakdownMaximum,
-        kind: "system",
-        title: t("System prompt sections")
-      }
+      /* @__PURE__ */ import_react25.default.createElement(
+        "button",
+        {
+          type: "button",
+          className: "dsh-usage-context-trigger",
+          "aria-expanded": open,
+          "aria-controls": "dsh-context-breakdown",
+          title: t("Show context breakdown"),
+          onClick: () => setFocused(true)
+        },
+        /* @__PURE__ */ import_react25.default.createElement(UsageRing, { percent: occupancy, size: "small", severity }),
+        /* @__PURE__ */ import_react25.default.createElement("span", { className: "dsh-usage-summary-context" }, occupied === void 0 ? "--" : compactTokens(occupied), " / ", capacity === void 0 ? "--" : compactTokens(capacity))
+      ),
+      open ? /* @__PURE__ */ import_react25.default.createElement(
+        "div",
+        {
+          id: "dsh-context-breakdown",
+          className: "dsh-usage-panel",
+          ref: panelRef,
+          style: { left: panelLeft },
+          role: "dialog",
+          "aria-label": t("Token statistics")
+        },
+        /* @__PURE__ */ import_react25.default.createElement("div", { className: "dsh-usage-panel-head" }, /* @__PURE__ */ import_react25.default.createElement("div", null, /* @__PURE__ */ import_react25.default.createElement("strong", null, t("Token statistics")), /* @__PURE__ */ import_react25.default.createElement("span", null, routeLabel, " \xB7 effort ", route.reasoningEffort || t("Default")))),
+        /* @__PURE__ */ import_react25.default.createElement(
+          "div",
+          {
+            className: "dsh-usage-context-stat",
+            title: t("Estimate based on the latest provider usage and current Surface changes")
+          },
+          /* @__PURE__ */ import_react25.default.createElement(UsageRing, { percent: occupancy, size: "large", severity }),
+          /* @__PURE__ */ import_react25.default.createElement("div", null, /* @__PURE__ */ import_react25.default.createElement("span", null, t("Context usage \xB7 estimated")), /* @__PURE__ */ import_react25.default.createElement("strong", null, occupied === void 0 ? "--" : compactTokens(occupied), /* @__PURE__ */ import_react25.default.createElement("small", null, " / ", capacity === void 0 ? "--" : compactTokens(capacity))))
+        ),
+        breakdown ? /* @__PURE__ */ import_react25.default.createElement("div", { className: "dsh-token-chart", "aria-label": t("Context composition") }, /* @__PURE__ */ import_react25.default.createElement("div", { className: "dsh-token-chart-head" }, /* @__PURE__ */ import_react25.default.createElement("span", null, t("What fills the context")), /* @__PURE__ */ import_react25.default.createElement("span", null, t("Harness estimate"))), /* @__PURE__ */ import_react25.default.createElement(
+          ChartRow,
+          {
+            label: t("System prompt"),
+            tokens: breakdown.systemTokens,
+            maximum: breakdownMaximum,
+            kind: "system",
+            title: t("System prompt sections")
+          }
+        ), /* @__PURE__ */ import_react25.default.createElement(
+          ChartRow,
+          {
+            label: t("Tools"),
+            tokens: breakdown.toolsTokens,
+            maximum: breakdownMaximum,
+            kind: "tools",
+            title: t("Tool schemas offered to the model")
+          }
+        ), /* @__PURE__ */ import_react25.default.createElement(
+          ChartRow,
+          {
+            label: t("Messages"),
+            tokens: breakdown.messageTokens,
+            maximum: breakdownMaximum,
+            kind: "messages",
+            title: t("Conversation history after compaction")
+          }
+        )) : null,
+        billing ? /* @__PURE__ */ import_react25.default.createElement("div", { className: "dsh-token-chart", "aria-label": t("Billed session token distribution") }, /* @__PURE__ */ import_react25.default.createElement("div", { className: "dsh-token-chart-head" }, /* @__PURE__ */ import_react25.default.createElement("span", null, t("Billed session tokens")), /* @__PURE__ */ import_react25.default.createElement("span", null, t("Provider usage"))), /* @__PURE__ */ import_react25.default.createElement(
+          ChartRow,
+          {
+            label: t("Input"),
+            tokens: billing.uncachedInputTokens,
+            maximum: chartMaximum,
+            kind: "input",
+            title: t("Uncached input tokens")
+          }
+        ), /* @__PURE__ */ import_react25.default.createElement(
+          ChartRow,
+          {
+            label: t("Output"),
+            tokens: billing.outputTokens,
+            maximum: chartMaximum,
+            kind: "output",
+            title: t("Output tokens")
+          }
+        ), /* @__PURE__ */ import_react25.default.createElement(
+          ChartRow,
+          {
+            label: t("Reasoning"),
+            tokens: billing.reasoningTokens,
+            maximum: Math.max(1, billing.outputTokens),
+            kind: "reasoning",
+            suffix: t("Output subset"),
+            title: t("Reasoning tokens are included in output")
+          }
+        ), /* @__PURE__ */ import_react25.default.createElement(
+          ChartRow,
+          {
+            label: t("Cache read"),
+            tokens: billing.cacheReadTokens,
+            maximum: chartMaximum,
+            kind: "cache-read",
+            suffix: cacheHitRate === void 0 ? void 0 : t("{rate}% hit", { rate: numberFormatter.format(cacheHitRate) }),
+            title: t("Cache-read tokens and hit rate")
+          }
+        ), /* @__PURE__ */ import_react25.default.createElement(
+          ChartRow,
+          {
+            label: t("Cache write"),
+            tokens: billing.cacheWriteTokens,
+            maximum: chartMaximum,
+            kind: "cache-write",
+            title: t("Cache-write tokens")
+          }
+        )) : /* @__PURE__ */ import_react25.default.createElement("div", { className: "dsh-usage-empty" }, t("No provider billing data"))
+      ) : null
     ), /* @__PURE__ */ import_react25.default.createElement(
-      ChartRow,
+      "button",
       {
-        label: t("Tools"),
-        tokens: breakdown.toolsTokens,
-        maximum: breakdownMaximum,
-        kind: "tools",
-        title: t("Tool schemas offered to the model")
-      }
-    ), /* @__PURE__ */ import_react25.default.createElement(
-      ChartRow,
-      {
-        label: t("Messages"),
-        tokens: breakdown.messageTokens,
-        maximum: breakdownMaximum,
-        kind: "messages",
-        title: t("Conversation history after compaction")
-      }
-    )) : null, billing ? /* @__PURE__ */ import_react25.default.createElement("div", { className: "dsh-token-chart", "aria-label": t("Billed session token distribution") }, /* @__PURE__ */ import_react25.default.createElement("div", { className: "dsh-token-chart-head" }, /* @__PURE__ */ import_react25.default.createElement("span", null, t("Billed session tokens")), /* @__PURE__ */ import_react25.default.createElement("span", null, t("Provider usage"))), /* @__PURE__ */ import_react25.default.createElement(
-      ChartRow,
-      {
-        label: t("Input"),
-        tokens: billing.uncachedInputTokens,
-        maximum: chartMaximum,
-        kind: "input",
-        title: t("Uncached input tokens")
-      }
-    ), /* @__PURE__ */ import_react25.default.createElement(
-      ChartRow,
-      {
-        label: t("Output"),
-        tokens: billing.outputTokens,
-        maximum: chartMaximum,
-        kind: "output",
-        title: t("Output tokens")
-      }
-    ), /* @__PURE__ */ import_react25.default.createElement(
-      ChartRow,
-      {
-        label: t("Reasoning"),
-        tokens: billing.reasoningTokens,
-        maximum: Math.max(1, billing.outputTokens),
-        kind: "reasoning",
-        suffix: t("Output subset"),
-        title: t("Reasoning tokens are included in output")
-      }
-    ), /* @__PURE__ */ import_react25.default.createElement(
-      ChartRow,
-      {
-        label: t("Cache read"),
-        tokens: billing.cacheReadTokens,
-        maximum: chartMaximum,
-        kind: "cache-read",
-        suffix: cacheHitRate === void 0 ? void 0 : t("{rate}% hit", { rate: numberFormatter.format(cacheHitRate) }),
-        title: t("Cache-read tokens and hit rate")
-      }
-    ), /* @__PURE__ */ import_react25.default.createElement(
-      ChartRow,
-      {
-        label: t("Cache write"),
-        tokens: billing.cacheWriteTokens,
-        maximum: chartMaximum,
-        kind: "cache-write",
-        title: t("Cache-write tokens")
-      }
-    )) : /* @__PURE__ */ import_react25.default.createElement("div", { className: "dsh-usage-empty" }, t("No provider billing data"))) : null);
+        type: "button",
+        className: "dsh-usage-model",
+        title: t("Select the current session model"),
+        onClick: () => postAction({ type: "selectModel" })
+      },
+      /* @__PURE__ */ import_react25.default.createElement("strong", null, routeLabel)
+    ));
   }
 
   // webview/src/components/useSlashCompletion.ts
@@ -26874,7 +26927,7 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
       {
         type: "button",
         className: `dsh-plan-chip${planActive ? "" : " dsh-plan-chip-off"}`,
-        title: planActive ? t("Plan mode on \u2014 click to turn off (/plan off)") : t("Plan mode off \u2014 click to turn on (/plan on)"),
+        title: planActive ? t("Plan mode on \u2014 click to turn off (/plan off)") : t("Plan mode off \u2014 click to turn on (/plan)"),
         "aria-label": planActive ? t("Plan mode on, click to turn off") : t("Plan mode off, click to turn on"),
         "aria-pressed": planActive,
         disabled: !planCommandAvailable,

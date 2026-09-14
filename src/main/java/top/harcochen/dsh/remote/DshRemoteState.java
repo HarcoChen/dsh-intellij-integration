@@ -12,6 +12,7 @@ import com.google.gson.JsonObject;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -39,6 +40,7 @@ public final class DshRemoteState {
 
     // ---- session catalog -----------------------------------------------------
     private final Map<String, JsonObject> catalogBySession = new LinkedHashMap<>();
+    private boolean sessionListBaselineReceived;
 
     // ---- workspace registry --------------------------------------------------
     private final Map<String, JsonObject> workspacesById = new LinkedHashMap<>();
@@ -68,6 +70,7 @@ public final class DshRemoteState {
         this.phase = phase;
         this.message = null;
         catalogBySession.clear();
+        sessionListBaselineReceived = false;
         controlBySession.clear();
         pendingControlBaseline = null;
         workspacesById.clear();
@@ -86,6 +89,7 @@ public final class DshRemoteState {
     /** Apply the `session/list` baseline. Items are stored raw. */
     void applySessionList(JsonArray items) {
         catalogBySession.clear();
+        sessionListBaselineReceived = true;
         if (items != null) {
             for (JsonElement candidate : items) {
                 if (!candidate.isJsonObject()) continue;
@@ -291,14 +295,18 @@ public final class DshRemoteState {
                             ? value.getAsJsonObject("projections")
                             : new JsonObject();
             controlBySession.clear();
-            if (catalogBySession.isEmpty()) {
+            if (!sessionListBaselineReceived) {
                 // The catalog baseline has not arrived yet; hold the baseline and
                 // apply it when session/list lands (applySessionList).
                 pendingControlBaseline = frame.deepCopy();
                 return;
             }
             pendingControlBaseline = null;
-            for (String sessionId : catalogBySession.keySet()) {
+            Set<String> sessionIds = new HashSet<>(catalogBySession.keySet());
+            sessionIds.addAll(queues.keySet());
+            sessionIds.addAll(jobs.keySet());
+            sessionIds.addAll(projections.keySet());
+            for (String sessionId : sessionIds) {
                 SessionControl control = controlFor(sessionId);
                 control.replaceQueue(asArray(queues.get(sessionId)));
                 control.replaceJobs(asArray(jobs.get(sessionId)));
@@ -604,7 +612,7 @@ public final class DshRemoteState {
             JsonObject raw = entry.getValue();
             SessionControl control = controlBySession.get(sessionId);
             Map<String, ProjectionCell> cells =
-                    control == null ? Map.of() : Map.copyOf(control.projections);
+                    new HashMap<>(control == null ? Map.of() : control.projections);
             JsonObject row = new JsonObject();
             row.addProperty("sessionId", sessionId);
             String title = projectedTitle(sessionId, cells, raw);
@@ -631,10 +639,22 @@ public final class DshRemoteState {
                         values.has("values") && values.get("values").isJsonObject()
                                 ? values.getAsJsonObject("values")
                                 : null;
-                if (block != null
-                        && block.has("subagentTiming")
-                        && block.get("subagentTiming").isJsonObject()) {
-                    row.add("subagentTiming", block.getAsJsonObject("subagentTiming").deepCopy());
+                if (block != null && block.has("subagentTiming")) {
+                    long baselineSeq = longValue(values.get("asOfSeq"), -1L);
+                    ProjectionCell known = cells.get("subagentTiming");
+                    if (known == null || baselineSeq > known.seq()) {
+                        cells.put(
+                                "subagentTiming",
+                                new ProjectionCell(
+                                        block.get("subagentTiming").deepCopy(), baselineSeq));
+                    }
+                }
+            }
+            ProjectionCell timing = cells.get("subagentTiming");
+            if (timing != null) {
+                row.remove("subagentTiming");
+                if (timing.value() != null && timing.value().isJsonObject()) {
+                    row.add("subagentTiming", timing.value().deepCopy());
                 }
             }
             String lastError = string(raw, "lastError");
@@ -646,12 +666,24 @@ public final class DshRemoteState {
                             control == null ? new JsonArray() : control.queueDock(),
                             control == null ? new JsonArray() : control.jobRows(sessionId),
                             control == null ? new JsonArray() : control.interactionRows(),
-                            cells,
+                            Map.copyOf(cells),
                             control == null ? Set.of() : Set.copyOf(control.durableRequestIds)));
         }
         rows.sort(
                 Comparator.comparing((JsonObject value) -> bool(value, "running", false))
                         .reversed());
+        // Child sessions can carry live control projections without appearing in session/list.
+        for (Map.Entry<String, SessionControl> entry : controlBySession.entrySet()) {
+            SessionControl control = entry.getValue();
+            sessions.putIfAbsent(
+                    entry.getKey(),
+                    new SessionView(
+                            control.queueDock(),
+                            control.jobRows(entry.getKey()),
+                            control.interactionRows(),
+                            Map.copyOf(control.projections),
+                            Set.copyOf(control.durableRequestIds)));
+        }
         JsonArray catalog = new JsonArray();
         for (JsonObject row : rows) catalog.add(row);
 

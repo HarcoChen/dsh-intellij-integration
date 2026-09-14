@@ -21,5 +21,5 @@ Copyright (c) 2026 HanaAyane. Licensed under the MIT License.
 
 `src/main/resources/webview/main.js` and `main.css` are built artifacts from
 the MIT-licensed [deepseek-harness-vscode](https://github.com/HarcoChen/deepseek-harness-vscode)
-repository. They are embedded unchanged and adapted at runtime through the
-JCEF bridge documented in `DshBridge.java`.
+repository, with selected component updates and IntelliJ-specific corrections.
+They are adapted at runtime through the JCEF bridge documented in `DshBridge.java`.

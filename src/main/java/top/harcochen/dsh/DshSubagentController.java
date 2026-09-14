@@ -12,6 +12,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 import top.harcochen.dsh.remote.DshRemoteContracts;
 import top.harcochen.dsh.remote.DshRemoteService;
+import top.harcochen.dsh.remote.DshRemoteState;
 
 /** Loads the durable subagent tree and manages one opened child transcript. */
 final class DshSubagentController {
@@ -154,6 +155,8 @@ final class DshSubagentController {
 
     /** Read the optional timing projection already carried by the session catalog. */
     private JsonObject timingFor(String childSessionId) {
+        DshRemoteState.ProjectionCell live = timingCell(childSessionId);
+        if (live != null) return normalizeTiming(live.value());
         JsonArray catalog = sessions.get();
         for (JsonElement candidate : catalog) {
             if (!candidate.isJsonObject()
@@ -171,22 +174,51 @@ final class DshSubagentController {
         return null;
     }
 
-    private static JsonObject normalizeTiming(JsonObject value) {
-        if (value == null) return null;
-        long settled = DshJson.longValue(value.get("settledMs"), -1L);
+    private DshRemoteState.ProjectionCell timingCell(String childSessionId) {
+        DshRemoteState.SessionView view = remote.snapshot().sessions.get(childSessionId);
+        return view == null ? null : view.projections.get("subagentTiming");
+    }
+
+    private String activityFor(String childSessionId, String fallback) {
+        for (JsonElement candidate : sessions.get()) {
+            if (!candidate.isJsonObject()) continue;
+            JsonObject row = candidate.getAsJsonObject();
+            if (childSessionId.equals(DshJson.string(row, "sessionId"))) {
+                return DshJson.bool(row, "running", false) ? "running" : "inactive";
+            }
+        }
+        return fallback;
+    }
+
+    static JsonObject normalizeTiming(JsonElement candidate) {
+        if (candidate == null || !candidate.isJsonObject()) return null;
+        JsonObject value = candidate.getAsJsonObject();
+        long settled = timingNumber(value.get("settledMs"));
         if (settled < 0) return null;
         JsonObject result = new JsonObject();
         result.addProperty("settledMs", settled);
-        if (!value.has("active") || !value.get("active").isJsonObject()) return result;
+        if (!value.has("active")) return result;
+        if (!value.get("active").isJsonObject()) return null;
         JsonObject active = value.getAsJsonObject("active");
-        long since = DshJson.longValue(active.get("since"), -1L);
-        long through = DshJson.longValue(active.get("through"), -1L);
+        long since = timingNumber(active.get("since"));
+        long through = timingNumber(active.get("through"));
         if (since < 0 || through < since) return null;
         JsonObject activeView = new JsonObject();
         activeView.addProperty("since", since);
         activeView.addProperty("through", through);
         result.add("active", activeView);
         return result;
+    }
+
+    private static long timingNumber(JsonElement value) {
+        if (value == null || !value.isJsonPrimitive() || !value.getAsJsonPrimitive().isNumber())
+            return -1L;
+        try {
+            long number = value.getAsBigDecimal().longValueExact();
+            return number >= 0 && number <= 9_007_199_254_740_991L ? number : -1L;
+        } catch (ArithmeticException | NumberFormatException ignored) {
+            return -1L;
+        }
     }
 
     private static void addDiagnosticNode(
@@ -265,6 +297,10 @@ final class DshSubagentController {
                             requestedPreview.timing =
                                     normalizeTiming(values.getAsJsonObject("subagentTiming"));
                         }
+                        requestedPreview.timingSeq =
+                                projections == null
+                                        ? -1L
+                                        : DshJson.longValue(projections.get("asOfSeq"), -1L);
                         requestedPreview.state = "ready";
                     } catch (Exception error) {
                         if (preview != requestedPreview) {
@@ -412,7 +448,18 @@ final class DshSubagentController {
         }
         result.addProperty("rootSessionId", currentTree.rootSessionId);
         result.addProperty("state", currentTree.state);
-        result.add("nodes", currentTree.nodes.deepCopy());
+        JsonArray nodes = currentTree.nodes.deepCopy();
+        for (JsonElement candidate : nodes) {
+            JsonObject node = candidate.getAsJsonObject();
+            if (!"child".equals(DshJson.string(node, "kind"))) continue;
+            String childSessionId = DshJson.string(node, "id");
+            node.addProperty(
+                    "activity", activityFor(childSessionId, DshJson.string(node, "activity")));
+            JsonObject timing = timingFor(childSessionId);
+            node.remove("timing");
+            if (timing != null) node.add("timing", timing);
+        }
+        result.add("nodes", nodes);
         if (currentTree.error != null) {
             result.addProperty("error", currentTree.error);
         }
@@ -432,12 +479,16 @@ final class DshSubagentController {
         result.addProperty("label", currentPreview.label);
         result.addProperty("mode", currentPreview.mode);
         result.addProperty("parentAvailable", currentPreview.parentAvailable);
-        result.addProperty("activity", currentPreview.activity);
+        result.addProperty(
+                "activity", activityFor(currentPreview.childSessionId, currentPreview.activity));
         result.addProperty("state", currentPreview.state);
         result.add("messages", currentPreview.messages.deepCopy());
-        if (currentPreview.timing != null) {
-            result.add("timing", currentPreview.timing.deepCopy());
-        }
+        DshRemoteState.ProjectionCell live = timingCell(currentPreview.childSessionId);
+        JsonObject timing =
+                live != null && live.seq() >= currentPreview.timingSeq
+                        ? normalizeTiming(live.value())
+                        : currentPreview.timing;
+        if (timing != null) result.add("timing", timing.deepCopy());
         if (currentPreview.pendingAction != null) {
             result.addProperty("pendingAction", currentPreview.pendingAction);
         }
@@ -477,6 +528,7 @@ final class DshSubagentController {
         private final boolean parentAvailable;
         private final String activity;
         private JsonObject timing;
+        private long timingSeq = -1L;
         private String state = "loading";
         private JsonArray messages = new JsonArray();
         private String pendingAction;

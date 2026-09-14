@@ -7,8 +7,10 @@ import com.intellij.openapi.diagnostic.Logger;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -57,6 +59,7 @@ final class DshPromptController {
     private volatile boolean commandRegistryUnavailable;
     private volatile boolean submitting;
     private volatile boolean cancelling;
+    private CompletableFuture<Void> planCommandTail = CompletableFuture.completedFuture(null);
 
     DshPromptController(
             DshRuntimeService runtime,
@@ -91,6 +94,43 @@ final class DshPromptController {
 
     boolean isCancelling() {
         return cancelling;
+    }
+
+    /** Serialize selections without submitting a prompt or consuming one-shot IDE context. */
+    synchronized void setPlanMode(boolean active) {
+        String selected = sessionId.get();
+        planCommandTail =
+                planCommandTail
+                        .handle((ignored, failure) -> null)
+                        .thenRunAsync(
+                                () -> {
+                                    try {
+                                        errorSink.accept(null);
+                                        runtime.startAsync().join();
+                                        if (!Objects.equals(sessionId.get(), selected)) {
+                                            throw new IllegalStateException(
+                                                    DshBundle.message("dsh.plan.session.changed"));
+                                        }
+                                        String current = selected;
+                                        if (current == null || current.isBlank()) {
+                                            current = sessionProvider.ensure();
+                                        }
+                                        ensureCommandCatalog(current);
+                                        if (!sessionState.isRegisteredCommand(current, "plan")) {
+                                            throw new IllegalStateException(
+                                                    DshBundle.message("dsh.plan.unavailable"));
+                                        }
+                                        // /plan on treats "on" as a prompt. Only the bare command
+                                        // enters plan mode without starting a model turn.
+                                        runHostCommand(current, active ? "/plan" : "/plan off");
+                                        refreshState.run();
+                                    } catch (Exception error) {
+                                        errorSink.accept(DshJson.message(error));
+                                    } finally {
+                                        stateChanged.run();
+                                    }
+                                },
+                                operations);
     }
 
     void send(JsonObject action) {

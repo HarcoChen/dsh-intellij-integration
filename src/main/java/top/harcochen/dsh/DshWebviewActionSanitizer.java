@@ -4,10 +4,49 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import java.net.URI;
+import java.util.HashSet;
+import java.util.Set;
 
 /** Validates messages crossing the untrusted JCEF-to-host boundary. */
 final class DshWebviewActionSanitizer {
     private DshWebviewActionSanitizer() {}
+
+    private static boolean validAnswers(JsonArray answers) {
+        Set<String> ids = new HashSet<>();
+        for (JsonElement candidate : answers) {
+            if (!candidate.isJsonObject()) return false;
+            JsonObject answer = candidate.getAsJsonObject();
+            String id = stringAnswerField(answer, "id");
+            if (!hasOnly(answer, "id", "selected", "custom")
+                    || id == null
+                    || id.isBlank()
+                    || id.length() > 256
+                    || !ids.add(id)
+                    || !answer.has("selected")
+                    || !answer.get("selected").isJsonArray()
+                    || answer.getAsJsonArray("selected").size() > 100) return false;
+            Set<String> labels = new HashSet<>();
+            for (JsonElement label : answer.getAsJsonArray("selected")) {
+                if (!label.isJsonPrimitive()
+                        || !label.getAsJsonPrimitive().isString()
+                        || label.getAsString().isBlank()
+                        || label.getAsString().length() > 8192
+                        || !labels.add(label.getAsString())) return false;
+            }
+            if (answer.has("custom")) {
+                String custom = stringAnswerField(answer, "custom");
+                if (custom == null || custom.length() > 1_000_000) return false;
+            }
+        }
+        return true;
+    }
+
+    private static String stringAnswerField(JsonObject answer, String key) {
+        JsonElement value = answer.get(key);
+        return value != null && value.isJsonPrimitive() && value.getAsJsonPrimitive().isString()
+                ? value.getAsString()
+                : null;
+    }
 
     static JsonObject sanitize(JsonObject input) {
         String type = DshJson.string(input, "type");
@@ -166,6 +205,7 @@ final class DshWebviewActionSanitizer {
                             && answers != null
                             && answers.isJsonArray()
                             && answers.getAsJsonArray().size() <= 100
+                            && validAnswers(answers.getAsJsonArray())
                     ? input
                     : null;
         }

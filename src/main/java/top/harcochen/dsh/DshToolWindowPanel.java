@@ -536,7 +536,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
             case "openReasoningEffort" -> sessionActions.openReasoningEffort();
             case "setPermissionPreset" ->
                     sessionActions.setPermissionPreset(string(action, "value"));
-            case "setPlanMode" -> setPlanMode(bool(action, "active", false));
+            case "setPlanMode" -> prompts.setPlanMode(bool(action, "active", false));
             case "prefillGitDiff" -> prefillGitDiffTask(string(action, "kind"));
             case "askAboutResource" ->
                     askAboutResource(string(action, "path"), bool(action, "isDirectory", false));
@@ -589,16 +589,6 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
             notify("This message is no longer available for a checkpoint action.");
         }
         return turn;
-    }
-
-    private void setPlanMode(boolean active) {
-        String current = sessionId;
-        if (current == null || current.isBlank()) return;
-        if (!sessionState.isRegisteredCommand(current, "plan")) {
-            notify("The connected DSH Runtime does not expose the /plan command.");
-            return;
-        }
-        sessionActions.setPlanMode(active);
     }
 
     /** Dispatch a structured action from IDE menus, as if it came from the webview. */
@@ -1035,7 +1025,10 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
                         permissionsCell == null ? null : permissionsCell.value());
         if (permissions != null) state.add("permissions", permissions);
         DshRemoteState.SessionView view = sessionView(sessionId);
-        state.add("interactions", view == null ? new JsonArray() : view.interactions);
+        state.add(
+                "interactions",
+                DshInteractionProjector.present(
+                        view == null ? new JsonArray() : view.interactions));
         state.add("queue", view == null ? new JsonArray() : view.queue);
         state.add("jobs", view == null ? new JsonArray() : view.jobs);
         state.add("changeReviews", changeReviews.view(sessionId));
@@ -1150,6 +1143,26 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
         }
         operations.execute(
                 () -> {
+                    DshRemoteState.SessionView view = sessionView(current);
+                    boolean pending = false;
+                    if (view != null) {
+                        for (JsonElement candidate : view.interactions) {
+                            if (!candidate.isJsonObject()) continue;
+                            JsonObject item = candidate.getAsJsonObject();
+                            String expectedKind = action.has("outcome") ? "approval" : "question";
+                            if (key.equals(string(item, "key"))
+                                    && expectedKind.equals(string(item, "kind"))
+                                    && "pending".equals(string(item, "status"))) {
+                                pending = true;
+                                break;
+                            }
+                        }
+                    }
+                    if (!pending) {
+                        lastError = DshBundle.message("dsh.interaction.unavailable");
+                        postStateLater();
+                        return;
+                    }
                     String failure = remote.answerInteraction(current, key, outcomeValue);
                     if (failure != null) {
                         lastError = failure;
