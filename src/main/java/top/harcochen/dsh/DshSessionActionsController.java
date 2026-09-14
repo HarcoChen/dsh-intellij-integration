@@ -445,23 +445,6 @@ final class DshSessionActionsController {
                 });
     }
 
-    /** Toggle the Runtime's public plan command for the current session. */
-    void setPlanMode(boolean active) {
-        String current = sessionId.get();
-        if (current == null) return;
-        operations.execute(
-                () -> {
-                    try {
-                        JsonElement execution =
-                                remote.executeCommand(current, active ? "/plan on" : "/plan off");
-                        showCommandResult(execution);
-                        refreshState.run();
-                    } catch (Exception error) {
-                        report(error);
-                    }
-                });
-    }
-
     private void showCommandResult(JsonElement execution) {
         if (execution == null || !execution.isJsonObject()) {
             return;

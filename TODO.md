@@ -66,10 +66,15 @@ item is complete only when the IntelliJ host action, Harness RPC/projection boun
 action validation, and the user-visible failure path are wired together.
 
 - [ ] Message checkpoints: fork from a finalized message, restore code to that message, or fork and restore together.
-- [ ] Plan Mode: consume the public `plan` projection and expose `/plan` plus a composer toggle.
+- [x] Plan Mode: consume the public `plan` projection and expose `/plan` plus a composer toggle.
+  - [x] Serialize composer toggles and use bare `/plan` so enabling the mode does not submit `on` as a task.
+  - [x] Render declared plan reviews with approve / continue-planning feedback, preserving the question protocol.
+  - [x] Validate nested answer fields and refuse replies to unavailable or mismatched session interactions.
 - [ ] IDE Provider management: configure endpoints, credentials, and models; discover models through `llm.models` and `llm.discoverModels`.
 - [ ] Debug Context: attach a bounded, one-shot snapshot of the current XDebugger frame, stack, locals, source excerpt, and diagnostics.
-- [ ] Subagent timing: consume `subagentTiming` and show settled/active duration in the tree and preview.
+- [x] Subagent timing: consume `subagentTiming` and show settled/active duration in the tree and preview.
+  - [x] Use live control projections, including children outside the session catalog, and compare timing watermarks.
+  - [x] Refresh duration and activity in both views; reject malformed, fractional, or unsafe integer durations.
 - [ ] Managed Runtime distribution: cache and integrity-check the platform Runtime instead of relying only on pnpm/npx.
 - [ ] Conversation outline: provide a native session message navigator.
 - [ ] Agent status candidates: support a validated list of status labels instead of one fixed label.
@@ -77,6 +82,18 @@ action validation, and the user-visible failure path are wired together.
 - [-] Message feedback: deferred until the evaluation/statistics loop has a product surface; the upstream sidecar remains optional.
 
 ## Quality gates for each batch
+
+Latest parity batch verified on 2026-09-14 against the pinned `0.1.2-rc.1` Runtime:
+
+- `clean buildPlugin`, formatting, lint, and Plugin Verifier for IC / PC 2024.3.6 passed.
+- Isolated integration used the Java authentication, unary, mux, event, and state adapters with
+  a temporary DSH home and a loopback model stub. Plan on/off projections, prompt-free toggles,
+  review feedback, approval and mode exit, and a real subagent's active/settled timing passed.
+- Plan review rendering preserved the original question payload and escaped embedded HTML;
+  the WebView boundary accepted valid answers and rejected surplus fields and non-string feedback.
+- No unit tests were added. Installed-IDE interaction remains the manual gate below.
+- The separate 0.1.5 protocol / Runtime lifecycle migration is still pending; this batch keeps the
+  existing audited Runtime version.
 
 - [x] Reject malformed or surplus WebView action fields at the host boundary for the completed batch.
 - [x] Keep IntelliJ model reads inside read actions and mutations inside write commands for the completed batch.
