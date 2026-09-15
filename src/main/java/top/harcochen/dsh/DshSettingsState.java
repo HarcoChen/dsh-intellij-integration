@@ -16,8 +16,8 @@ import org.jetbrains.annotations.NotNull;
  */
 @State(name = "DshSettings", storages = @Storage(StoragePathMacros.WORKSPACE_FILE))
 public final class DshSettingsState implements PersistentStateComponent<DshSettingsState> {
-    public String command = defaultPackageManagerCommand();
-    public String commandArgs = "dlx @deepseek-ai/dsh@0.1.2-rc.1 web --no-open";
+    public String command = "auto";
+    public String commandArgs = "";
     public String serverUrl = "";
     public int serverPort = 0;
     public boolean autoStart = true;
@@ -29,11 +29,13 @@ public final class DshSettingsState implements PersistentStateComponent<DshSetti
     public String lastSessionId = "";
 
     public boolean installWhenMissing = true;
+    public boolean recoveryEnabled = true;
+    public boolean recoveryAutoPersistBundleIsolation = true;
 
     /** Enable the compaction command by injecting a launcher patch into web-profile launches. */
     public boolean enableCompaction = true;
 
-    public String runtimeVersion = "0.1.2-rc.1";
+    public String runtimeVersion = DshRuntimeVersion.DEFAULT;
     public String npmRegistry = "https://registry.npmmirror.com";
     public int startupTimeoutMs = 30_000;
     public int requestTimeoutMs = 600_000;
@@ -75,8 +77,17 @@ public final class DshSettingsState implements PersistentStateComponent<DshSetti
         persistSession = state.persistSession;
         lastSessionId = state.lastSessionId;
         installWhenMissing = state.installWhenMissing;
+        recoveryEnabled = state.recoveryEnabled;
+        recoveryAutoPersistBundleIsolation = state.recoveryAutoPersistBundleIsolation;
         enableCompaction = state.enableCompaction;
         runtimeVersion = state.runtimeVersion;
+        if ("0.1.2-rc.1".equals(runtimeVersion)) {
+            runtimeVersion = DshRuntimeVersion.DEFAULT;
+            if ("dlx @deepseek-ai/dsh@0.1.2-rc.1 web --no-open".equals(commandArgs)) {
+                command = "auto";
+                commandArgs = "";
+            }
+        }
         npmRegistry = state.npmRegistry;
         startupTimeoutMs = state.startupTimeoutMs;
         requestTimeoutMs = state.requestTimeoutMs;

@@ -34,9 +34,10 @@ final class DshSessionStateStore {
                 history != null && history.has("events") && history.get("events").isJsonArray()
                         ? history.getAsJsonArray("events")
                         : new JsonArray();
+        JsonElement stream = history == null ? null : history.get("assistantStream");
         synchronized (lock) {
             HistoryProjectionCache cached = historyCaches.get(session);
-            if (cached != null && cached.matches(events, statusLabel)) {
+            if (cached != null && cached.matches(events, stream, statusLabel)) {
                 return cached.projection();
             }
         }
@@ -45,10 +46,10 @@ final class DshSessionStateStore {
                 DshMessageProjector.project(history, statusLabel);
         JsonArray rendered = markdownRenderCache.render(projected.messages, "session:" + session);
         HistoryProjectionCache fresh =
-                new HistoryProjectionCache(events, statusLabel, projected, rendered);
+                new HistoryProjectionCache(events, stream, statusLabel, projected, rendered);
         synchronized (lock) {
             HistoryProjectionCache cached = historyCaches.get(session);
-            if (cached != null && cached.matches(events, statusLabel)) {
+            if (cached != null && cached.matches(events, stream, statusLabel)) {
                 return cached.projection();
             }
             historyCaches.put(session, fresh);
@@ -498,23 +499,30 @@ final class DshSessionStateStore {
 
     private static final class HistoryProjectionCache {
         private final JsonArray events;
+        private final JsonElement stream;
         private final String statusLabel;
         private final DshMessageProjector.Projection projection;
         private final JsonArray messages;
 
         private HistoryProjectionCache(
                 JsonArray events,
+                JsonElement stream,
                 String statusLabel,
                 DshMessageProjector.Projection projection,
                 JsonArray messages) {
             this.events = events;
+            this.stream = stream;
             this.statusLabel = statusLabel;
             this.projection = projection;
             this.messages = messages;
         }
 
-        private boolean matches(JsonArray candidateEvents, String candidateStatusLabel) {
+        private boolean matches(
+                JsonArray candidateEvents,
+                JsonElement candidateStream,
+                String candidateStatusLabel) {
             return Objects.equals(statusLabel, candidateStatusLabel)
+                    && Objects.equals(stream, candidateStream)
                     && events.equals(candidateEvents);
         }
 

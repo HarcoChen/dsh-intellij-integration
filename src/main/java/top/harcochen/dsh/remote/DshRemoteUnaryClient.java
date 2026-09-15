@@ -106,9 +106,15 @@ public final class DshRemoteUnaryClient {
             return CompletableFuture.failedFuture(
                     DshRemoteException.protocol(endpoint, "Remote request URL is invalid", error));
         }
-        return HTTP_CLIENT
-                .sendAsync(request, HttpResponse.BodyHandlers.ofString())
-                .thenApply(response -> parse(endpoint, rpcId, response));
+        CompletableFuture<HttpResponse<String>> transport =
+                HTTP_CLIENT.sendAsync(request, HttpResponse.BodyHandlers.ofString());
+        CompletableFuture<JsonElement> result =
+                transport.thenApply(response -> parse(endpoint, rpcId, response));
+        result.whenComplete(
+                (value, error) -> {
+                    if (result.isCancelled()) transport.cancel(true);
+                });
+        return result;
     }
 
     /**

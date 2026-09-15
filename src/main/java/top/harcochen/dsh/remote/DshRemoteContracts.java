@@ -9,7 +9,7 @@ import java.util.UUID;
 
 /**
  * Wire contracts for the RC Remote API, fixed against {@code deepseek-harness} tag {@code
- * dsh-v0.1.2-rc.1}, commit {@code a66e4702047846cdaa10c66c9d3df3951f5ea70d}.
+ * dsh-v0.1.5-rc.2}, commit {@code fb2c4b9e698e30edb738bca4cf0618587db7d203}.
  *
  * <p>Every endpoint's {@code args} field names were taken from the Host method parameters (the
  * descriptor {@code wire} names), not from flattened DTOs. Zero-argument endpoints send an {@code
@@ -19,10 +19,10 @@ import java.util.UUID;
  */
 public final class DshRemoteContracts {
     /** Harness tag this contract was audited against. */
-    public static final String TARGET_TAG = "dsh-v0.1.2-rc.1";
+    public static final String TARGET_TAG = "dsh-v0.1.5-rc.2";
 
     /** Harness commit this contract was audited against. */
-    public static final String TARGET_COMMIT = "a66e4702047846cdaa10c66c9d3df3951f5ea70d";
+    public static final String TARGET_COMMIT = "fb2c4b9e698e30edb738bca4cf0618587db7d203";
 
     public static final String MUX_PATH = "/api/remote.mux";
     public static final String EVENT_STREAM_ENDPOINT = "$events";
@@ -269,7 +269,7 @@ public final class DshRemoteContracts {
     /**
      * `session/list(_request)`; the baseline request is an empty object. The Host's descriptor
      * names this parameter {@code _request} — the one wire name that differs from the method
-     * signature — verified against the live `dsh-v0.1.2-rc.1` Runtime.
+     * signature — verified against the live `dsh-v0.1.5-rc.2` Runtime.
      */
     public static JsonObject argsSessionList() {
         JsonObject args = new JsonObject();
@@ -394,6 +394,7 @@ public final class DshRemoteContracts {
         JsonObject request = new JsonObject();
         request.add("address", address.deepCopy());
         if (maxMessages > 0) request.addProperty("maxMessages", maxMessages);
+        request.addProperty("assistantStream", true);
         return withRequest(request);
     }
 
@@ -564,7 +565,8 @@ public final class DshRemoteContracts {
         if (clientTimeZone != null && !clientTimeZone.isBlank()) {
             args.addProperty("clientTimeZone", clientTimeZone);
         }
-        return args;
+        args.addProperty("delivery", "queue");
+        return withRequest(args);
     }
 
     /** `subagents/interruptByParent(parentSessionId, childSessionId, mode)`. */
@@ -591,12 +593,16 @@ public final class DshRemoteContracts {
         return args;
     }
 
-    /** `commands/execute(agentId, line, images)`. */
+    /** `commands/execute(agentId, line, submittedAttachments)`. */
     public static JsonObject argsCommandsExecute(String agentId, String line, JsonArray images) {
         JsonObject args = new JsonObject();
         args.addProperty("agentId", agentId);
         args.addProperty("line", line == null ? "" : line);
-        args.add("images", images == null ? new JsonArray() : images.deepCopy());
+        JsonArray attachments = images == null ? new JsonArray() : images.deepCopy();
+        for (JsonElement image : attachments) {
+            if (image.isJsonObject()) image.getAsJsonObject().addProperty("type", "image");
+        }
+        args.add("submittedAttachments", attachments);
         return args;
     }
 

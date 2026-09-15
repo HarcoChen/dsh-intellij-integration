@@ -10,6 +10,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import top.harcochen.dsh.remote.DshAssistantStream;
 
 /** Converts Harness history events into the ChatViewState message rows. */
 public final class DshMessageProjector {
@@ -50,6 +51,9 @@ public final class DshMessageProjector {
             long time = number(event, "time", seq);
             JsonObject data = object(event, "data");
             if (data == null) data = new JsonObject();
+
+            // Surface replacements change the model context, not the conversation already shown.
+            if (object(event, "surfaceOp") != null) continue;
 
             if (type.equals("user/message")) {
                 JsonObject message = object(data, "message");
@@ -123,6 +127,9 @@ public final class DshMessageProjector {
                                         : message.get("text"));
                 String reasoning =
                         reasoningText(message.has("content") ? message.get("content") : null);
+                if (reasoning.isBlank() && data.has("stream")) {
+                    reasoning = streamText(DshAssistantStream.expand(data.get("stream")), true);
+                }
                 if (reasoning.isBlank() && partial != null)
                     reasoning = partial.reasoning.toString();
                 String key = "event:" + seq;
@@ -216,6 +223,31 @@ public final class DshMessageProjector {
 
         JsonArray messages = new JsonArray();
         for (JsonObject row : rows.values()) messages.add(row);
+        JsonObject stream = object(history, "assistantStream");
+        if (stream != null && stream.has("chunks") && stream.get("chunks").isJsonArray()) {
+            JsonArray chunks = stream.getAsJsonArray("chunks");
+            String text = streamText(chunks, false);
+            String reasoning = streamText(chunks, true);
+            JsonObject row =
+                    message(
+                            "attempt:" + string(stream, "attemptId"),
+                            "assistant",
+                            text,
+                            chunks.isEmpty()
+                                    ? 0
+                                    : number(chunks.get(0).getAsJsonObject(), "time", 0),
+                            number(stream, "startedAfterSeq", -1),
+                            "streaming");
+            row.addProperty("renderedHtml", markdownHtml(text));
+            if (!reasoning.isEmpty()) {
+                row.addProperty("reasoning", reasoning);
+                row.addProperty("reasoningState", "streaming");
+                row.addProperty("renderedReasoningHtml", markdownHtml(reasoning));
+            }
+            messages.add(row);
+            activeTurn = integer(stream, "turn", activeTurn);
+            turnPhase = "running";
+        }
         return new Projection(
                 messages,
                 activeTurn,
@@ -223,6 +255,21 @@ public final class DshMessageProjector {
                 turnDetail,
                 "running".equals(turnPhase),
                 agentStatusLabel);
+    }
+
+    private static String streamText(JsonArray chunks, boolean reasoning) {
+        StringBuilder text = new StringBuilder();
+        for (JsonElement value : chunks) {
+            if (!value.isJsonObject()) continue;
+            JsonObject chunk = object(value.getAsJsonObject(), "chunk");
+            if (chunk != null
+                    && (reasoning ? "reasoning-delta" : "text-delta")
+                            .equals(string(chunk, "type"))) {
+                String delta = string(chunk, "text");
+                if (delta != null) text.append(delta);
+            }
+        }
+        return text.toString();
     }
 
     private static JsonObject toolRow(

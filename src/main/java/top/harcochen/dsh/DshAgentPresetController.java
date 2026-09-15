@@ -29,6 +29,10 @@ final class DshAgentPresetController {
     private final Consumer<String> errorSink;
 
     private volatile JsonArray catalog = new JsonArray();
+    private volatile boolean modeSelectionEnabled = true;
+    private volatile long catalogGeneration = -1;
+    private volatile long catalogReadAt;
+    private volatile long catalogSettingsEpoch = -1;
 
     DshAgentPresetController(
             Project project,
@@ -52,7 +56,10 @@ final class DshAgentPresetController {
     }
 
     void refreshCatalogIfNecessary() {
-        if (!catalog.isEmpty()) {
+        if (!catalog.isEmpty()
+                && catalogGeneration == remote.snapshot().generation
+                && catalogSettingsEpoch == remote.settingsEpoch()
+                && System.currentTimeMillis() - catalogReadAt < 3000) {
             return;
         }
         try {
@@ -62,11 +69,49 @@ final class DshAgentPresetController {
         }
     }
 
-    private JsonArray agentPresets() throws Exception {
+    private JsonArray agentPresets() throws top.harcochen.dsh.remote.DshRemoteException {
+        long requestedEpoch = remote.settingsEpoch();
         JsonObject value = remote.agentPresetCatalog();
+        modeSelectionEnabled = DshJson.bool(value, "modeSelectionEnabled", true);
+        if (!modeSelectionEnabled) pendingPreset.accept(null);
+        catalogGeneration = remote.snapshot().generation;
+        catalogReadAt = System.currentTimeMillis();
+        catalogSettingsEpoch = requestedEpoch;
         return value.has("presets") && value.get("presets").isJsonArray()
                 ? value.getAsJsonArray("presets")
                 : new JsonArray();
+    }
+
+    boolean modeSelectionEnabled() {
+        return modeSelectionEnabled;
+    }
+
+    void prepareForSend(String session) throws top.harcochen.dsh.remote.DshRemoteException {
+        JsonArray presets = agentPresets();
+        catalog = presets;
+        if (modeSelectionEnabled || session == null) return;
+        for (JsonElement item : remote.snapshot().catalog) {
+            JsonObject row = item.getAsJsonObject();
+            if (!session.equals(DshJson.string(row, "sessionId"))
+                    || !DshJson.bool(row, "blank", false)) continue;
+            for (JsonElement candidate : presets) {
+                JsonObject preset = candidate.getAsJsonObject();
+                if (DshJson.bool(preset, "isDefault", false)
+                        && (!preset.has("broken") || preset.get("broken").isJsonNull())) {
+                    String id = DshJson.string(preset, "id");
+                    if (id != null && !id.equals(DshJson.string(row, "agentPreset"))) {
+                        try {
+                            remote.selectAgentPreset(session, id);
+                        } catch (top.harcochen.dsh.remote.DshRemoteException error) {
+                            if (!"locked".equals(error.code())
+                                    && (error.code() == null || !error.code().endsWith("/locked")))
+                                throw error;
+                        }
+                    }
+                    return;
+                }
+            }
+        }
     }
 
     String label(String presetId) {
@@ -312,6 +357,9 @@ final class DshAgentPresetController {
                 () -> {
                     try {
                         JsonArray presets = agentPresets();
+                        if (!modeSelectionEnabled)
+                            throw new IllegalStateException(
+                                    DshBundle.message("dsh.presets.selection.disabled"));
                         List<String> labels = new ArrayList<>();
                         List<String> ids = new ArrayList<>();
                         for (JsonElement presetElement : presets) {
@@ -377,6 +425,13 @@ final class DshAgentPresetController {
         operations.execute(
                 () -> {
                     try {
+                        agentPresets();
+                        if (!modeSelectionEnabled)
+                            throw new IllegalStateException(
+                                    DshBundle.message("dsh.presets.selection.disabled"));
+                        if (!java.util.Objects.equals(currentSession, sessionId.get()))
+                            throw new IllegalStateException(
+                                    DshBundle.message("dsh.plan.session.changed"));
                         remote.selectAgentPreset(currentSession, target);
                         refreshState.run();
                     } catch (Exception error) {

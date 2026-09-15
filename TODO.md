@@ -96,8 +96,23 @@ Latest parity batch verified on 2026-09-14 against the pinned `0.1.2-rc.1` Runti
 - Plan review rendering preserved the original question payload and escaped embedded HTML;
   the WebView boundary accepted valid answers and rejected surplus fields and non-string feedback.
 - No unit tests were added. Installed-IDE interaction remains the manual gate below.
-- The separate 0.1.5 protocol / Runtime lifecycle migration is still pending; this batch keeps the
-  existing audited Runtime version.
+
+Runtime 0.1.5 migration batch (2026-09-15):
+
+- [x] RC.2 assistant streams, reconnect settlement, V3 history, attachments, subagent request envelopes, Goal activation.
+- [x] Authoritative model catalog, mode-selection policy and skill source-path hints.
+- [x] Compatible local Runtime preference, pinned package fallback, shared-lock reuse, confirmed local upgrades and orphan migration.
+- [x] Bundled crash recovery engine, isolated validation, cancellation, reversible bundle isolation and diagnostic export.
+- [x] Agent Team experimental typed client (optional service; no Team UI).
+- Real RC.2 integration passed with a temporary Harness home and loopback model: streaming reconnect,
+  durable settlement, history decoding, native Java startup/stop/cancel, crash restart and offline diagnostics.
+- The vendored recovery engine passed its 12 existing process integration scenarios, including budget,
+  cancellation, sandbox validation and restoration conflicts. Java/Node shared-lock interop passed.
+- Final formatting/lint/build and IC/PC 2024.3.6 Plugin Verifier passed; both IDEs report compatible
+  with the existing deprecated-API warnings. The ZIP contains the helper and its MIT license.
+- Browser smoke verified the recovering banner, Chinese status and cancel action. Remaining banner
+  clicks were not completed because UI approval timed out twice; they remain a manual check.
+- No unit tests were added. Windows/Linux execution and installed-IDE interaction remain manual gates.
 
 - [x] Reject malformed or surplus WebView action fields at the host boundary for the completed batch.
 - [x] Keep IntelliJ model reads inside read actions and mutations inside write commands for the completed batch.

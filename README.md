@@ -27,7 +27,7 @@ An independent community plugin for IntelliJ IDEA, PyCharm, and other IntelliJ P
 ## Quick start
 
 1. **Install** — in **Settings → Plugins → Marketplace**, search for **DeepSeek Harness Integration**, or open the [Marketplace page](https://plugins.jetbrains.com/plugin/33924-deepseek-harness-integration). Restart the IDE if prompted.
-2. **Connect** — open a project and the **DSH** tool window. For local startup, have Node.js and `pnpm` or `npm`/`npx` available. The plugin starts the Runtime automatically by default. Configure the launch command or an existing Runtime's **Server URL** in **Settings → Tools → DeepSeek Harness**.
+2. **Connect** — open a project and the **DSH** tool window. For local startup, have Node.js 24+ and `pnpm` or `npm`/`npx` available. The plugin starts the Runtime automatically by default. Configure the launch command or an existing Runtime's **Server URL** in **Settings → Tools → DeepSeek Harness**.
 3. **Configure credentials** — find **DSH: Configure API Key** via **Find Action**. Restart the local Runtime after changing the key so it receives the new value. An existing external Runtime uses its own credentials.
 4. **Try it** — select a function, right-click **DSH → Explain Selection**, or ask a question in the chat. Inspect tool cards and proposed diffs when an approval is requested.
 
@@ -63,6 +63,14 @@ The subagent tree and preview show active and completed execution time when the 
 
 The plugin manages local Runtime startup, shutdown, and restart, with `pnpm`, an installed `dsh`, and `npx` launch options. Package-manager launches use the configured Runtime version. You can also connect to an existing Runtime or open its Web UI in a browser.
 
+Runtime 0.1.5 support includes transient assistant streaming across reconnects, V3 history and compaction records, submitted attachments, queued subagent prompts, and explicit Goal resume after reconnect. Mode selection follows Runtime policy, and skill menus show source paths on hover. The context ring still shows statistics on hover; click the model name to switch models.
+
+Owned local Runtimes retry after crashes and can recover through isolated validation, bounded repair attempts, and reversible bundle isolation. The status banner offers cancellation, restoration, and redacted diagnostics export. Both automatic recovery and persistent bundle isolation can be disabled in settings. The bundled Node helper runs locally; it needs Node.js 24+ even with an installed standalone `dsh`.
+
+Only a compatible Runtime advertised by the shared editor lock is reused automatically. Updating a verified local npm installation or stopping an identified abandoned Runtime requires a native confirmation dialog. Manually configured external Runtimes remain externally managed. Upgrade old Runtimes before connecting; 0.1.5 history migrations are not a downgrade path.
+
+Agent Team experimental support is an internal typed client for view/create/update operations, with cancellation, revision checks, and structured business errors. It does not install the optional service or add a Team UI.
+
 API keys are stored in IntelliJ **Password Safe** and passed to a newly started local Runtime. The UI includes English and Simplified Chinese resources.
 
 ## Configuration
@@ -72,10 +80,10 @@ Open **Settings | Tools | DeepSeek Harness**.
 
 | Setting | Default | What it does |
 | --- | --- | --- |
-| Command / Args | `pnpm dlx @deepseek-ai/dsh@0.1.2-rc.1 web --no-open` | How the Runtime is launched; point it at an installed `dsh` or a local checkout instead. |
+| Command / Args | `auto` / empty | Prefer a compatible local `dsh`, then pinned pnpm/npx when automatic installation is enabled. Explicit launch commands remain supported. |
 | Server URL / Port | `""` / `0` | Prefer an already running DSH Runtime; port `0` selects an available port for local startup. |
 | Auto start | `true` | Start or connect to the Runtime when the project opens. |
-| Runtime version | `0.1.2-rc.1` | Locked version of the managed Remote protocol. |
+| Runtime version | `0.1.5-rc.2` | Package-manager fallback version; the minimum supported local Runtime is `0.1.5-rc.1`. |
 | npm registry | `https://registry.npmmirror.com` | Registry mirror used as a download fallback. |
 | Timeouts | `30s` startup, `600s` request | How long to wait for startup and individual RPC calls. |
 | Context bytes | `120000` | Maximum UTF-8 bytes of `<ide_context>` included per prompt. |

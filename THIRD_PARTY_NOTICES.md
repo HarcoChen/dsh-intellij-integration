@@ -23,3 +23,16 @@ Copyright (c) 2026 HanaAyane. Licensed under the MIT License.
 the MIT-licensed [deepseek-harness-vscode](https://github.com/HarcoChen/deepseek-harness-vscode)
 repository, with selected component updates and IntelliJ-specific corrections.
 They are adapted at runtime through the JCEF bridge documented in `DshBridge.java`.
+
+## dsh-ide Runtime recovery engine
+
+`runtime-helper/upstream/` vendors recovery, process ownership, lock, migration, version,
+local-upgrade and Remote client modules from the same MIT-licensed dsh-ide repository,
+commit `ab5f7a813d99ffb029d3442f1c3666382dde8b3d`.
+Copyright (c) 2026 dsh-community. The license is retained in that directory and in
+`src/main/resources/runtime/LICENSE` alongside the bundled helper.
+
+The IntelliJ adapter replaces editor UI and localization dependencies with a private
+stdin/stdout bridge. `runtime-helper/main.ts` supplies lifecycle orchestration;
+`src/main/resources/runtime/helper.cjs` is the bundled artifact. Build instructions
+and local adaptations are documented in `runtime-helper/README.md`.

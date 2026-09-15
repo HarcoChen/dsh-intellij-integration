@@ -23841,6 +23841,12 @@
     "mutation": "mutation",
     "Edit": "\u7F16\u8F91",
     "Pause": "\u6682\u505C",
+    "Waiting for resume": "\u7b49\u5f85\u7ee7\u7eed",
+    "Cancel recovery": "\u53d6\u6d88\u6062\u590d",
+    "Restore": "\u8fd8\u539f",
+    "Export diagnostics": "\u5bfc\u51fa\u8bca\u65ad",
+    "Automatic recovery is in progress": "\u6b63\u5728\u81ea\u52a8\u6062\u590d",
+    "Automatic recovery completed": "\u81ea\u52a8\u6062\u590d\u5b8c\u6210",
     "Resume": "\u7EE7\u7EED",
     "Complete": "\u5B8C\u6210",
     "New Goal": "\u65B0 Goal",
@@ -23946,6 +23952,7 @@
   function statusLabel(status) {
     if (status.state === "running") return t("Running");
     if (status.state === "starting") return t("Starting");
+    if (status.state === "recovering") return t("Automatic recovery is in progress");
     if (status.state === "error") return t("Error");
     return t("Stopped");
   }
@@ -25273,10 +25280,10 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
       },
       current.objective
     ), /* @__PURE__ */ import_react12.default.createElement("div", { className: "dsh-card-detail" }, t("{phase} \xB7 round {started}/{maximum}", {
-      phase: t(GOAL_PHASE_LABELS[current.phase]),
+      phase: t(current.phase === "active" && goal.activation === "disarmed" ? "Waiting for resume" : GOAL_PHASE_LABELS[current.phase]),
       started: roundsStarted,
       maximum: current.maxGoalRounds
-    })), /* @__PURE__ */ import_react12.default.createElement(GoalHint, null), current.blockedReason ? /* @__PURE__ */ import_react12.default.createElement("div", { className: "dsh-goal-blocked", role: "status" }, /* @__PURE__ */ import_react12.default.createElement("strong", null, t("Blocked")), /* @__PURE__ */ import_react12.default.createElement("span", null, current.blockedReason.code, " \xB7 ", current.blockedReason.message)) : null, /* @__PURE__ */ import_react12.default.createElement(GoalPending, { goal }), goal.error ? /* @__PURE__ */ import_react12.default.createElement(GoalError, { error: goal.error }) : null);
+    })), /* @__PURE__ */ import_react12.default.createElement(GoalHint, null), current.phase === "active" && goal.activation === "disarmed" ? import_react12.default.createElement("button", { type: "button", className: "dsh-button", disabled: goal.pending || roundsStarted >= current.maxGoalRounds, onClick: () => postAction({ type: "goalResume" }) }, t("Resume")) : null, current.blockedReason ? /* @__PURE__ */ import_react12.default.createElement("div", { className: "dsh-goal-blocked", role: "status" }, /* @__PURE__ */ import_react12.default.createElement("strong", null, t("Blocked")), /* @__PURE__ */ import_react12.default.createElement("span", null, current.blockedReason.code, " \xB7 ", current.blockedReason.message)) : null, /* @__PURE__ */ import_react12.default.createElement(GoalPending, { goal }), goal.error ? /* @__PURE__ */ import_react12.default.createElement(GoalError, { error: goal.error }) : null);
   }
 
   // webview/src/components/dock/JobsPanel.tsx
@@ -26298,7 +26305,7 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
     { name: "/trace", description: t("Open the current session trace"), action: { type: "openTrace" }, origin: "ide" },
     { name: "/stop", description: t("Stop the dsh runtime"), action: { type: "stop" }, origin: "ide" }
   ];
-  function mergeSlashCommands(hostCommands) {
+  function mergeSlashCommands(hostCommands, modeSelectionEnabled = true) {
     const fromHost = hostCommands.map((command) => ({
       name: `/${command.name}`,
       description: command.description,
@@ -26308,12 +26315,12 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
     const claimed = new Set(fromHost.map((command) => command.name));
     return [
       ...fromHost,
-      ...IDE_SLASH_COMMANDS.filter((command) => !claimed.has(command.name))
+      ...IDE_SLASH_COMMANDS.filter((command) => !claimed.has(command.name) && (modeSelectionEnabled || !["/mode", "/preset"].includes(command.name)))
     ].sort((left, right) => left.name.localeCompare(right.name));
   }
   function runSlashCommand(name, context) {
     const mode = name.match(/^\/(?:mode|preset)(?:\s+(.+))?$/iu);
-    if (mode && !context.commands.some((entry) => entry.origin === "host" && /^\/(?:mode|preset)$/iu.test(entry.name))) {
+    if (mode && context.modeSelectionEnabled !== false && !context.commands.some((entry) => entry.origin === "host" && /^\/(?:mode|preset)$/iu.test(entry.name))) {
       const agentPreset = mode[1]?.trim();
       postAction({
         type: "selectAgentPreset",
@@ -26349,21 +26356,21 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
     reasoningEffort,
     onShowEffort,
     focusTextarea
-  }) {
+  , modeSelectionEnabled = true }) {
     const [slashIndex, setSlashIndex] = (0, import_react26.useState)(0);
     const resetSlashIndex = (0, import_react26.useCallback)(() => setSlashIndex(0), []);
-    const available = (0, import_react26.useMemo)(() => mergeSlashCommands(commands), [commands]);
+    const available = (0, import_react26.useMemo)(() => mergeSlashCommands(commands, modeSelectionEnabled), [commands, modeSelectionEnabled]);
     const executeSlashCommand = (0, import_react26.useCallback)((name) => {
       const handled = runSlashCommand(name, {
         reasoningEffortAvailable: !!reasoningEffort?.options.length,
         onShowEffort,
-        commands: available
+        commands: available, modeSelectionEnabled
       });
       if (!handled) return false;
       setText("");
       setSlashIndex(0);
       return true;
-    }, [reasoningEffort, onShowEffort, setText, available]);
+    }, [reasoningEffort, onShowEffort, setText, available, modeSelectionEnabled]);
     const slashQuery = text.match(/^\/(\S*)$/u)?.[1]?.toLowerCase();
     const slashMatches = slashQuery === void 0 ? [] : available.filter((command) => command.name.slice(1).startsWith(slashQuery));
     const slashSkillMatches = slashQuery === void 0 ? [] : skills.filter(
@@ -26488,6 +26495,7 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
           "aria-selected": index === activeIndex,
           className: index === activeIndex ? "active" : "",
           key: `skill:${skill.name}`,
+          title: skill.path,
           onMouseDown: (event) => event.preventDefault(),
           onClick: () => onChooseSkill(skill.name)
         },
@@ -26511,6 +26519,7 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
         "aria-selected": index === activeIndex,
         className: index === activeIndex ? "active" : "",
         key: skill.name,
+        title: skill.path,
         onMouseDown: (event) => event.preventDefault(),
         onClick: () => onChooseSkill(skill.name)
       },
@@ -26529,6 +26538,7 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
     fileReferenceCandidates,
     skills,
     commands,
+    modeSelectionEnabled = true,
     permissions,
     tokenUsage,
     sessionStats,
@@ -26580,6 +26590,7 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
       setText,
       skills,
       commands,
+      modeSelectionEnabled,
       reasoningEffort,
       onShowEffort,
       focusTextarea
@@ -27047,36 +27058,59 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
 
   // webview/src/components/StatusBanner.tsx
   var import_react30 = __toESM(require_react());
+  var ACTION_LABELS = {
+    cancelRecovery: "Cancel recovery",
+    openLogs: "View details",
+    restoreRecovery: "Restore",
+    exportRecoveryDiagnostics: "Export diagnostics",
+    start: "Retry"
+  };
   function StatusBanner({ status, sessionStatus }) {
+    const recovery = status.recovery;
+    const recovering = status.state === "recovering";
+    const recovered = recovery?.phase === "recovered" && status.state === "running" && !sessionStatus?.error;
     const runtimeError = status.state === "error" ? status.message : void 0;
     const sessionError = sessionStatus?.error;
     const message = sessionError || runtimeError;
-    const messageKey = message ? `${sessionError ? "session" : "runtime"}:${message}` : void 0;
+    const messageKey = message ? `${sessionError ? "session" : "runtime"}:${message}:${recovery?.phase ?? ""}` : recovery?.sessionId ? `recovery:${recovery.sessionId}:${recovery.phase}` : void 0;
     const [dismissedKey, setDismissedKey] = (0, import_react30.useState)();
     (0, import_react30.useEffect)(() => {
       setDismissedKey(void 0);
     }, [messageKey]);
-    if (!message || messageKey === dismissedKey) return null;
-    const isSessionError = Boolean(sessionError);
-    return /* @__PURE__ */ import_react30.default.createElement("div", { className: "dsh-error-banner", role: "alert", "aria-live": "assertive" }, /* @__PURE__ */ import_react30.default.createElement("div", { className: "dsh-error-banner-content" }, /* @__PURE__ */ import_react30.default.createElement("span", { className: "dsh-error-banner-message" }, message), /* @__PURE__ */ import_react30.default.createElement("div", { className: "dsh-error-banner-actions" }, /* @__PURE__ */ import_react30.default.createElement(
-      "button",
+    if (!recovering && messageKey !== void 0 && messageKey === dismissedKey) return null;
+    if (!recovering && !recovered && !message) return null;
+    const terminalRecovery = recovery?.phase === "unrecoverable" || recovery?.phase === "cancelled";
+    const actions = recovering ? ["cancelRecovery", "openLogs"] : recovered ? ["restoreRecovery", "exportRecoveryDiagnostics"] : [sessionError ? "openLogs" : terminalRecovery ? "exportRecoveryDiagnostics" : "start"];
+    if (!recovering && !recovered && recovery?.canRestore) actions.push("restoreRecovery");
+    const bannerMessage = recovering ? `${status.message || t("Automatic recovery is in progress")} (${recovery?.usedBoots ?? 0}/${recovery?.maxBoots ?? 8})` : recovered ? status.message || t("Automatic recovery completed") : message;
+    return /* @__PURE__ */ import_react30.default.createElement(
+      "div",
       {
-        type: "button",
-        className: "dsh-button dsh-button-secondary",
-        onClick: () => postAction({ type: isSessionError ? "openLogs" : "start" })
+        className: `dsh-error-banner${recovering || recovered ? " dsh-recovery-banner" : ""}`,
+        role: recovering || recovered ? "status" : "alert",
+        "aria-live": recovering || recovered ? "polite" : "assertive"
       },
-      isSessionError ? t("View details") : t("Retry")
-    ), /* @__PURE__ */ import_react30.default.createElement(
-      "button",
-      {
-        type: "button",
-        className: "dsh-icon-button",
-        "aria-label": t("Dismiss"),
-        title: t("Dismiss"),
-        onClick: () => setDismissedKey(messageKey)
-      },
-      /* @__PURE__ */ import_react30.default.createElement(CloseIcon, null)
-    ))));
+      /* @__PURE__ */ import_react30.default.createElement("div", { className: "dsh-error-banner-content" }, /* @__PURE__ */ import_react30.default.createElement("span", { className: "dsh-error-banner-message" }, bannerMessage), /* @__PURE__ */ import_react30.default.createElement("div", { className: "dsh-error-banner-actions" }, actions.map((type) => /* @__PURE__ */ import_react30.default.createElement(
+        "button",
+        {
+          key: type,
+          type: "button",
+          className: "dsh-button dsh-button-secondary",
+          onClick: () => postAction({ type })
+        },
+        t(ACTION_LABELS[type])
+      )), !recovering && /* @__PURE__ */ import_react30.default.createElement(
+        "button",
+        {
+          type: "button",
+          className: "dsh-icon-button",
+          "aria-label": t("Dismiss"),
+          title: t("Dismiss"),
+          onClick: () => setDismissedKey(messageKey)
+        },
+        /* @__PURE__ */ import_react30.default.createElement(CloseIcon, null)
+      )))
+    );
   }
 
   // webview/src/App.tsx
@@ -27114,6 +27148,7 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
         todos: state.todos,
         permissions: state.permissions,
         commands: state.commands,
+        modeSelectionEnabled: state.modeSelectionEnabled,
         sessionId: state.sessionId,
         sessionRunning: state.sessionStatus?.running === true,
         agentPresetLabel: state.agentPresetLabel
@@ -27127,6 +27162,7 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
         fileReferenceCandidates: state.fileReferenceCandidates,
         skills: state.skills,
         commands: state.commands,
+        modeSelectionEnabled: state.modeSelectionEnabled,
         permissions: state.permissions,
         tokenUsage: state.tokenUsage,
         sessionStats: state.sessionStats,
