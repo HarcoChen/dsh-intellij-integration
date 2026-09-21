@@ -16,8 +16,12 @@ public final class DshRemoteHistory {
             JsonObject row = candidate.getAsJsonObject();
             String type = DshJson.string(row, "type");
             if ("chunks".equals(type)) {
-                JsonObject event = row.getAsJsonObject("event");
-                JsonObject data = event.getAsJsonObject("data");
+                JsonElement eventValue = row.get("event");
+                if (eventValue == null || !eventValue.isJsonObject()) throw invalid();
+                JsonObject event = eventValue.getAsJsonObject();
+                JsonElement dataValue = event.get("data");
+                if (dataValue == null || !dataValue.isJsonObject()) throw invalid();
+                JsonObject data = dataValue.getAsJsonObject();
                 String tag = DshJson.string(event, "type");
                 if (tag == null || !tag.startsWith("chunkrow/")) throw invalid();
                 JsonObject run = data.deepCopy();

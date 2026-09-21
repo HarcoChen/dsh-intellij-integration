@@ -76,7 +76,7 @@ final class DshSettingsController {
                         });
     }
 
-    void togglePanel() {
+    synchronized void togglePanel() {
         if (panel != null) {
             generation.incrementAndGet();
             pluginInventoryGeneration.incrementAndGet();
@@ -163,10 +163,12 @@ final class DshSettingsController {
                         inventory = failedPluginInventory();
                         errorSink.accept(DshJson.message(error));
                     }
-                    if (pluginInventoryGeneration.get() != requested || panel == null) return;
-                    JsonObject latest = panel.deepCopy();
-                    latest.add("pluginInventory", inventory);
-                    panel = latest;
+                    synchronized (DshSettingsController.this) {
+                        if (pluginInventoryGeneration.get() != requested || panel == null) return;
+                        JsonObject latest = panel.deepCopy();
+                        latest.add("pluginInventory", inventory);
+                        panel = latest;
+                    }
                     stateChanged.run();
                 });
     }

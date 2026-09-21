@@ -7,11 +7,13 @@ import com.intellij.openapi.Disposable;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
 import com.intellij.util.concurrency.AppExecutorUtil;
+import java.io.ByteArrayOutputStream;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -19,7 +21,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Flow;
 import java.util.function.Consumer;
 import org.jetbrains.annotations.NotNull;
 import top.harcochen.dsh.DshBundle;
@@ -45,6 +49,9 @@ public final class DshRemoteService implements Disposable {
                     .build();
     private static final String FILE_UPLOAD_ENDPOINT =
             DshRemoteContracts.SESSION_UPLOAD_FILE_BINARY;
+    private static final long MAX_UPLOAD_RESPONSE_BYTES = 1_000_000L;
+    private static final HttpResponse.BodyHandler<String> LIMITED_UPLOAD_BODY_HANDLER =
+            ignored -> new SizeLimitedBodySubscriber(MAX_UPLOAD_RESPONSE_BYTES);
 
     public static final String PHASE_STOPPED = "stopped";
 
@@ -347,14 +354,16 @@ public final class DshRemoteService implements Disposable {
 
         HttpResponse<String> response;
         try {
-            response =
-                    UPLOAD_HTTP_CLIENT.send(
-                            requestBuilder.build(), HttpResponse.BodyHandlers.ofString());
+            response = UPLOAD_HTTP_CLIENT.send(requestBuilder.build(), LIMITED_UPLOAD_BODY_HANDLER);
         } catch (InterruptedException error) {
             Thread.currentThread().interrupt();
             throw DshRemoteException.carrier(
                     FILE_UPLOAD_ENDPOINT, "File upload was interrupted", error);
         } catch (Exception error) {
+            if (isUploadResponseTooLarge(error)) {
+                throw DshRemoteException.protocol(
+                        FILE_UPLOAD_ENDPOINT, "File upload response is too large", error);
+            }
             throw DshRemoteException.carrier(
                     FILE_UPLOAD_ENDPOINT,
                     error.getMessage() == null ? "File upload failed" : error.getMessage(),
@@ -371,7 +380,7 @@ public final class DshRemoteService implements Disposable {
             throw DshRemoteException.http(FILE_UPLOAD_ENDPOINT, status);
         }
         String body = response.body();
-        if (body == null || body.length() > 1_000_000) {
+        if (body == null || body.length() > MAX_UPLOAD_RESPONSE_BYTES) {
             throw DshRemoteException.protocol(
                     FILE_UPLOAD_ENDPOINT, "File upload response is too large", null);
         }
@@ -1054,6 +1063,81 @@ public final class DshRemoteService implements Disposable {
                 && object.has(key)
                 && object.get(key).isJsonPrimitive()
                 && object.get(key).getAsBoolean();
+    }
+
+    private static boolean isUploadResponseTooLarge(Throwable error) {
+        Throwable current = error;
+        while (current != null) {
+            if (current instanceof UploadResponseTooLargeException) return true;
+            Throwable cause = current.getCause();
+            if (cause == current) break;
+            current = cause;
+        }
+        return false;
+    }
+
+    private static final class UploadResponseTooLargeException extends RuntimeException {
+        UploadResponseTooLargeException() {
+            super("File upload response is too large");
+        }
+    }
+
+    private static final class SizeLimitedBodySubscriber
+            implements HttpResponse.BodySubscriber<String> {
+        private final long limit;
+        private final CompletableFuture<String> body = new CompletableFuture<>();
+        private final ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        private Flow.Subscription subscription;
+        private long received;
+
+        SizeLimitedBodySubscriber(long limit) {
+            this.limit = limit;
+        }
+
+        @Override
+        public CompletionStage<String> getBody() {
+            return body;
+        }
+
+        @Override
+        public void onSubscribe(Flow.Subscription next) {
+            if (subscription != null) {
+                next.cancel();
+                return;
+            }
+            subscription = next;
+            next.request(1);
+        }
+
+        @Override
+        public void onNext(List<ByteBuffer> items) {
+            if (body.isDone()) return;
+            long chunk = 0;
+            for (ByteBuffer item : items) chunk += item.remaining();
+            if (chunk > limit - received) {
+                subscription.cancel();
+                body.completeExceptionally(new UploadResponseTooLargeException());
+                return;
+            }
+            for (ByteBuffer item : items) {
+                ByteBuffer copy = item.asReadOnlyBuffer();
+                byte[] value = new byte[copy.remaining()];
+                copy.get(value);
+                bytes.writeBytes(value);
+            }
+            received += chunk;
+            subscription.request(1);
+        }
+
+        @Override
+        public void onError(Throwable error) {
+            body.completeExceptionally(error);
+        }
+
+        @Override
+        public void onComplete() {
+            body.complete(new String(bytes.toByteArray(), StandardCharsets.UTF_8));
+        }
     }
 
     private static Boolean booleanValue(JsonObject object, String key) {

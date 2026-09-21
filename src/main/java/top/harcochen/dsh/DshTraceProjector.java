@@ -86,7 +86,7 @@ final class DshTraceProjector {
                     String callId = string(data, "subCallId");
                     if (callId != null) subSettles.putIfAbsent(callId, entry);
                 }
-                case "assistant/message" -> {
+                case "assistant/message", "assistant/attempt" -> {
                     if (location != null) assistantSteps.add(location);
                 }
                 default -> {}

@@ -589,25 +589,38 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
                                         else {
                                             String display =
                                                     DshBundle.message("dsh.recovery.restored");
-                                            for (String line : result.split("\\R")) {
-                                                if (line.startsWith("DSH_INTELLIJ_HELPER ")) {
-                                                    JsonObject message =
-                                                            com.google.gson.JsonParser.parseString(
-                                                                            line.substring(
-                                                                                    "DSH_INTELLIJ_HELPER "
-                                                                                            .length()))
-                                                                    .getAsJsonObject();
-                                                    if ("diagnostics"
-                                                            .equals(string(message, "event")))
-                                                        display =
-                                                                DshBundle.message(
-                                                                        "dsh.recovery.exported",
-                                                                        string(
-                                                                                message
-                                                                                        .getAsJsonObject(
-                                                                                                "value"),
-                                                                                "path"));
+                                            try {
+                                                if (result != null) {
+                                                    for (String line : result.split("\\R")) {
+                                                        if (line.startsWith(
+                                                                "DSH_INTELLIJ_HELPER ")) {
+                                                            JsonObject message =
+                                                                    com.google.gson.JsonParser
+                                                                            .parseString(
+                                                                                    line.substring(
+                                                                                            "DSH_INTELLIJ_HELPER "
+                                                                                                    .length()))
+                                                                            .getAsJsonObject();
+                                                            if ("diagnostics"
+                                                                    .equals(
+                                                                            string(
+                                                                                    message,
+                                                                                    "event")))
+                                                                display =
+                                                                        DshBundle.message(
+                                                                                "dsh.recovery.exported",
+                                                                                string(
+                                                                                        message
+                                                                                                .getAsJsonObject(
+                                                                                                        "value"),
+                                                                                        "path"));
+                                                        }
+                                                    }
                                                 }
+                                            } catch (RuntimeException malformed) {
+                                                LOG.debug(
+                                                        "Malformed DSH recovery helper output",
+                                                        malformed);
                                             }
                                             notify(display);
                                         }

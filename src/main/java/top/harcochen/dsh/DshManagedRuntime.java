@@ -102,17 +102,29 @@ final class DshManagedRuntime {
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(90);
         String token = UUID.randomUUID().toString();
         while (System.nanoTime() < deadline) {
+            Path staging =
+                    lock.resolveSibling(lock.getFileName() + "." + UUID.randomUUID() + ".tmp");
             try {
-                Files.createFile(lock);
                 Files.writeString(
-                        lock, ProcessHandle.current().pid() + "\n" + token, StandardCharsets.UTF_8);
-                return token;
-            } catch (java.nio.file.FileAlreadyExistsException exists) {
-                if (lockOwnerAlive(lock)) {
-                    Thread.sleep(500);
-                    continue;
+                        staging,
+                        ProcessHandle.current().pid() + "\n" + token,
+                        StandardCharsets.UTF_8,
+                        java.nio.file.StandardOpenOption.CREATE_NEW,
+                        java.nio.file.StandardOpenOption.WRITE);
+                try {
+                    Files.createLink(lock, staging);
+                    return token;
+                } catch (java.nio.file.FileAlreadyExistsException exists) {
+                    if (lockOwnerAlive(lock)) {
+                        Thread.sleep(500);
+                        continue;
+                    }
+                    Files.deleteIfExists(lock);
                 }
-                Files.deleteIfExists(lock);
+            } catch (java.nio.file.FileAlreadyExistsException exists) {
+                // A UUID collision with the staging path is harmless; retry with a new path.
+            } finally {
+                Files.deleteIfExists(staging);
             }
         }
         return null;
@@ -128,12 +140,23 @@ final class DshManagedRuntime {
 
     private static boolean lockOwnerAlive(Path lock) {
         try {
-            String[] lines = Files.readString(lock).split("\\R", -1);
-            if (lines.length == 0) return false;
-            long pid = Long.parseLong(lines[0].trim());
-            return pid > 0 && ProcessHandle.of(pid).map(ProcessHandle::isAlive).orElse(false);
-        } catch (Exception ignored) {
+            String contents = Files.readString(lock);
+            if (contents.isBlank()) return true;
+            String[] lines = contents.split("\\R", -1);
+            if (lines.length == 0 || lines[0].isBlank()) return true;
+            long pid;
+            try {
+                pid = Long.parseLong(lines[0].trim());
+            } catch (NumberFormatException malformed) {
+                return true;
+            }
+            if (pid <= 0) return true;
+            return ProcessHandle.of(pid).map(ProcessHandle::isAlive).orElse(false);
+        } catch (java.nio.file.NoSuchFileException missing) {
             return false;
+        } catch (IOException | SecurityException unreadable) {
+            // An unreadable or partially published lock is safer to treat as owned.
+            return true;
         }
     }
 

@@ -35,7 +35,7 @@ final class DshPromptController {
     private static final int MAX_FILES_PER_MESSAGE = 20;
     private static final int MAX_FILE_NAME_CHARACTERS = 512;
     private static final int MAX_UPLOAD_NAME_CHARACTERS = 255;
-    private static final long MAX_FILE_BYTES = 1L * 1024 * 1024 * 1024;
+    private static final long MAX_FILE_BYTES = 32L * 1024 * 1024;
     private static final long MAX_FILE_BASE64_CHARACTERS = ((MAX_FILE_BYTES + 2) / 3) * 4;
 
     private final DshRuntimeService runtime;

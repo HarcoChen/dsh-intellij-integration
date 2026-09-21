@@ -13,9 +13,10 @@ final class DshWebviewActionSanitizer {
     private static final int MAX_FILE_NAME_CHARACTERS = 512;
 
     /** Bounds the untrusted JCEF payload before the host decodes file bytes. */
-    private static final long MAX_FILE_BASE64_CHARACTERS = 2L * 1024 * 1024 * 1024 - 4;
+    private static final long MAX_FILE_BYTES = 32L * 1024 * 1024;
 
-    private static final long MAX_TOTAL_FILE_BASE64_CHARACTERS = 8L * 1024 * 1024 * 1024;
+    private static final long MAX_FILE_BASE64_CHARACTERS = ((MAX_FILE_BYTES + 2) / 3) * 4;
+    private static final long MAX_TOTAL_FILE_BASE64_CHARACTERS = ((64L * 1024 * 1024 + 2) / 3) * 4;
 
     private DshWebviewActionSanitizer() {}
 

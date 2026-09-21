@@ -382,10 +382,12 @@ public final class DshRemoteConnection implements AutoCloseable {
             return;
         }
         boolean ordered = state.applyFollowFrame(key, item);
-        if (ordered
-                && "snapshot".equals(top.harcochen.dsh.DshJson.string(item, "type"))
-                && key.startsWith("session:")) {
-            refreshGoalActivation(key.substring("session:".length()));
+        if (ordered && "snapshot".equals(top.harcochen.dsh.DshJson.string(item, "type"))) {
+            FollowLease lease = follows.get(key);
+            if (lease != null) lease.reopenAttempts = 0;
+            if (key.startsWith("session:")) {
+                refreshGoalActivation(key.substring("session:".length()));
+            }
         }
         if (!ordered) {
             FollowLease lease = follows.get(key);
