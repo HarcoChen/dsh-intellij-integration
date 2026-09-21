@@ -32,6 +32,11 @@ final class DshPromptController {
     private static final Logger LOG = Logger.getInstance(DshPromptController.class);
     private static final Pattern COMMAND_LINE =
             Pattern.compile("^/([a-z][a-z0-9_-]*)(?:$|[\t\n\r ])");
+    private static final int MAX_FILES_PER_MESSAGE = 20;
+    private static final int MAX_FILE_NAME_CHARACTERS = 512;
+    private static final int MAX_UPLOAD_NAME_CHARACTERS = 255;
+    private static final long MAX_FILE_BYTES = 32L * 1024 * 1024;
+    private static final long MAX_FILE_BASE64_CHARACTERS = ((MAX_FILE_BYTES + 2) / 3) * 4;
 
     private final DshRuntimeService runtime;
     private final DshRemoteService remote;
@@ -49,7 +54,12 @@ final class DshPromptController {
 
     /** One unretired submission kept so an explicit retry can replay the exact payload. */
     private record PendingPrompt(
-            String requestId, String displayText, String wireText, JsonArray images, String mode) {}
+            String requestId,
+            String displayText,
+            String wireText,
+            JsonArray images,
+            JsonArray files,
+            String mode) {}
 
     private final Object pendingLock = new Object();
     private final Map<String, LinkedHashMap<String, PendingPrompt>> pendingBySession =
@@ -139,7 +149,11 @@ final class DshPromptController {
                 action.has("images") && action.get("images").isJsonArray()
                         ? action.getAsJsonArray("images").deepCopy()
                         : new JsonArray();
-        if (text.isBlank() && images.isEmpty()) {
+        JsonArray files =
+                action.has("files") && action.get("files").isJsonArray()
+                        ? action.getAsJsonArray("files").deepCopy()
+                        : new JsonArray();
+        if (text.isBlank() && images.isEmpty() && files.isEmpty()) {
             return;
         }
         String mode = "steer".equals(DshJson.string(action, "mode")) ? "steer" : "queue";
@@ -149,12 +163,13 @@ final class DshPromptController {
         String editorContext = ideContext.captureEditorContext();
         List<String> capturedContextIds = ideContext.contextItemIds();
         stateChanged.run();
-        scheduleSend(text, images, mode, editorContext, capturedContextIds, null);
+        scheduleSend(text, images, files, mode, editorContext, capturedContextIds, null);
     }
 
     private void scheduleSend(
             String text,
             JsonArray images,
+            JsonArray files,
             String mode,
             String editorContext,
             List<String> capturedContextIds,
@@ -164,6 +179,7 @@ final class DshPromptController {
                         send(
                                 text,
                                 images,
+                                files,
                                 mode,
                                 editorContext,
                                 capturedContextIds,
@@ -173,6 +189,7 @@ final class DshPromptController {
     private void send(
             String text,
             JsonArray images,
+            JsonArray files,
             String mode,
             String editorContext,
             List<String> capturedContextIds,
@@ -181,7 +198,9 @@ final class DshPromptController {
             runtime.startAsync().join();
             String current = sessionProvider.ensure();
             String commandName =
-                    requestIdOverride == null && images.isEmpty() ? commandName(text) : null;
+                    requestIdOverride == null && images.isEmpty() && files.isEmpty()
+                            ? commandName(text)
+                            : null;
             if (commandName != null) {
                 ensureCommandCatalog(current);
                 if (sessionState.isRegisteredCommand(current, commandName)) {
@@ -193,13 +212,14 @@ final class DshPromptController {
             String prompt = editorContext.isBlank() ? text : text + "\n\n" + editorContext;
             String requestId =
                     requestIdOverride == null
-                            ? requestIdForNewSubmission(current, text, prompt, images, mode)
+                            ? requestIdForNewSubmission(current, text, prompt, images, files, mode)
                             : requestIdOverride;
+            JsonArray uploadedFiles = uploadFiles(current, files);
             remote.prompt(
                     requestId,
                     current,
                     mode,
-                    contentOf(prompt, images),
+                    contentOf(prompt, images, uploadedFiles),
                     java.util.TimeZone.getDefault().getID());
             ideContext.removeCapturedContext(capturedContextIds);
             refreshState.run();
@@ -216,7 +236,12 @@ final class DshPromptController {
 
     /** Every ordinary submission gets a fresh id; only an explicit retry may pass an old id. */
     private String requestIdForNewSubmission(
-            String session, String displayText, String wireText, JsonArray images, String mode) {
+            String session,
+            String displayText,
+            String wireText,
+            JsonArray images,
+            JsonArray files,
+            String mode) {
         String requestId = UUID.randomUUID().toString();
         synchronized (pendingLock) {
             LinkedHashMap<String, PendingPrompt> pending =
@@ -224,7 +249,13 @@ final class DshPromptController {
             pending.entrySet().removeIf(entry -> remote.hasDurableEcho(session, entry.getKey()));
             pending.put(
                     requestId,
-                    new PendingPrompt(requestId, displayText, wireText, images.deepCopy(), mode));
+                    new PendingPrompt(
+                            requestId,
+                            displayText,
+                            wireText,
+                            images.deepCopy(),
+                            files.deepCopy(),
+                            mode));
             while (pending.size() > MAX_PENDING_PROMPTS_PER_SESSION) {
                 pending.remove(pending.keySet().iterator().next());
             }
@@ -413,6 +444,7 @@ final class DshPromptController {
             scheduleSend(
                     pending.wireText(),
                     pending.images().deepCopy(),
+                    pending.files().deepCopy(),
                     pending.mode(),
                     "",
                     List.of(),
@@ -523,7 +555,17 @@ final class DshPromptController {
     }
 
     private static JsonArray contentOf(String text, JsonArray images) {
+        return contentOf(text, images, new JsonArray());
+    }
+
+    private static JsonArray contentOf(String text, JsonArray images, JsonArray files) {
         JsonArray content = new JsonArray();
+        if (text != null && !text.isEmpty()) {
+            JsonObject part = new JsonObject();
+            part.addProperty("type", "text");
+            part.addProperty("text", text);
+            content.add(part);
+        }
         for (JsonElement image : images) {
             JsonObject part = new JsonObject();
             part.addProperty("type", "image");
@@ -536,13 +578,77 @@ final class DshPromptController {
             }
             content.add(part);
         }
-        if (text != null && !text.isEmpty()) {
+        for (JsonElement file : files) {
+            if (!file.isJsonObject()) continue;
+            String receiptId = DshJson.string(file.getAsJsonObject(), "receiptId");
+            if (receiptId == null || receiptId.isBlank()) continue;
             JsonObject part = new JsonObject();
-            part.addProperty("type", "text");
-            part.addProperty("text", text);
+            part.addProperty("type", "file");
+            part.addProperty("receiptId", receiptId);
             content.add(part);
         }
         return content;
+    }
+
+    /** Upload raw file drafts and return opaque, session-scoped receipts for the prompt. */
+    private JsonArray uploadFiles(String session, JsonArray files) throws DshRemoteException {
+        JsonArray receipts = new JsonArray();
+        if (files == null || files.isEmpty()) return receipts;
+        if (files.size() > MAX_FILES_PER_MESSAGE) {
+            throw new IllegalArgumentException(
+                    DshBundle.message("dsh.file.upload.too.many", MAX_FILES_PER_MESSAGE));
+        }
+        for (JsonElement candidate : files) {
+            if (!candidate.isJsonObject()) {
+                throw new IllegalArgumentException(DshBundle.message("dsh.file.upload.invalid"));
+            }
+            JsonObject file = candidate.getAsJsonObject();
+            String name = strictString(file, "name");
+            String encoded = strictString(file, "data");
+            if (name == null
+                    || name.isBlank()
+                    || name.length() > MAX_FILE_NAME_CHARACTERS
+                    || encoded == null
+                    || encoded.isBlank()) {
+                throw new IllegalArgumentException(DshBundle.message("dsh.file.upload.invalid"));
+            }
+            if (encoded.length() > MAX_FILE_BASE64_CHARACTERS) {
+                throw new IllegalArgumentException(
+                        DshBundle.message("dsh.file.upload.too.large", name));
+            }
+            String leaf = name.replace('\\', '/');
+            int slash = leaf.lastIndexOf('/');
+            leaf = slash >= 0 ? leaf.substring(slash + 1) : leaf;
+            if (leaf.isBlank()) {
+                throw new IllegalArgumentException(DshBundle.message("dsh.file.upload.invalid"));
+            }
+            if (leaf.length() > MAX_UPLOAD_NAME_CHARACTERS) {
+                leaf = leaf.substring(0, MAX_UPLOAD_NAME_CHARACTERS);
+            }
+            final byte[] bytes;
+            try {
+                bytes = java.util.Base64.getDecoder().decode(encoded);
+            } catch (IllegalArgumentException error) {
+                throw new IllegalArgumentException(
+                        DshBundle.message("dsh.file.upload.invalid"), error);
+            }
+            if (bytes.length == 0 || bytes.length > MAX_FILE_BYTES) {
+                throw new IllegalArgumentException(
+                        DshBundle.message("dsh.file.upload.too.large", leaf));
+            }
+            String receipt = remote.uploadFile(session, leaf, bytes);
+            JsonObject part = new JsonObject();
+            part.addProperty("receiptId", receipt);
+            receipts.add(part);
+        }
+        return receipts;
+    }
+
+    private static String strictString(JsonObject object, String key) {
+        JsonElement value = object == null ? null : object.get(key);
+        return value != null && value.isJsonPrimitive() && value.getAsJsonPrimitive().isString()
+                ? value.getAsString()
+                : null;
     }
 
     private static String commandName(String text) {

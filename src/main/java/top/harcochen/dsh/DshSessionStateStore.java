@@ -3,10 +3,14 @@ package top.harcochen.dsh;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 /**
  * UI-side caches for the chat panel: projected message history, command/skill catalogs, and the
@@ -18,6 +22,15 @@ import java.util.Set;
  * and never sees wire frames.
  */
 final class DshSessionStateStore {
+    private static final int MAX_SCHEDULE_ITEMS = 200;
+    private static final Pattern SCHEDULE_UTC_INSTANT =
+            Pattern.compile(
+                    "^(?!0000)\\d{4}-(?:0[1-9]|1[0-2])-"
+                            + "(?:0[1-9]|[12]\\d|3[01])T(?:[01]\\d|2[0-3]):"
+                            + "[0-5]\\d:[0-5]\\d\\.\\d{3}Z$");
+    private static final DateTimeFormatter SCHEDULE_FORMATTER =
+            DateTimeFormatter.ofPattern("uuuu-MM-dd'T'HH:mm:ss.SSS'Z'").withZone(ZoneOffset.UTC);
+
     private final Object lock = new Object();
     private final DshMarkdownRenderCache markdownRenderCache;
     private final Map<String, HistoryProjectionCache> historyCaches =
@@ -34,9 +47,10 @@ final class DshSessionStateStore {
                 history != null && history.has("events") && history.get("events").isJsonArray()
                         ? history.getAsJsonArray("events")
                         : new JsonArray();
+        JsonElement stream = history == null ? null : history.get("assistantStream");
         synchronized (lock) {
             HistoryProjectionCache cached = historyCaches.get(session);
-            if (cached != null && cached.matches(events, statusLabel)) {
+            if (cached != null && cached.matches(events, stream, statusLabel)) {
                 return cached.projection();
             }
         }
@@ -45,10 +59,10 @@ final class DshSessionStateStore {
                 DshMessageProjector.project(history, statusLabel);
         JsonArray rendered = markdownRenderCache.render(projected.messages, "session:" + session);
         HistoryProjectionCache fresh =
-                new HistoryProjectionCache(events, statusLabel, projected, rendered);
+                new HistoryProjectionCache(events, stream, statusLabel, projected, rendered);
         synchronized (lock) {
             HistoryProjectionCache cached = historyCaches.get(session);
-            if (cached != null && cached.matches(events, statusLabel)) {
+            if (cached != null && cached.matches(events, stream, statusLabel)) {
                 return cached.projection();
             }
             historyCaches.put(session, fresh);
@@ -245,6 +259,78 @@ final class DshSessionStateStore {
             result.add(row);
         }
         return result;
+    }
+
+    /** Validate and expose the optional read-only Runtime Schedule projection. */
+    static JsonArray schedule(JsonElement value) {
+        if (value == null
+                || !value.isJsonArray()
+                || value.getAsJsonArray().size() > MAX_SCHEDULE_ITEMS) {
+            return null;
+        }
+        JsonArray result = new JsonArray();
+        Set<String> seen = new HashSet<>();
+        for (JsonElement candidate : value.getAsJsonArray()) {
+            if (!candidate.isJsonObject()) return null;
+            JsonObject source = candidate.getAsJsonObject();
+            String id = DshJson.string(source, "id");
+            String prompt = DshJson.string(source, "prompt");
+            String scheduledAt = DshJson.string(source, "scheduledAt");
+            if (!validScheduleText(id)
+                    || !validScheduleText(prompt)
+                    || !validScheduleInstant(scheduledAt)
+                    || !seen.add(id)) return null;
+            JsonObject row = new JsonObject();
+            row.addProperty("id", id);
+            row.addProperty("prompt", prompt);
+            row.addProperty("scheduledAt", scheduledAt);
+            String kind = DshJson.string(source, "kind");
+            if ("after".equals(kind)) {
+                Long seconds = safeInteger(source.get("afterSeconds"), 1);
+                if (seconds == null) return null;
+                row.addProperty("kind", kind);
+                row.addProperty("afterSeconds", seconds);
+            } else if ("every".equals(kind)) {
+                Long seconds = safeInteger(source.get("everySeconds"), 300);
+                if (seconds == null) return null;
+                row.addProperty("kind", kind);
+                row.addProperty("everySeconds", seconds);
+            } else if ("at".equals(kind)) {
+                row.addProperty("kind", kind);
+            } else {
+                return null;
+            }
+            result.add(row);
+        }
+        return result;
+    }
+
+    private static boolean validScheduleText(String value) {
+        return value != null && !value.isEmpty() && value.trim().equals(value);
+    }
+
+    private static boolean validScheduleInstant(String value) {
+        if (value == null || !SCHEDULE_UTC_INSTANT.matcher(value).matches()) return false;
+        try {
+            return SCHEDULE_FORMATTER.format(Instant.parse(value)).equals(value);
+        } catch (RuntimeException ignored) {
+            return false;
+        }
+    }
+
+    private static Long safeInteger(JsonElement value, long minimum) {
+        if (value == null || !value.isJsonPrimitive() || !value.getAsJsonPrimitive().isNumber())
+            return null;
+        try {
+            double number = value.getAsDouble();
+            if (!Double.isFinite(number)
+                    || number != Math.rint(number)
+                    || number < minimum
+                    || number > 9_007_199_254_740_991d) return null;
+            return value.getAsLong();
+        } catch (RuntimeException ignored) {
+            return null;
+        }
     }
 
     static JsonObject imageLimits(JsonElement value) {
@@ -498,23 +584,30 @@ final class DshSessionStateStore {
 
     private static final class HistoryProjectionCache {
         private final JsonArray events;
+        private final JsonElement stream;
         private final String statusLabel;
         private final DshMessageProjector.Projection projection;
         private final JsonArray messages;
 
         private HistoryProjectionCache(
                 JsonArray events,
+                JsonElement stream,
                 String statusLabel,
                 DshMessageProjector.Projection projection,
                 JsonArray messages) {
             this.events = events;
+            this.stream = stream;
             this.statusLabel = statusLabel;
             this.projection = projection;
             this.messages = messages;
         }
 
-        private boolean matches(JsonArray candidateEvents, String candidateStatusLabel) {
+        private boolean matches(
+                JsonArray candidateEvents,
+                JsonElement candidateStream,
+                String candidateStatusLabel) {
             return Objects.equals(statusLabel, candidateStatusLabel)
+                    && Objects.equals(stream, candidateStream)
                     && events.equals(candidateEvents);
         }
 

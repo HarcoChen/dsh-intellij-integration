@@ -53,12 +53,18 @@ public final class DshRemoteConnection implements AutoCloseable {
     private final ScheduledExecutorService timer;
     private final AtomicBoolean publishPending = new AtomicBoolean();
     private final AtomicLong pendingGeneration = new AtomicLong();
+    private volatile long settingsEpoch;
+
+    long settingsEpoch() {
+        return settingsEpoch;
+    }
 
     /** Connection-executor-confined fields below. */
     private boolean started;
 
     private boolean stopped;
     private boolean generationConnected;
+    private final Map<String, Long> goalActivationEpochs = new HashMap<>();
     private long generation;
     private Opening opening;
     private DshRemoteEventClient events;
@@ -195,6 +201,8 @@ public final class DshRemoteConnection implements AutoCloseable {
     private void connectNow() {
         if (stopped || !started) return;
         generation = pendingGeneration.incrementAndGet();
+        goalActivationEpochs.clear();
+        for (FollowLease lease : follows.values()) lease.reopenAttempts = 0;
         opening = new Opening();
         state.beginGeneration(generation, "connecting");
         publish();
@@ -366,13 +374,66 @@ public final class DshRemoteConnection implements AutoCloseable {
 
     private void onSessionFollowFrame(String key, JsonObject item) {
         if (item == null) return;
+        if ("snapshot".equals(string(item, "type")) && !item.has("assistantStream")) {
+            failFollow(
+                    key,
+                    "This Runtime does not expose the 0.1.5 assistant stream. "
+                            + "Upgrade DSH Runtime to >= 0.1.5-rc.1 and reconnect.");
+            return;
+        }
         boolean ordered = state.applyFollowFrame(key, item);
+        if (ordered && "snapshot".equals(top.harcochen.dsh.DshJson.string(item, "type"))) {
+            FollowLease lease = follows.get(key);
+            if (lease != null) lease.reopenAttempts = 0;
+            if (key.startsWith("session:")) {
+                refreshGoalActivation(key.substring("session:".length()));
+            }
+        }
         if (!ordered) {
+            FollowLease lease = follows.get(key);
+            if (lease != null && ++lease.reopenAttempts > 3) {
+                failFollow(
+                        key,
+                        "Remote session history remained inconsistent after three retries. Reconnect to retry.");
+                return;
+            }
             callbacks.onDropped(
                     "Remote session history detected a sequence gap; reopening the stream");
             reopenFollow(key);
         }
         publish();
+    }
+
+    private void failFollow(String key, String message) {
+        FollowLease lease = follows.get(key);
+        if (lease != null && lease.stream != null) lease.stream.handle.cancel();
+        if (lease != null) lease.stream = null;
+        coreStreams.remove(key);
+        state.clearAssistantStreams();
+        state.setPhase("error", message);
+        callbacks.onDropped(message);
+        publish();
+    }
+
+    private void refreshGoalActivation(String session) {
+        if (!follows.containsKey("session:" + session)) return;
+        long gen = generation;
+        long epoch = goalActivationEpochs.merge(session, 1L, Long::sum);
+        JsonObject args = new JsonObject();
+        args.addProperty("agentId", session);
+        unary.callAsync("goals/get", args)
+                .whenComplete(
+                        (value, error) ->
+                                execute(
+                                        () -> {
+                                            if (error != null
+                                                    || gen != generation
+                                                    || !java.util.Objects.equals(
+                                                            goalActivationEpochs.get(session),
+                                                            epoch)) return;
+                                            state.setGoalActivation(session, value);
+                                            publish();
+                                        }));
     }
 
     private void reopenFollow(String key) {
@@ -382,7 +443,6 @@ public final class DshRemoteConnection implements AutoCloseable {
         lease.stream = null;
         coreStreams.remove(key);
         if (stream != null) stream.handle.cancel();
-        state.closeFollow(key);
         openFollowStream(key);
     }
 
@@ -399,6 +459,7 @@ public final class DshRemoteConnection implements AutoCloseable {
         for (StreamLease lease : coreStreams.values()) lease.handle.cancel();
         coreStreams.clear();
         for (FollowLease lease : follows.values()) lease.stream = null;
+        state.clearAssistantStreams();
         state.setPhase("reconnecting", reason);
         publish();
         if (reconnect && !stopped) scheduleReconnect();
@@ -467,6 +528,31 @@ public final class DshRemoteConnection implements AutoCloseable {
             executor.execute(
                     () -> {
                         if (gen != generation) return;
+                        if ("settings/document-updated".equals(event)
+                                || "agent-preset/selected".equals(event)) {
+                            settingsEpoch++;
+                            publish();
+                            return;
+                        }
+                        if ("goal/activation-changed".equals(event)
+                                && args != null
+                                && !args.isEmpty()
+                                && args.get(0).isJsonObject()) {
+                            JsonObject payload = args.get(0).getAsJsonObject();
+                            String session = top.harcochen.dsh.DshJson.string(payload, "sessionId");
+                            if (session != null) {
+                                goalActivationEpochs.merge(session, 1L, Long::sum);
+                                state.setGoalActivation(session, payload.get("goal"));
+                                publish();
+                            }
+                            return;
+                        }
+                        if ("api-session/status".equals(event)
+                                && args != null
+                                && !args.isEmpty()
+                                && args.get(0).isJsonPrimitive()) {
+                            refreshGoalActivation(args.get(0).getAsString());
+                        }
                         if (event.startsWith("api-session/")) {
                             if (opening != null) {
                                 opening.catalogEmits.add(
@@ -567,10 +653,6 @@ public final class DshRemoteConnection implements AutoCloseable {
 
         @Override
         public void onItem(JsonObject value) {
-            if (value != null && "snapshot".equals(string(value, "type"))) {
-                FollowLease lease = follows.get(key);
-                if (lease != null) lease.reopenAttempts = 0;
-            }
             onSessionFollowFrame(key, value);
         }
 
