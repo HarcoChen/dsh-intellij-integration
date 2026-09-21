@@ -16,7 +16,8 @@ final class DshWebviewActionSanitizer {
     private static final long MAX_FILE_BYTES = 32L * 1024 * 1024;
 
     private static final long MAX_FILE_BASE64_CHARACTERS = ((MAX_FILE_BYTES + 2) / 3) * 4;
-    private static final long MAX_TOTAL_FILE_BASE64_CHARACTERS = ((64L * 1024 * 1024 + 2) / 3) * 4;
+    private static final long MAX_TOTAL_ATTACHMENT_BASE64_CHARACTERS =
+            ((64L * 1024 * 1024 + 2) / 3) * 4;
 
     private DshWebviewActionSanitizer() {}
 
@@ -68,11 +69,11 @@ final class DshWebviewActionSanitizer {
             }
             String text = DshJson.string(input, "text");
             String mode = DshJson.string(input, "mode");
-            if (text == null
-                    || text.length() > 1_000_000
+            if ((text != null && text.length() > 1_000_000)
                     || !("queue".equals(mode) || "steer".equals(mode))) {
                 return null;
             }
+            long totalAttachmentCharacters = 0;
             if (input.has("images")) {
                 if (!input.get("images").isJsonArray()
                         || input.getAsJsonArray("images").size() > 20) {
@@ -98,6 +99,10 @@ final class DshWebviewActionSanitizer {
                                     || mediaType.equals("image/gif"))) {
                         return null;
                     }
+                    totalAttachmentCharacters += data.length();
+                    if (totalAttachmentCharacters > MAX_TOTAL_ATTACHMENT_BASE64_CHARACTERS) {
+                        return null;
+                    }
                 }
             }
             if (input.has("files")) {
@@ -105,7 +110,6 @@ final class DshWebviewActionSanitizer {
                         || input.getAsJsonArray("files").size() > MAX_FILES_PER_MESSAGE) {
                     return null;
                 }
-                long totalCharacters = 0;
                 for (JsonElement file : input.getAsJsonArray("files")) {
                     if (!file.isJsonObject()) return null;
                     JsonObject fileObject = file.getAsJsonObject();
@@ -120,10 +124,16 @@ final class DshWebviewActionSanitizer {
                             || data.length() > MAX_FILE_BASE64_CHARACTERS) {
                         return null;
                     }
-                    totalCharacters += data.length();
-                    if (totalCharacters > MAX_TOTAL_FILE_BASE64_CHARACTERS) return null;
+                    totalAttachmentCharacters += data.length();
+                    if (totalAttachmentCharacters > MAX_TOTAL_ATTACHMENT_BASE64_CHARACTERS) {
+                        return null;
+                    }
                 }
             }
+            boolean noText = text == null || text.isBlank();
+            boolean noImages = !input.has("images") || input.getAsJsonArray("images").isEmpty();
+            boolean noFiles = !input.has("files") || input.getAsJsonArray("files").isEmpty();
+            if (noText && noImages && noFiles) return null;
             return input;
         }
         if ("copyMessage".equals(type)) {
