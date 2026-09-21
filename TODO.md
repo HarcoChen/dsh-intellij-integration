@@ -148,6 +148,9 @@ Provider/runtime parity batch (2026-09-21):
       now pre-fills the composer without silently submitting or injecting a draft.
 - [x] XDebugger context capture remains one-shot and bounded; agent status labels accept a
       validated candidate list with a fixed-label override.
+- [x] Tool-write dirty-file guard: before approving a structured file diff, compare its target
+      paths with IntelliJ's unsaved editor documents; keep the approval pending and explain how
+      to save/revert when they overlap.
 - [x] Latest Activity Dock surfaces are now host-backed: schedule, plugin inventory, and optional
       dynamic Cordis plugin state/actions are projected through the same sanitized WebView boundary.
 - `compileJava`, `spotlessCheck`, `checkstyleMain`, and `buildPlugin` are the automated gates for

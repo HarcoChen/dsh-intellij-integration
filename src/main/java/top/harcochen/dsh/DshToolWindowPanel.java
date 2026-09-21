@@ -13,9 +13,12 @@ import com.intellij.ide.BrowserUtil;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.diagnostic.Logger;
+import com.intellij.openapi.editor.Document;
+import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.ide.CopyPasteManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.Messages;
+import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.ui.components.JBLabel;
 import java.awt.BorderLayout;
 import java.awt.FlowLayout;
@@ -1342,6 +1345,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
                 () -> {
                     DshRemoteState.SessionView view = sessionView(current);
                     boolean pending = false;
+                    JsonObject pendingItem = null;
                     if (view != null) {
                         for (JsonElement candidate : view.interactions) {
                             if (!candidate.isJsonObject()) continue;
@@ -1351,6 +1355,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
                                     && expectedKind.equals(string(item, "kind"))
                                     && "pending".equals(string(item, "status"))) {
                                 pending = true;
+                                pendingItem = item;
                                 break;
                             }
                         }
@@ -1360,12 +1365,92 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
                         postStateLater();
                         return;
                     }
+                    if ("allowed-once".equals(string(action, "outcome"))) {
+                        List<String> dirty =
+                                dirtyApprovalPaths(
+                                        current,
+                                        pendingItem == null ? null : string(pendingItem, "callId"));
+                        if (!dirty.isEmpty()) {
+                            String files = String.join(", ", dirty);
+                            String message = DshBundle.message("dsh.approval.dirty", files);
+                            lastError = message;
+                            notify(message);
+                            postStateLater();
+                            return;
+                        }
+                    }
                     String failure = remote.answerInteraction(current, key, outcomeValue);
                     if (failure != null) {
                         lastError = failure;
                         postStateLater();
                     }
                 });
+    }
+
+    /**
+     * Find unsaved editor buffers that a pending structured tool diff would overwrite.
+     *
+     * <p>The check is deliberately limited to paths present in the Runtime's diff card. We do not
+     * infer write targets from a tool name or command text, so an approval whose presentation has
+     * no structured file diff keeps the ordinary approval flow. When a match is found the caller
+     * leaves the interaction pending; saving or reverting the document then makes the same action
+     * available again.
+     */
+    private List<String> dirtyApprovalPaths(String session, String callId) {
+        if (session == null || session.isBlank() || callId == null || callId.isBlank()) {
+            return List.of();
+        }
+        try {
+            JsonObject history = remote.traceHistory(session, 160);
+            DshToolDiff.CallDiffState state = DshToolDiff.callDiffState(history, callId);
+            if (state == null) return List.of();
+            List<String> diffPaths = DshToolDiff.diffViewPaths(state.view);
+            if (diffPaths.isEmpty()) return List.of();
+
+            Set<String> dirtyFiles =
+                    ReadAction.compute(
+                            () -> {
+                                Set<String> result = new HashSet<>();
+                                FileDocumentManager manager = FileDocumentManager.getInstance();
+                                for (Document document : manager.getUnsavedDocuments()) {
+                                    VirtualFile file = manager.getFile(document);
+                                    if (file != null && file.isValid()) {
+                                        String path = canonicalPath(file.getPath());
+                                        if (path != null) result.add(path);
+                                    }
+                                }
+                                return result;
+                            });
+            if (dirtyFiles.isEmpty()) return List.of();
+
+            String root = project.getBasePath();
+            List<String> matches = new ArrayList<>();
+            for (String path : diffPaths) {
+                String absolute = resolveDiffPath(root, path);
+                if (absolute == null) continue;
+                String canonical = canonicalPath(absolute);
+                if (canonical != null && dirtyFiles.contains(canonical)) matches.add(path);
+            }
+            return matches;
+        } catch (Exception error) {
+            // A trace read can fail during reconnect. The structured diff is optional; preserve
+            // the normal approval path rather than blocking a tool on a best-effort guard.
+            LOG.debug("Unable to inspect approval diff for dirty editor buffers", error);
+            return List.of();
+        }
+    }
+
+    private static String resolveDiffPath(String root, String path) {
+        if (path == null || path.isBlank()) return null;
+        try {
+            Path candidate = Path.of(path);
+            if (!candidate.isAbsolute() && root != null && !root.isBlank()) {
+                candidate = Path.of(root).resolve(candidate);
+            }
+            return candidate.normalize().toString();
+        } catch (RuntimeException error) {
+            return null;
+        }
     }
 
     private void openBrowser() {

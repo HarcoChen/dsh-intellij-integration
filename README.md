@@ -48,6 +48,8 @@ An independent community plugin for IntelliJ IDEA, PyCharm, and other IntelliJ P
 
 Review file edits in the IDE's own diff viewer. For supported tool diff cards, DSH reconstructs before/after content from session history, so the preview does not depend on a Git repository. Proposed edits can be previewed before approval. If later file changes make reconstruction unreliable, the plugin reports that instead of showing a misleading comparison.
 
+Before an approval can release a structured file edit, DSH checks IntelliJ's unsaved editor buffers against the proposed paths. Overlapping edits keep the approval pending until you save or revert the document.
+
 ### Put the right context into the conversation
 
 Use **DSH: Ask About Selection** for an open-ended question, or the **DSH** context menu for explain / fix / review / documentation tasks. The context picker also supports attaching the current unstaged Git diff. Editor context is bounded by the configurable byte limit.
