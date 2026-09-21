@@ -13,13 +13,17 @@ import com.intellij.ide.BrowserUtil;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.diagnostic.Logger;
+import com.intellij.openapi.ide.CopyPasteManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.ui.components.JBLabel;
 import java.awt.BorderLayout;
 import java.awt.FlowLayout;
+import java.awt.datatransfer.StringSelection;
 import java.nio.file.Path;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
@@ -96,6 +100,10 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
     private volatile DshRemoteState.Snapshot snapshot = DshRemoteService.emptySnapshot();
     private volatile JsonArray messages = new JsonArray();
     private volatile DshMessageProjector.Projection projection;
+
+    /** Keeps visible text briefly so copy actions survive a stream-to-history projection race. */
+    private final Map<String, String> copyableMessageTexts = new LinkedHashMap<>();
+
     private volatile String lastError;
     private volatile JsonObject pendingComposerUpdate;
 
@@ -309,6 +317,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
                         sessionState.projectHistory(selected, history, statusLabel);
                 projection = cached.projection();
                 messages = cached.messages();
+                rememberCopyableMessages(selected, messages);
                 changeReviews.observe(selected, project.getBasePath(), history);
                 prompts.refreshCatalogs(selected);
                 sessionActions.refreshModelCatalog(selected);
@@ -512,6 +521,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
             case "restoreCodeToMessage" -> checkpointRestore(integer(action, "seq", -1));
             case "forkAndRestoreCodeToMessage" ->
                     checkpointForkAndRestore(integer(action, "seq", -1));
+            case "copyMessage" -> copyMessage(string(action, "messageId"));
             case "archiveSession" -> sessionActions.archive();
             case "openTrace" -> openTrace(action);
             case "openBrowser" -> openBrowser();
@@ -630,6 +640,72 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
             notify("This message is no longer available for a checkpoint action.");
         }
         return turn;
+    }
+
+    /** Copy the host-projected message text rather than trusting text supplied by the WebView. */
+    private void copyMessage(String messageId) {
+        if (messageId == null || messageId.isBlank()) return;
+        String scope = sessionId == null ? "none" : sessionId;
+        String cacheKey = scope + ":" + messageId;
+        String text = null;
+        synchronized (copyableMessageTexts) {
+            text = copyableMessageTexts.get(cacheKey);
+        }
+        JsonArray current = messages;
+        if (text == null) {
+            for (JsonElement candidate : current) {
+                if (!candidate.isJsonObject()) continue;
+                JsonObject row = candidate.getAsJsonObject();
+                if (!messageId.equals(string(row, "id"))) continue;
+                String role = string(row, "role");
+                if (!"user".equals(role) && !"assistant".equals(role)) break;
+                text = stringOr(row, "text", "");
+                String skill = string(row, "skillInvocation");
+                if ("user".equals(role) && skill != null && !skill.isBlank()) {
+                    text = "/" + skill + (text.isBlank() ? "" : " " + text);
+                }
+                if (!text.isBlank()) rememberCopyableMessage(cacheKey, text);
+                break;
+            }
+        }
+        if (text == null || text.isBlank()) {
+            notify(DshBundle.message("dsh.message.copy.unavailable"));
+            return;
+        }
+        String copied = text;
+        ApplicationManager.getApplication()
+                .invokeLater(
+                        () ->
+                                CopyPasteManager.getInstance()
+                                        .setContents(new StringSelection(copied)));
+    }
+
+    private void rememberCopyableMessages(String session, JsonArray rows) {
+        if (session == null || session.isBlank() || rows == null) return;
+        for (JsonElement candidate : rows) {
+            if (!candidate.isJsonObject()) continue;
+            JsonObject row = candidate.getAsJsonObject();
+            String role = string(row, "role");
+            if (!"user".equals(role) && !"assistant".equals(role)) continue;
+            String text = stringOr(row, "text", "");
+            String skill = string(row, "skillInvocation");
+            if ("user".equals(role) && skill != null && !skill.isBlank()) {
+                text = "/" + skill + (text.isBlank() ? "" : " " + text);
+            }
+            if (!text.isBlank()) {
+                rememberCopyableMessage(session + ":" + string(row, "id"), text);
+            }
+        }
+    }
+
+    private void rememberCopyableMessage(String key, String text) {
+        if (key == null || key.endsWith(":null") || text == null || text.isBlank()) return;
+        synchronized (copyableMessageTexts) {
+            copyableMessageTexts.put(key, text);
+            while (copyableMessageTexts.size() > 2_000) {
+                copyableMessageTexts.remove(copyableMessageTexts.keySet().iterator().next());
+            }
+        }
     }
 
     /** Dispatch a structured action from IDE menus, as if it came from the webview. */

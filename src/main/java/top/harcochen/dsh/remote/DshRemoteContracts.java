@@ -77,6 +77,9 @@ public final class DshRemoteContracts {
     public static final String CREDENTIALS_SET = "credentials/set";
     public static final String CREDENTIALS_UNSET = "credentials/unset";
 
+    /** Binary HTTP route used by {@code session/prompt} file content parts. */
+    public static final String SESSION_UPLOAD_FILE_BINARY = "session/uploadFileBinary";
+
     /** Recorded for capability documentation; no IntelliJ UI exposes it yet. */
     public static final String MESSAGE_FEEDBACK_LIST = "messageFeedback/list";
 

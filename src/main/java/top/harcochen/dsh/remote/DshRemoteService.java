@@ -7,6 +7,13 @@ import com.intellij.openapi.Disposable;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
 import com.intellij.util.concurrency.AppExecutorUtil;
+import java.net.URI;
+import java.net.URLEncoder;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -30,6 +37,14 @@ import top.harcochen.dsh.DshSettingsState;
  */
 public final class DshRemoteService implements Disposable {
     private static final Logger LOG = Logger.getInstance(DshRemoteService.class);
+    private static final HttpClient UPLOAD_HTTP_CLIENT =
+            HttpClient.newBuilder()
+                    .version(HttpClient.Version.HTTP_1_1)
+                    .connectTimeout(Duration.ofSeconds(5))
+                    .followRedirects(HttpClient.Redirect.NEVER)
+                    .build();
+    private static final String FILE_UPLOAD_ENDPOINT =
+            DshRemoteContracts.SESSION_UPLOAD_FILE_BINARY;
 
     public static final String PHASE_STOPPED = "stopped";
 
@@ -277,6 +292,138 @@ public final class DshRemoteService implements Disposable {
                         DshRemoteContracts.SESSION_PROMPT,
                         DshRemoteContracts.argsSessionPrompt(
                                 requestId, sessionId, mode, content, clientTimeZone)));
+    }
+
+    /**
+     * Upload one raw file draft and return the Runtime-owned receipt used in a prompt content part.
+     * The upload route is intentionally kept outside the Remote unary envelope: it accepts binary
+     * bytes, but it still uses the same authority-bound cookie and request timeout.
+     */
+    public String uploadFile(String sessionId, String name, byte[] bytes)
+            throws DshRemoteException {
+        if (sessionId == null || sessionId.isBlank() || name == null || name.isBlank()) {
+            throw new IllegalArgumentException("A file upload needs a session and name");
+        }
+        if (bytes == null || bytes.length == 0) {
+            throw new IllegalArgumentException("A file upload cannot be empty");
+        }
+        String base = runtime.getUrl();
+        if (base == null || base.isBlank()) {
+            throw DshRemoteException.carrier(
+                    FILE_UPLOAD_ENDPOINT, "DSH Runtime is not connected", null);
+        }
+        try {
+            auth.cookie();
+        } catch (DshRemoteException error) {
+            LOG.warn("DSH Runtime authentication failed during file upload: " + error.display());
+            throw error;
+        }
+
+        URI uri;
+        try {
+            uri =
+                    URI.create(
+                            base.strip().replaceAll("/+$", "")
+                                    + "/api/"
+                                    + FILE_UPLOAD_ENDPOINT
+                                    + "?sessionId="
+                                    + URLEncoder.encode(sessionId, StandardCharsets.UTF_8)
+                                    + "&name="
+                                    + URLEncoder.encode(name, StandardCharsets.UTF_8));
+        } catch (RuntimeException error) {
+            throw DshRemoteException.protocol(
+                    FILE_UPLOAD_ENDPOINT, "File upload URL is invalid", error);
+        }
+
+        HttpRequest.Builder requestBuilder =
+                HttpRequest.newBuilder()
+                        .uri(uri)
+                        .timeout(Duration.ofMillis(uploadTimeoutMs()))
+                        .header("content-type", "application/octet-stream")
+                        .POST(HttpRequest.BodyPublishers.ofByteArray(bytes));
+        for (Map.Entry<String, String> entry : auth.headers().entrySet()) {
+            requestBuilder.header(entry.getKey(), entry.getValue());
+        }
+
+        HttpResponse<String> response;
+        try {
+            response =
+                    UPLOAD_HTTP_CLIENT.send(
+                            requestBuilder.build(), HttpResponse.BodyHandlers.ofString());
+        } catch (InterruptedException error) {
+            Thread.currentThread().interrupt();
+            throw DshRemoteException.carrier(
+                    FILE_UPLOAD_ENDPOINT, "File upload was interrupted", error);
+        } catch (Exception error) {
+            throw DshRemoteException.carrier(
+                    FILE_UPLOAD_ENDPOINT,
+                    error.getMessage() == null ? "File upload failed" : error.getMessage(),
+                    error);
+        }
+
+        int status = response.statusCode();
+        if (status == 401 || status == 403) {
+            auth.invalidate();
+            throw DshRemoteException.auth(FILE_UPLOAD_ENDPOINT, status);
+        }
+        if (status == 404) throw DshRemoteException.capability(FILE_UPLOAD_ENDPOINT);
+        if (status < 200 || status >= 300) {
+            throw DshRemoteException.http(FILE_UPLOAD_ENDPOINT, status);
+        }
+        String body = response.body();
+        if (body == null || body.length() > 1_000_000) {
+            throw DshRemoteException.protocol(
+                    FILE_UPLOAD_ENDPOINT, "File upload response is too large", null);
+        }
+        JsonObject envelope;
+        try {
+            JsonElement parsed = com.google.gson.JsonParser.parseString(body);
+            if (!parsed.isJsonObject()) throw new IllegalArgumentException("not an object");
+            envelope = parsed.getAsJsonObject();
+        } catch (RuntimeException error) {
+            throw DshRemoteException.protocol(
+                    FILE_UPLOAD_ENDPOINT, "File upload returned invalid JSON", error);
+        }
+        Boolean ok = booleanValue(envelope, "ok");
+        if (Boolean.FALSE.equals(ok)) {
+            JsonObject error = objectValue(envelope, "error");
+            String code = stringOf(error, "code");
+            String message = stringOf(error, "message");
+            throw DshRemoteException.remote(
+                    FILE_UPLOAD_ENDPOINT,
+                    code.isBlank() ? "upload/rejected" : code,
+                    message.isBlank() ? "The Runtime rejected the file upload" : message,
+                    error);
+        }
+        if (!Boolean.TRUE.equals(ok)) {
+            throw DshRemoteException.protocol(
+                    FILE_UPLOAD_ENDPOINT, "File upload response has no ok flag", null);
+        }
+        JsonObject value = objectValue(envelope, "value");
+        JsonObject file = objectValue(value, "file");
+        String receiptId = stringOf(value, "receiptId");
+        String attachmentId = stringOf(file, "attachmentId");
+        String returnedName = stringOf(file, "name");
+        long returnedBytes = longOf(file, "bytes", -1);
+        if (receiptId.isBlank()
+                || receiptId.length() > 512
+                || attachmentId.isBlank()
+                || attachmentId.length() > 512
+                || returnedName.isBlank()
+                || returnedName.length() > 512
+                || returnedName.contains("/")
+                || returnedName.contains("\\")
+                || returnedBytes < 0
+                || returnedBytes != bytes.length) {
+            throw DshRemoteException.protocol(
+                    FILE_UPLOAD_ENDPOINT, "File upload returned an unusable receipt", null);
+        }
+        return receiptId;
+    }
+
+    private int uploadTimeoutMs() {
+        int configured = DshSettingsState.getInstance(project).requestTimeoutMs;
+        return Math.max(1_000, Math.min(configured, 3_600_000));
     }
 
     public void cancel(String sessionId) throws DshRemoteException {
@@ -729,6 +876,12 @@ public final class DshRemoteService implements Disposable {
         return value != null && value.isJsonObject() ? value.getAsJsonObject() : new JsonObject();
     }
 
+    private static JsonObject objectValue(JsonObject object, String key) {
+        return object != null && object.has(key) && object.get(key).isJsonObject()
+                ? object.getAsJsonObject(key)
+                : new JsonObject();
+    }
+
     private static JsonArray arrayOrEmpty(JsonObject value, String key) {
         return value.has(key) && value.get(key).isJsonArray()
                 ? value.getAsJsonArray(key)
@@ -749,6 +902,15 @@ public final class DshRemoteService implements Disposable {
                 && object.has(key)
                 && object.get(key).isJsonPrimitive()
                 && object.get(key).getAsBoolean();
+    }
+
+    private static Boolean booleanValue(JsonObject object, String key) {
+        if (object == null || !object.has(key) || !object.get(key).isJsonPrimitive()) return null;
+        try {
+            return object.get(key).getAsBoolean();
+        } catch (RuntimeException ignored) {
+            return null;
+        }
     }
 
     private static long longOf(JsonObject object, String key, long fallback) {

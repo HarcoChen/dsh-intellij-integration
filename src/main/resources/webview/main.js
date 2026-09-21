@@ -26,9 +26,9 @@
     mod
   ));
 
-  // node_modules/react/cjs/react.development.js
+  // ../../../Users/harco/Programs/dsh-ide/node_modules/react/cjs/react.development.js
   var require_react_development = __commonJS({
-    "node_modules/react/cjs/react.development.js"(exports, module) {
+    "../../../Users/harco/Programs/dsh-ide/node_modules/react/cjs/react.development.js"(exports, module) {
       "use strict";
       if (true) {
         (function() {
@@ -1085,7 +1085,7 @@
             }
             return dispatcher.useContext(Context);
           }
-          function useState17(initialState) {
+          function useState20(initialState) {
             var dispatcher = resolveDispatcher();
             return dispatcher.useState(initialState);
           }
@@ -1093,11 +1093,11 @@
             var dispatcher = resolveDispatcher();
             return dispatcher.useReducer(reducer, initialArg, init);
           }
-          function useRef9(initialValue) {
+          function useRef11(initialValue) {
             var dispatcher = resolveDispatcher();
             return dispatcher.useRef(initialValue);
           }
-          function useEffect15(create, deps) {
+          function useEffect16(create, deps) {
             var dispatcher = resolveDispatcher();
             return dispatcher.useEffect(create, deps);
           }
@@ -1105,15 +1105,15 @@
             var dispatcher = resolveDispatcher();
             return dispatcher.useInsertionEffect(create, deps);
           }
-          function useLayoutEffect2(create, deps) {
+          function useLayoutEffect4(create, deps) {
             var dispatcher = resolveDispatcher();
             return dispatcher.useLayoutEffect(create, deps);
           }
-          function useCallback4(callback, deps) {
+          function useCallback5(callback, deps) {
             var dispatcher = resolveDispatcher();
             return dispatcher.useCallback(callback, deps);
           }
-          function useMemo4(create, deps) {
+          function useMemo6(create, deps) {
             var dispatcher = resolveDispatcher();
             return dispatcher.useMemo(create, deps);
           }
@@ -1876,19 +1876,19 @@
           exports.memo = memo;
           exports.startTransition = startTransition;
           exports.unstable_act = act;
-          exports.useCallback = useCallback4;
+          exports.useCallback = useCallback5;
           exports.useContext = useContext;
           exports.useDebugValue = useDebugValue;
           exports.useDeferredValue = useDeferredValue;
-          exports.useEffect = useEffect15;
+          exports.useEffect = useEffect16;
           exports.useId = useId;
           exports.useImperativeHandle = useImperativeHandle;
           exports.useInsertionEffect = useInsertionEffect;
-          exports.useLayoutEffect = useLayoutEffect2;
-          exports.useMemo = useMemo4;
+          exports.useLayoutEffect = useLayoutEffect4;
+          exports.useMemo = useMemo6;
           exports.useReducer = useReducer;
-          exports.useRef = useRef9;
-          exports.useState = useState17;
+          exports.useRef = useRef11;
+          exports.useState = useState20;
           exports.useSyncExternalStore = useSyncExternalStore;
           exports.useTransition = useTransition;
           exports.version = ReactVersion;
@@ -1900,9 +1900,9 @@
     }
   });
 
-  // node_modules/react/index.js
+  // ../../../Users/harco/Programs/dsh-ide/node_modules/react/index.js
   var require_react = __commonJS({
-    "node_modules/react/index.js"(exports, module) {
+    "../../../Users/harco/Programs/dsh-ide/node_modules/react/index.js"(exports, module) {
       "use strict";
       if (false) {
         module.exports = null;
@@ -1912,9 +1912,9 @@
     }
   });
 
-  // node_modules/scheduler/cjs/scheduler.development.js
+  // ../../../Users/harco/Programs/dsh-ide/node_modules/scheduler/cjs/scheduler.development.js
   var require_scheduler_development = __commonJS({
-    "node_modules/scheduler/cjs/scheduler.development.js"(exports) {
+    "../../../Users/harco/Programs/dsh-ide/node_modules/scheduler/cjs/scheduler.development.js"(exports) {
       "use strict";
       if (true) {
         (function() {
@@ -2362,9 +2362,9 @@
     }
   });
 
-  // node_modules/scheduler/index.js
+  // ../../../Users/harco/Programs/dsh-ide/node_modules/scheduler/index.js
   var require_scheduler = __commonJS({
-    "node_modules/scheduler/index.js"(exports, module) {
+    "../../../Users/harco/Programs/dsh-ide/node_modules/scheduler/index.js"(exports, module) {
       "use strict";
       if (false) {
         module.exports = null;
@@ -2374,9 +2374,9 @@
     }
   });
 
-  // node_modules/react-dom/cjs/react-dom.development.js
+  // ../../../Users/harco/Programs/dsh-ide/node_modules/react-dom/cjs/react-dom.development.js
   var require_react_dom_development = __commonJS({
-    "node_modules/react-dom/cjs/react-dom.development.js"(exports) {
+    "../../../Users/harco/Programs/dsh-ide/node_modules/react-dom/cjs/react-dom.development.js"(exports) {
       "use strict";
       if (true) {
         (function() {
@@ -2384,9 +2384,9 @@
           if (typeof __REACT_DEVTOOLS_GLOBAL_HOOK__ !== "undefined" && typeof __REACT_DEVTOOLS_GLOBAL_HOOK__.registerInternalModuleStart === "function") {
             __REACT_DEVTOOLS_GLOBAL_HOOK__.registerInternalModuleStart(new Error());
           }
-          var React31 = require_react();
+          var React36 = require_react();
           var Scheduler = require_scheduler();
-          var ReactSharedInternals = React31.__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED;
+          var ReactSharedInternals = React36.__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED;
           var suppressWarning = false;
           function setSuppressWarning(newSuppressWarning) {
             {
@@ -3993,7 +3993,7 @@
             {
               if (props.value == null) {
                 if (typeof props.children === "object" && props.children !== null) {
-                  React31.Children.forEach(props.children, function(child) {
+                  React36.Children.forEach(props.children, function(child) {
                     if (child == null) {
                       return;
                     }
@@ -23538,9 +23538,9 @@
     }
   });
 
-  // node_modules/react-dom/index.js
+  // ../../../Users/harco/Programs/dsh-ide/node_modules/react-dom/index.js
   var require_react_dom = __commonJS({
-    "node_modules/react-dom/index.js"(exports, module) {
+    "../../../Users/harco/Programs/dsh-ide/node_modules/react-dom/index.js"(exports, module) {
       "use strict";
       if (false) {
         checkDCE();
@@ -23551,9 +23551,9 @@
     }
   });
 
-  // node_modules/react-dom/client.js
+  // ../../../Users/harco/Programs/dsh-ide/node_modules/react-dom/client.js
   var require_client = __commonJS({
-    "node_modules/react-dom/client.js"(exports) {
+    "../../../Users/harco/Programs/dsh-ide/node_modules/react-dom/client.js"(exports) {
       "use strict";
       var m = require_react_dom();
       if (false) {
@@ -23583,11 +23583,11 @@
   });
 
   // webview/src/main.tsx
-  var import_react32 = __toESM(require_react());
+  var import_react37 = __toESM(require_react());
   var import_client = __toESM(require_client());
 
   // webview/src/App.tsx
-  var import_react31 = __toESM(require_react());
+  var import_react36 = __toESM(require_react());
 
   // webview/src/bridge.ts
   var import_react = __toESM(require_react());
@@ -23596,6 +23596,7 @@
   var ZH_CN = {
     "Running": "\u8FD0\u884C\u4E2D",
     "Starting": "\u542F\u52A8\u4E2D",
+    "Recovering": "\u6062\u590D\u4E2D",
     "Error": "\u9519\u8BEF",
     "Stopped": "\u672A\u542F\u52A8",
     "Queued": "\u5DF2\u6392\u961F",
@@ -23614,6 +23615,11 @@
     "Session error": "\u4F1A\u8BDD\u9519\u8BEF",
     "View details": "\u67E5\u770B\u8BE6\u60C5",
     "Dismiss": "\u5173\u95ED",
+    "Cancel automatic recovery": "\u53D6\u6D88\u81EA\u52A8\u6062\u590D",
+    "Cancel recovery": "\u53D6\u6D88\u6062\u590D",
+    "Automatic recovery is in progress": "\u6B63\u5728\u81EA\u52A8\u6062\u590D",
+    "Automatic recovery completed": "\u81EA\u52A8\u6062\u590D\u5DF2\u5B8C\u6210",
+    "Export diagnostics": "\u5BFC\u51FA\u8BCA\u65AD",
     "Rename session": "\u91CD\u547D\u540D\u4F1A\u8BDD",
     "Fork session": "Fork \u4F1A\u8BDD",
     "Archive session": "\u5F52\u6863\u4F1A\u8BDD",
@@ -23626,6 +23632,72 @@
     "Manage providers": "\u7BA1\u7406\u63D0\u4F9B\u5546",
     "Manage plugin settings": "\u7BA1\u7406\u63D2\u4EF6\u8BBE\u7F6E",
     "Plugin settings": "\u63D2\u4EF6\u8BBE\u7F6E",
+    "Plugin inventory": "\u63D2\u4EF6\u6E05\u5355",
+    "Read-only plugin inventory": "\u53EA\u8BFB\u63D2\u4EF6\u6E05\u5355",
+    "Refresh plugin inventory": "\u5237\u65B0\u63D2\u4EF6\u6E05\u5355",
+    "Reading plugins...": "\u6B63\u5728\u8BFB\u53D6\u63D2\u4EF6\u2026",
+    "Plugins are temporarily unavailable.": "\u6682\u65F6\u65E0\u6CD5\u8BFB\u53D6\u63D2\u4EF6\u3002",
+    "Search plugins": "\u641C\u7D22\u63D2\u4EF6",
+    "No plugins are available.": "\u6682\u65E0\u63D2\u4EF6\u3002",
+    "No matching plugins.": "\u6CA1\u6709\u5339\u914D\u7684\u63D2\u4EF6\u3002",
+    "Session plugins": "\u4F1A\u8BDD\u63D2\u4EF6",
+    "Composed per session by agent presets": "\u7531 Agent preset \u6309\u4F1A\u8BDD\u7EC4\u5408",
+    "Choose agent preset": "\u9009\u62E9 Agent preset",
+    "{name} (default)": "{name}\uFF08\u9ED8\u8BA4\uFF09",
+    "{name} (failed to load)": "{name}\uFF08\u52A0\u8F7D\u5931\u8D25\uFF09",
+    "{count} plugins": "{count} \u4E2A\u63D2\u4EF6",
+    "{count} more matches in other presets": "\u5176\u4ED6 preset \u4E2D\u8FD8\u6709 {count} \u4E2A\u5339\u914D\u9879",
+    "Global plugins": "\u5168\u5C40\u63D2\u4EF6",
+    "Shared by the system and every session": "\u7CFB\u7EDF\u4E0E\u6240\u6709\u4F1A\u8BDD\u5171\u7528",
+    "Enabled": "\u5DF2\u542F\u7528",
+    "Disabled": "\u5DF2\u505C\u7528",
+    "Conditional": "\u6761\u4EF6\u542F\u7528",
+    "Enabled via presets": "\u7531 preset \u542F\u7528",
+    "Not running": "\u672A\u8FD0\u884C",
+    "Waiting for dependencies": "\u7B49\u5F85\u4F9D\u8D56",
+    "Loading": "\u52A0\u8F7D\u4E2D",
+    "Unloading": "\u5378\u8F7D\u4E2D",
+    "Failed to start": "\u542F\u52A8\u5931\u8D25",
+    "Module": "\u5B8C\u6574\u540D\u79F0",
+    "From": "\u6765\u81EA",
+    "Disabled when": "\u7981\u7528\u6761\u4EF6",
+    "Configuration": "\u914D\u7F6E\u72B6\u6001",
+    "Status": "\u8FD0\u884C\u72B6\u6001",
+    "Preset provides this plugin": "\u7531 Agent preset \u6309\u4F1A\u8BDD\u63D0\u4F9B",
+    "Enabled in": "\u542F\u7528\u4E8E",
+    "Dynamic plugins": "\u52A8\u6001\u63D2\u4EF6",
+    "Read-only state; removal stops future package use": "\u53EA\u8BFB\u72B6\u6001\uFF1B\u79FB\u9664\u4F1A\u505C\u6B62\u63D2\u4EF6\u5E76\u963B\u6B62\u540E\u7EED package \u4F7F\u7528",
+    "Refresh dynamic plugins": "\u5237\u65B0\u52A8\u6001\u63D2\u4EF6",
+    "Reading dynamic plugins...": "\u6B63\u5728\u8BFB\u53D6\u52A8\u6001\u63D2\u4EF6\u2026",
+    "Dynamic plugins are temporarily unavailable.": "\u6682\u65F6\u65E0\u6CD5\u8BFB\u53D6\u52A8\u6001\u63D2\u4EF6\u3002",
+    "No dynamic plugins.": "\u6682\u65E0\u52A8\u6001\u63D2\u4EF6\u3002",
+    "Awaiting approval": "\u7B49\u5F85\u6279\u51C6",
+    "Waiting for services": "\u7B49\u5F85\u670D\u52A1",
+    "Absent": "\u4E0D\u5B58\u5728",
+    "Pending": "\u7B49\u5F85\u4E2D",
+    "Waiting": "\u7B49\u5F85\u4E2D",
+    "Declared": "\u5DF2\u58F0\u660E",
+    "Idle": "\u7A7A\u95F2",
+    "No package selected": "\u672A\u9009\u62E9 package",
+    "Host half": "Host half",
+    "Client half": "Client half",
+    "{count} packages": "{count} \u4E2A package",
+    "Waiting for": "\u7B49\u5F85",
+    "Review in dsh Web UI": "\u5728 dsh Web UI \u4E2D\u5BA1\u6838",
+    "Stop plugin": "\u505C\u6B62\u63D2\u4EF6",
+    "Remove plugin": "\u79FB\u9664\u63D2\u4EF6",
+    "Remove dynamic plugin {pluginId}?": "\u786E\u5B9A\u79FB\u9664\u52A8\u6001\u63D2\u4EF6 {pluginId}\uFF1F",
+    "Hide details": "\u9690\u85CF\u8BE6\u60C5",
+    "Current package": "\u5F53\u524D package",
+    "Next package": "\u4E0B\u4E00\u4E2A package",
+    "Run": "\u8FD0\u884C",
+    "Approval request": "\u6279\u51C6\u8BF7\u6C42",
+    "Packages": "Package \u7248\u672C",
+    "Show {count} plugins from other sessions": "\u663E\u793A\u5176\u4ED6\u4F1A\u8BDD\u4E2D\u7684 {count} \u4E2A\u63D2\u4EF6",
+    "{count} plugin approval(s) waiting in the dsh Web UI": "dsh Web UI \u4E2D\u6709 {count} \u4E2A\u63D2\u4EF6\u6279\u51C6\u8BF7\u6C42\u5F85\u5904\u7406",
+    "Dynamic plugin state is out of date. Refresh and try again.": "\u52A8\u6001\u63D2\u4EF6\u72B6\u6001\u5DF2\u8FC7\u671F\uFF0C\u8BF7\u5237\u65B0\u540E\u91CD\u8BD5\u3002",
+    "Dynamic plugin approval is out of date. Refresh and try again.": "\u52A8\u6001\u63D2\u4EF6\u6279\u51C6\u8BF7\u6C42\u5DF2\u8FC7\u671F\uFF0C\u8BF7\u5237\u65B0\u540E\u91CD\u8BD5\u3002",
+    "The dynamic plugin approval was already resolved.": "\u52A8\u6001\u63D2\u4EF6\u6279\u51C6\u8BF7\u6C42\u5DF2\u7ECF\u5904\u7406\u3002",
     "Public Harness settings namespaces": "\u516C\u5F00 Harness \u8BBE\u7F6E\u547D\u540D\u7A7A\u95F4",
     "Applies after restart": "\u91CD\u542F\u540E\u751F\u6548",
     "Applies immediately": "\u7ACB\u5373\u751F\u6548",
@@ -23666,10 +23738,10 @@
     "Slash commands": "Slash \u547D\u4EE4",
     "Skill candidates": "Skill \u5019\u9009",
     "Add one-shot IDE context": "\u6DFB\u52A0\u4E00\u6B21\u6027 IDE context",
+    "Pre-fill the composer from a .dsh/prompts template": "\u7528 .dsh/prompts \u6A21\u677F\u9884\u586B\u8F93\u5165\u6846",
     "Recent terminal command": "\u6700\u8FD1\u7684\u7EC8\u7AEF\u547D\u4EE4",
     "The connected dsh server does not expose the /compact command. Update dsh or enable the command-compact package.": "\u5F53\u524D\u8FDE\u63A5\u7684 dsh server \u672A\u63D0\u4F9B /compact command\u3002\u8BF7\u66F4\u65B0 dsh \u6216\u542F\u7528 command-compact package\u3002",
     "Compacting": "\u6B63\u5728\u538B\u7F29",
-    "Show context breakdown": "显示上下文统计",
     "Select the current session model": "\u9009\u62E9\u5F53\u524D\u4F1A\u8BDD\u6A21\u578B",
     "Select reasoning effort": "\u9009\u62E9\u63A8\u7406\u5F3A\u5EA6",
     "Select agent mode": "\u9009\u62E9 Agent \u6A21\u5F0F",
@@ -23678,7 +23750,7 @@
     "Plan mode on, click to turn off": "Plan \u6A21\u5F0F\u5DF2\u5F00\u542F\uFF0C\u70B9\u51FB\u5173\u95ED",
     "Plan mode on \u2014 click to turn off (/plan off)": "Plan \u6A21\u5F0F\u5DF2\u5F00\u542F \u2014 \u70B9\u51FB\u5173\u95ED\uFF08/plan off\uFF09",
     "Plan mode off, click to turn on": "Plan \u6A21\u5F0F\u5DF2\u5173\u95ED\uFF0C\u70B9\u51FB\u5F00\u542F",
-    "Plan mode off \u2014 click to turn on (/plan)": "Plan \u6A21\u5F0F\u5DF2\u5173\u95ED \u2014 \u70B9\u51FB\u5F00\u542F\uFF08/plan\uFF09",
+    "Plan mode off \u2014 click to turn on (/plan on)": "Plan \u6A21\u5F0F\u5DF2\u5173\u95ED \u2014 \u70B9\u51FB\u5F00\u542F\uFF08/plan on\uFF09",
     "Toggle focus mode": "\u5207\u6362 Focus \u6A21\u5F0F",
     "Open the current session trace": "\u6253\u5F00\u5F53\u524D\u4F1A\u8BDD Trace",
     "Stop the dsh runtime": "\u505C\u6B62 dsh \u8FD0\u884C\u65F6",
@@ -23745,6 +23817,11 @@
     "Images are uploaded to Harness when this message is sent.": "\u56FE\u7247\u5C06\u5728\u53D1\u9001\u672C\u6761\u6D88\u606F\u65F6\u4E0A\u4F20\u5230 Harness\u3002",
     "Only PNG, JPEG, WebP, and GIF images are supported.": "\u4EC5\u652F\u6301 PNG\u3001JPEG\u3001WebP \u548C GIF \u56FE\u7247\u3002",
     "Add images": "\u6DFB\u52A0\u56FE\u7247",
+    "Add files": "\u6DFB\u52A0\u6587\u4EF6",
+    "Pending files": "\u5F85\u53D1\u9001\u6587\u4EF6",
+    "Remove file": "\u79FB\u9664\u6587\u4EF6",
+    "file": "\u6587\u4EF6",
+    "A message can contain at most {count} files.": "\u6BCF\u6761\u6D88\u606F\u6700\u591A\u53EF\u9644\u52A0 {count} \u4E2A\u6587\u4EF6\u3002",
     "Capture AppShot": "\u622A\u53D6 AppShot",
     "Add attachment": "\u6DFB\u52A0\u9644\u4EF6",
     "A message can contain at most {count} images.": "\u6BCF\u6761\u6D88\u606F\u6700\u591A\u53EF\u9644\u52A0 {count} \u5F20\u56FE\u7247\u3002",
@@ -23757,6 +23834,8 @@
     " \xB7 streaming": " \xB7 \u6D41\u5F0F\u751F\u6210",
     "Locate in Trace": "\u5728 Trace \u4E2D\u5B9A\u4F4D",
     "Message actions": "\u6D88\u606F\u64CD\u4F5C",
+    "Copy message": "\u590D\u5236\u6D88\u606F",
+    "Copied": "\u5DF2\u590D\u5236",
     "Fork from here": "\u4ECE\u8FD9\u91CC Fork",
     "Restore code to here": "\u5C06\u4EE3\u7801\u6062\u590D\u5230\u8FD9\u91CC",
     "Fork + restore code": "Fork \u5E76\u6062\u590D\u4EE3\u7801",
@@ -23778,7 +23857,7 @@
     "Unknown model": "\u6A21\u578B\u672A\u77E5",
     "Default": "\u9ED8\u8BA4",
     "Token and context usage": "Token \u4E0E\u4E0A\u4E0B\u6587\u7528\u91CF",
-    "Open token statistics": "\u6253\u5F00 Token \u7EDF\u8BA1",
+    "Show context breakdown": "\u663E\u793A\u4E0A\u4E0B\u6587\u5206\u89E3",
     "Token statistics": "Token \u7EDF\u8BA1",
     "Close": "\u5173\u95ED",
     "Estimate based on the latest provider usage and current Surface changes": "\u4F30\u7B97\u503C\uFF1A\u57FA\u4E8E\u6700\u8FD1 provider usage \u4E0E\u5F53\u524D Surface \u53D8\u5316\u63A8\u7B97\u4E0B\u4E00\u6B21\u8BF7\u6C42\u5360\u7528",
@@ -23841,13 +23920,8 @@
     "mutation": "mutation",
     "Edit": "\u7F16\u8F91",
     "Pause": "\u6682\u505C",
-    "Waiting for resume": "\u7b49\u5f85\u7ee7\u7eed",
-    "Cancel recovery": "\u53d6\u6d88\u6062\u590d",
-    "Restore": "\u8fd8\u539f",
-    "Export diagnostics": "\u5bfc\u51fa\u8bca\u65ad",
-    "Automatic recovery is in progress": "\u6b63\u5728\u81ea\u52a8\u6062\u590d",
-    "Automatic recovery completed": "\u81ea\u52a8\u6062\u590d\u5b8c\u6210",
     "Resume": "\u7EE7\u7EED",
+    "Waiting for resume": "\u7B49\u5F85\u7EE7\u7EED",
     "Complete": "\u5B8C\u6210",
     "New Goal": "\u65B0 Goal",
     "Clear": "\u6E05\u9664",
@@ -23878,10 +23952,19 @@
     "Refresh": "\u5237\u65B0",
     "History": "\u5386\u53F2",
     "Job Center \xB7 read-only": "Job Center \xB7 \u53EA\u8BFB",
+    "Schedule": "\u5B9A\u65F6\u63D0\u9192",
+    "Active reminders": "\u6D3B\u52A8\u63D0\u9192",
+    "Active reminders \xB7 read-only": "\u6D3B\u52A8\u63D0\u9192 \xB7 \u53EA\u8BFB",
+    "After {duration}": "{duration} \u540E",
+    "Every {duration}": "\u6BCF {duration}",
+    "One-time": "\u4E00\u6B21\u6027",
+    "Next at {time}": "\u4E0B\u6B21\uFF1A{time}",
+    "ID {id}": "ID {id}",
     "Current preset: {preset}": "\u5F53\u524D preset\uFF1A{preset}",
     " \xB7 current": " \xB7 \u5F53\u524D",
     "Permission changes are handled by the public command in the Harness Web UI.": "\u6743\u9650\u5207\u6362\u7531 Harness Web UI \u7684\u516C\u5F00 command \u8D1F\u8D23\u3002",
     "Subagents": "\u5B50\u4EE3\u7406",
+    "Jobs": "\u4EFB\u52A1",
     "Permissions": "\u6743\u9650",
     "Subagent Tree": "Subagent \u6811",
     "has children": "\u6709\u5B50\u9879",
@@ -23952,7 +24035,7 @@
   function statusLabel(status) {
     if (status.state === "running") return t("Running");
     if (status.state === "starting") return t("Starting");
-    if (status.state === "recovering") return t("Automatic recovery is in progress");
+    if (status.state === "recovering") return t("Recovering");
     if (status.state === "error") return t("Error");
     return t("Stopped");
   }
@@ -24140,6 +24223,9 @@
   function ImageIcon({ size = 14 }) {
     return /* @__PURE__ */ import_react2.default.createElement("svg", { ...base(size) }, /* @__PURE__ */ import_react2.default.createElement("rect", { x: "2", y: "2.5", width: "12", height: "11", rx: "1.5" }), /* @__PURE__ */ import_react2.default.createElement("circle", { cx: "5.5", cy: "6", r: "1.2" }), /* @__PURE__ */ import_react2.default.createElement("path", { d: "m3.5 12 3.2-3.2 2.1 2 1.5-1.5L13 12" }));
   }
+  function FileIcon({ size = 14 }) {
+    return /* @__PURE__ */ import_react2.default.createElement("svg", { ...base(size) }, /* @__PURE__ */ import_react2.default.createElement("path", { d: "M9 1.8H4.2a1.2 1.2 0 0 0-1.2 1.2v10a1.2 1.2 0 0 0 1.2 1.2h7.6a1.2 1.2 0 0 0 1.2-1.2V5.8Z" }), /* @__PURE__ */ import_react2.default.createElement("path", { d: "M9 1.8v4h4" }));
+  }
   function AppShotIcon({ size = 14 }) {
     return /* @__PURE__ */ import_react2.default.createElement("svg", { ...base(size) }, /* @__PURE__ */ import_react2.default.createElement("rect", { x: "1.5", y: "3", width: "13", height: "10", rx: "1.5" }), /* @__PURE__ */ import_react2.default.createElement("path", { d: "M1.5 6h13M4 4.5h.01M6 4.5h.01" }), /* @__PURE__ */ import_react2.default.createElement("circle", { cx: "8", cy: "9.5", r: "2" }));
   }
@@ -24151,6 +24237,9 @@
   }
   function MoreIcon({ size = 14 }) {
     return /* @__PURE__ */ import_react2.default.createElement("svg", { ...base(size), fill: "currentColor", stroke: "none" }, /* @__PURE__ */ import_react2.default.createElement("circle", { cx: "3.5", cy: "8", r: "1.4" }), /* @__PURE__ */ import_react2.default.createElement("circle", { cx: "8", cy: "8", r: "1.4" }), /* @__PURE__ */ import_react2.default.createElement("circle", { cx: "12.5", cy: "8", r: "1.4" }));
+  }
+  function CopyIcon({ size = 14 }) {
+    return /* @__PURE__ */ import_react2.default.createElement("svg", { ...base(size) }, /* @__PURE__ */ import_react2.default.createElement("rect", { x: "5.5", y: "5.5", width: "8", height: "8", rx: "1.2" }), /* @__PURE__ */ import_react2.default.createElement("path", { d: "M10.5 5.5V3.7c0-1-.7-1.7-1.7-1.7H3.7C2.7 2 2 2.7 2 3.7v5.1c0 1 .7 1.7 1.7 1.7h1.8" }));
   }
   function SendIcon({ size = 14 }) {
     return /* @__PURE__ */ import_react2.default.createElement("svg", { ...base(size) }, /* @__PURE__ */ import_react2.default.createElement("path", { d: "M2.5 8 13.5 2.5 10 13.5 7.2 9.2 2.5 8Z" }), /* @__PURE__ */ import_react2.default.createElement("path", { d: "M13.5 2.5 7.2 9.2" }));
@@ -24226,6 +24315,7 @@
     }
     const hasSession = Boolean(sessionId);
     const runtimeRunning = status.state === "running" || status.state === "starting";
+    const recoveryRunning = status.state === "recovering";
     const menuItems = [
       { key: "rename", label: t("Rename session"), action: { type: "renameSession" }, disabled: !hasSession },
       { key: "fork", label: t("Fork session"), action: { type: "forkSession" }, disabled: !hasSession },
@@ -24233,8 +24323,8 @@
       { key: "trace", label: t("Open session trace"), action: { type: "openTrace" }, disabled: !hasSession },
       {
         key: "runtime",
-        label: runtimeRunning ? t("Stop runtime") : t("Start runtime"),
-        action: { type: runtimeRunning ? "stop" : "start" },
+        label: recoveryRunning ? t("Cancel automatic recovery") : runtimeRunning ? t("Stop runtime") : t("Start runtime"),
+        action: { type: recoveryRunning ? "cancelRecovery" : runtimeRunning ? "stop" : "start" },
         disabled: status.state === "starting",
         separatorBefore: true
       },
@@ -24292,19 +24382,10 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
       {
         type: "button",
         className: "dsh-icon-button",
-        title: t("New session"),
-        onClick: () => postAction({ type: "newSession" })
-      },
-      /* @__PURE__ */ import_react3.default.createElement(PlusIcon, null)
-    ), /* @__PURE__ */ import_react3.default.createElement(
-      "button",
-      {
-        type: "button",
-        className: "dsh-icon-button",
         title: t("Search sessions"),
         onClick: () => postAction({ type: "searchSession" })
       },
-      /* @__PURE__ */ import_react3.default.createElement(SearchIcon, null)
+      /* @__PURE__ */ import_react3.default.createElement(SearchIcon, { size: 16 })
     ), /* @__PURE__ */ import_react3.default.createElement("div", { className: "dsh-menu-anchor", ref: menuRef }, /* @__PURE__ */ import_react3.default.createElement(
       "button",
       {
@@ -24314,7 +24395,7 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
         "aria-expanded": menuOpen,
         onClick: () => setMenuOpen((open) => !open)
       },
-      /* @__PURE__ */ import_react3.default.createElement(MoreIcon, null)
+      /* @__PURE__ */ import_react3.default.createElement(MoreIcon, { size: 16 })
     ), menuOpen ? (
       // Disclosure, not the ARIA menu pattern: these are plain buttons
       // traversed with Tab and dismissed with Escape. Declaring
@@ -24508,12 +24589,12 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
     };
   }
   function findFileLocations(text) {
-    const matches = [];
+    const matches2 = [];
     for (const token of text.matchAll(LOCATION_TOKEN)) {
       const location = parseFileLocation(token[0]);
       const start = token.index;
       if (!location || start === void 0) continue;
-      matches.push({
+      matches2.push({
         ...location,
         start,
         end: start + token[0].length,
@@ -24526,15 +24607,15 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
       const location = parseBareFileReference(token[0]);
       if (!location) continue;
       const end = start + location.path.length;
-      if (matches.some((match) => start < match.end && end > match.start)) continue;
-      matches.push({
+      if (matches2.some((match) => start < match.end && end > match.start)) continue;
+      matches2.push({
         ...location,
         start,
         end,
         text: location.path
       });
     }
-    return matches.sort((left, right) => left.start - right.start);
+    return matches2.sort((left, right) => left.start - right.start);
   }
 
   // webview/src/components/MessageImages.tsx
@@ -24756,14 +24837,47 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
   function CompactionCard({ message }) {
     const compaction = message.compaction;
     if (!compaction) return null;
-    const statusLabel2 = compaction.status === "running" ? t("Compacting") : compaction.status === "failed" ? t("Failed") : t("Completed");
-    return /* @__PURE__ */ import_react6.default.createElement("div", { className: `dsh-compaction-card ${compaction.status}` }, /* @__PURE__ */ import_react6.default.createElement("div", { className: "dsh-compaction-head" }, /* @__PURE__ */ import_react6.default.createElement("span", { className: "dsh-compaction-status" }), /* @__PURE__ */ import_react6.default.createElement("span", { className: "dsh-compaction-title" }, message.text), /* @__PURE__ */ import_react6.default.createElement("span", { className: "dsh-compaction-meta" }, statusLabel2)), compaction.summary ? /* @__PURE__ */ import_react6.default.createElement("div", { className: "dsh-compaction-summary" }, compaction.summary) : null, compaction.error ? /* @__PURE__ */ import_react6.default.createElement("div", { className: "dsh-compaction-error" }, compaction.error) : null);
+    const statusLabel4 = compaction.status === "running" ? t("Compacting") : compaction.status === "failed" ? t("Failed") : t("Completed");
+    return /* @__PURE__ */ import_react6.default.createElement("div", { className: `dsh-compaction-card ${compaction.status}` }, /* @__PURE__ */ import_react6.default.createElement("div", { className: "dsh-compaction-head" }, /* @__PURE__ */ import_react6.default.createElement("span", { className: "dsh-compaction-status" }), /* @__PURE__ */ import_react6.default.createElement("span", { className: "dsh-compaction-title" }, message.text), /* @__PURE__ */ import_react6.default.createElement("span", { className: "dsh-compaction-meta" }, statusLabel4)), compaction.summary ? /* @__PURE__ */ import_react6.default.createElement("div", { className: "dsh-compaction-summary" }, compaction.summary) : null, compaction.error ? /* @__PURE__ */ import_react6.default.createElement("div", { className: "dsh-compaction-error" }, compaction.error) : null);
   }
 
   // webview/src/components/MessageContent.tsx
+  function ReasoningFold({
+    message,
+    agentStatusLabel,
+    autoOpen
+  }) {
+    const detailsRef = (0, import_react7.useRef)(null);
+    const previousStreamingRef = (0, import_react7.useRef)();
+    const streaming = message.reasoningState === "streaming";
+    (0, import_react7.useLayoutEffect)(() => {
+      const previousStreaming = previousStreamingRef.current;
+      previousStreamingRef.current = streaming;
+      if (!autoOpen || previousStreaming === streaming || !detailsRef.current) return;
+      detailsRef.current.open = streaming;
+    }, [autoOpen, streaming]);
+    const reasoningBody = /* @__PURE__ */ import_react7.default.createElement(
+      "div",
+      {
+        className: "dsh-message-body",
+        ...typeof message.renderedReasoningHtml === "string" ? { dangerouslySetInnerHTML: { __html: message.renderedReasoningHtml } } : { children: /* @__PURE__ */ import_react7.default.createElement("p", null, message.reasoning) }
+      }
+    );
+    return /* @__PURE__ */ import_react7.default.createElement(
+      "details",
+      {
+        ref: detailsRef,
+        className: "dsh-message-reasoning",
+        ...typeof message.reasoningRenderId === "string" ? { "data-render-id": message.reasoningRenderId } : {}
+      },
+      /* @__PURE__ */ import_react7.default.createElement("summary", null, streaming ? agentStatusLabel ?? t("Thinking...") : t("Reasoning \xB7 complete")),
+      reasoningBody
+    );
+  }
   function MessageContent({
     message,
-    agentStatusLabel
+    agentStatusLabel,
+    autoOpenReasoning
   }) {
     if (message.role === "tool" && message.tool) {
       return /* @__PURE__ */ import_react7.default.createElement(ToolCard, { tool: message.tool });
@@ -24783,26 +24897,51 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
     if (message.role !== "assistant" || !message.reasoning) {
       return /* @__PURE__ */ import_react7.default.createElement(import_react7.default.Fragment, null, images, skill, body);
     }
-    const reasoningBody = /* @__PURE__ */ import_react7.default.createElement(
-      "div",
-      {
-        className: "dsh-message-body",
-        ...typeof message.renderedReasoningHtml === "string" ? { dangerouslySetInnerHTML: { __html: message.renderedReasoningHtml } } : { children: /* @__PURE__ */ import_react7.default.createElement("p", null, message.reasoning) }
-      }
-    );
     return /* @__PURE__ */ import_react7.default.createElement(import_react7.default.Fragment, null, images, body, /* @__PURE__ */ import_react7.default.createElement(
-      "details",
+      ReasoningFold,
       {
-        className: "dsh-message-reasoning",
-        ...typeof message.reasoningRenderId === "string" ? { "data-render-id": message.reasoningRenderId } : {}
-      },
-      /* @__PURE__ */ import_react7.default.createElement("summary", null, message.reasoningState === "streaming" ? agentStatusLabel ?? t("Thinking...") : t("Reasoning \xB7 complete")),
-      reasoningBody
+        message,
+        agentStatusLabel,
+        autoOpen: autoOpenReasoning !== false
+      }
     ));
   }
 
   // webview/src/components/MessageItem.tsx
-  function MessageCheckpointMenu({ seq }) {
+  function canCopyMessage(message) {
+    return (message.role === "user" || message.role === "assistant") && (message.text.trim().length > 0 || Boolean(message.skillInvocation));
+  }
+  function MessageCopyButton({ message }) {
+    const [copied, setCopied] = (0, import_react8.useState)(false);
+    const resetTimerRef = (0, import_react8.useRef)();
+    (0, import_react8.useEffect)(() => () => {
+      if (resetTimerRef.current !== void 0) window.clearTimeout(resetTimerRef.current);
+    }, []);
+    if (!canCopyMessage(message)) return null;
+    const copy = () => {
+      postAction({ type: "copyMessage", messageId: message.id });
+      setCopied(true);
+      if (resetTimerRef.current !== void 0) window.clearTimeout(resetTimerRef.current);
+      resetTimerRef.current = window.setTimeout(() => setCopied(false), 1500);
+    };
+    return /* @__PURE__ */ import_react8.default.createElement(
+      "button",
+      {
+        type: "button",
+        className: "dsh-message-action-trigger dsh-icon-button",
+        "aria-label": copied ? t("Copied") : t("Copy message"),
+        title: copied ? t("Copied") : t("Copy message"),
+        onClick: (event) => {
+          event.stopPropagation();
+          copy();
+        }
+      },
+      copied ? /* @__PURE__ */ import_react8.default.createElement(CheckIcon, null) : /* @__PURE__ */ import_react8.default.createElement(CopyIcon, null)
+    );
+  }
+  function MessageActions({
+    checkpointSeq
+  }) {
     const [open, setOpen] = (0, import_react8.useState)(false);
     const menuRef = (0, import_react8.useRef)(null);
     (0, import_react8.useEffect)(() => {
@@ -24823,9 +24962,11 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
       };
     }, [open]);
     const run = (type) => {
-      postAction({ type, seq });
+      if (checkpointSeq === void 0) return;
+      postAction({ type, seq: checkpointSeq });
       setOpen(false);
     };
+    if (checkpointSeq === void 0) return null;
     return /* @__PURE__ */ import_react8.default.createElement("div", { className: `dsh-message-actions${open ? " open" : ""}`, ref: menuRef }, /* @__PURE__ */ import_react8.default.createElement(
       "button",
       {
@@ -24851,10 +24992,27 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
       run("forkAndRestoreCodeToMessage");
     } }, t("Fork + restore code"))) : null);
   }
+  function MessageFooterActions({
+    message,
+    traceSeq
+  }) {
+    if (traceSeq === void 0 && !canCopyMessage(message)) return null;
+    return /* @__PURE__ */ import_react8.default.createElement("div", { className: "dsh-message-footer-actions" }, traceSeq === void 0 ? null : /* @__PURE__ */ import_react8.default.createElement(
+      "button",
+      {
+        type: "button",
+        className: "dsh-message-trace",
+        "data-trace-seq": traceSeq,
+        title: t("Locate in Trace")
+      },
+      "trace"
+    ), /* @__PURE__ */ import_react8.default.createElement(MessageCopyButton, { message }));
+  }
   var MessageItem = import_react8.default.memo(function MessageItem2({
     message,
     submitting,
-    agentStatusLabel
+    agentStatusLabel,
+    autoOpenReasoning
   }) {
     const stateClass = message.state === "streaming" ? " dsh-streaming" : message.state === "pending" ? " dsh-pending" : "";
     const stateLabel = message.state === "pending" ? t(" \xB7 waiting for response") : message.state === "streaming" && message.role === "assistant" ? ` \xB7 ${agentStatusLabel ?? t("Thinking...")}` : message.state === "streaming" ? t(" \xB7 streaming") : "";
@@ -24867,17 +25025,16 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
         ...typeof message.renderId === "string" ? { "data-render-id": message.renderId } : {},
         ...Number.isSafeInteger(message.seq) ? { "data-message-seq": message.seq } : {}
       },
-      /* @__PURE__ */ import_react8.default.createElement("div", { className: "dsh-message-label" }, ROLE_LABELS[message.role], stateLabel, hasTrace ? /* @__PURE__ */ import_react8.default.createElement(
-        "button",
+      /* @__PURE__ */ import_react8.default.createElement("div", { className: "dsh-message-label" }, ROLE_LABELS[message.role], stateLabel, /* @__PURE__ */ import_react8.default.createElement(MessageActions, { checkpointSeq })),
+      /* @__PURE__ */ import_react8.default.createElement(
+        MessageContent,
         {
-          type: "button",
-          className: "dsh-message-trace",
-          "data-trace-seq": message.seq,
-          title: t("Locate in Trace")
-        },
-        "trace"
-      ) : null, checkpointSeq === void 0 ? null : /* @__PURE__ */ import_react8.default.createElement(MessageCheckpointMenu, { seq: checkpointSeq })),
-      /* @__PURE__ */ import_react8.default.createElement(MessageContent, { message, agentStatusLabel }),
+          message,
+          agentStatusLabel,
+          autoOpenReasoning
+        }
+      ),
+      /* @__PURE__ */ import_react8.default.createElement(MessageFooterActions, { message, traceSeq: hasTrace ? message.seq : void 0 }),
       message.state === "failed" ? /* @__PURE__ */ import_react8.default.createElement(
         "button",
         {
@@ -24922,7 +25079,8 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
   var MessageList = import_react9.default.memo(function MessageList2({
     messages,
     submitting,
-    agentStatusLabel
+    agentStatusLabel,
+    autoOpenReasoning
   }) {
     const listRef = (0, import_react9.useRef)(null);
     const stickToBottomRef = (0, import_react9.useRef)(true);
@@ -24980,7 +25138,8 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
           key: message.id,
           message,
           submitting,
-          agentStatusLabel
+          agentStatusLabel,
+          autoOpenReasoning
         }
       ))
     );
@@ -25200,7 +25359,7 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
   }
 
   // webview/src/components/dock/ActivityDock.tsx
-  var import_react18 = __toESM(require_react());
+  var import_react20 = __toESM(require_react());
 
   // webview/src/components/dock/ChangesPanel.tsx
   var import_react11 = __toESM(require_react());
@@ -25238,8 +25397,127 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
     }));
   }
 
-  // webview/src/components/dock/GoalPanel.tsx
+  // webview/src/components/dock/DynamicPluginsPanel.tsx
   var import_react12 = __toESM(require_react());
+  function packageFor(row) {
+    const packageId = row.nextPackageId ?? row.currentPackageId ?? row.activeRun?.packageId ?? row.packages.at(-1)?.packageId;
+    return packageId === void 0 ? void 0 : row.packages.find((pkg) => pkg.packageId === packageId);
+  }
+  function statusOf(row) {
+    const latest = row.latestRun;
+    if (latest?.status === "awaiting-approval") return "awaiting-approval";
+    if (latest?.status === "failed") return "failed";
+    if (latest?.status === "starting-host" || latest?.status === "client-pending") return "starting";
+    if (latest?.status === "waiting") return "waiting";
+    if (row.activeRun !== void 0 || latest?.status === "running") return "running";
+    if (latest?.status === "stopped" || latest?.status === "rejected" || latest?.status === "cancelled") return "stopped";
+    return "idle";
+  }
+  function statusLabel2(status) {
+    if (status === "awaiting-approval") return t("Awaiting approval");
+    if (status === "starting") return t("Starting");
+    if (status === "waiting") return t("Waiting for services");
+    if (status === "running") return t("Running");
+    if (status === "failed") return t("Failed");
+    if (status === "stopped") return t("Stopped");
+    return t("Idle");
+  }
+  function halfStatus(half) {
+    if (half.status === "absent") return t("Absent");
+    if (half.status === "pending") return t("Pending");
+    if (half.status === "stopped") return t("Stopped");
+    if (half.status === "running") return t("Running");
+    if (half.status === "waiting") return t("Waiting");
+    return t("Failed");
+  }
+  function DynamicPluginRow({ row }) {
+    const status = statusOf(row);
+    const packageValue = packageFor(row);
+    const latest = row.latestRun;
+    const approvalRequestId = latest?.approvalRequestId;
+    const waitingFor = [
+      ...(latest?.host.waitingFor ?? []).map((service) => `Host: ${service}`),
+      ...(latest?.client.waitingFor ?? []).map((service) => `Client: ${service}`)
+    ];
+    const [expanded, setExpanded] = (0, import_react12.useState)(false);
+    const [confirmingRemoval, setConfirmingRemoval] = (0, import_react12.useState)(false);
+    return /* @__PURE__ */ import_react12.default.createElement("li", { className: `dsh-dynamic-plugin-row ${status}` }, /* @__PURE__ */ import_react12.default.createElement("div", { className: "dsh-dynamic-plugin-row-head" }, /* @__PURE__ */ import_react12.default.createElement("strong", { title: row.pluginId }, row.pluginId), /* @__PURE__ */ import_react12.default.createElement("span", { className: "dsh-dynamic-plugin-status" }, statusLabel2(status))), /* @__PURE__ */ import_react12.default.createElement("div", { className: "dsh-dynamic-plugin-meta" }, packageValue?.name ?? t("No package selected"), /* @__PURE__ */ import_react12.default.createElement("span", { "aria-hidden": "true" }, " \xB7 "), t("owner {owner}", { owner: row.agentId })), packageValue?.purpose ? /* @__PURE__ */ import_react12.default.createElement("div", { className: "dsh-dynamic-plugin-purpose" }, packageValue.purpose) : null, /* @__PURE__ */ import_react12.default.createElement("div", { className: "dsh-dynamic-plugin-facts" }, /* @__PURE__ */ import_react12.default.createElement("span", null, t("Host half"), ": ", latest ? halfStatus(latest.host) : packageValue?.hasHostHalf ? t("Declared") : t("Absent")), /* @__PURE__ */ import_react12.default.createElement("span", null, t("Client half"), ": ", latest ? halfStatus(latest.client) : packageValue?.hasClientHalf ? t("Declared") : t("Absent")), row.packages.length > 1 ? /* @__PURE__ */ import_react12.default.createElement("span", null, t("{count} packages", { count: row.packages.length })) : null), waitingFor.length > 0 ? /* @__PURE__ */ import_react12.default.createElement("div", { className: "dsh-dynamic-plugin-waiting" }, t("Waiting for"), ": ", waitingFor.join(" \xB7 ")) : null, latest?.error ? /* @__PURE__ */ import_react12.default.createElement("div", { className: "dsh-dynamic-plugin-error", role: "alert" }, latest.error.message, " ", /* @__PURE__ */ import_react12.default.createElement("small", null, "(", latest.error.phase, ")")) : null, latest?.host.error ? /* @__PURE__ */ import_react12.default.createElement("div", { className: "dsh-dynamic-plugin-error", role: "alert" }, latest.host.error) : null, latest?.client.error ? /* @__PURE__ */ import_react12.default.createElement("div", { className: "dsh-dynamic-plugin-error", role: "alert" }, latest.client.error) : null, /* @__PURE__ */ import_react12.default.createElement("div", { className: "dsh-dynamic-plugin-actions" }, status === "awaiting-approval" ? /* @__PURE__ */ import_react12.default.createElement(import_react12.default.Fragment, null, /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", onClick: () => postAction({ type: "openBrowser" }) }, t("Review in dsh Web UI")), approvalRequestId ? /* @__PURE__ */ import_react12.default.createElement(
+      "button",
+      {
+        type: "button",
+        className: "danger",
+        onClick: () => postAction({
+          type: "declineDynamicPlugin",
+          requestId: approvalRequestId,
+          pluginId: row.pluginId
+        })
+      },
+      t("Decline")
+    ) : null) : null, row.activeRun !== void 0 ? /* @__PURE__ */ import_react12.default.createElement(
+      "button",
+      {
+        type: "button",
+        onClick: () => postAction({ type: "stopDynamicPlugin", sessionId: row.agentId, pluginId: row.pluginId })
+      },
+      t("Stop plugin")
+    ) : null, confirmingRemoval ? /* @__PURE__ */ import_react12.default.createElement(import_react12.default.Fragment, null, /* @__PURE__ */ import_react12.default.createElement("span", { className: "dsh-dynamic-plugin-confirm", role: "status" }, t("Remove dynamic plugin {pluginId}?", { pluginId: row.pluginId })), /* @__PURE__ */ import_react12.default.createElement(
+      "button",
+      {
+        type: "button",
+        className: "danger",
+        onClick: () => {
+          setConfirmingRemoval(false);
+          postAction({ type: "removeDynamicPlugin", sessionId: row.agentId, pluginId: row.pluginId });
+        }
+      },
+      t("Confirm")
+    ), /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", onClick: () => setConfirmingRemoval(false) }, t("Cancel"))) : /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: "danger", onClick: () => setConfirmingRemoval(true) }, t("Remove plugin")), /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: "dsh-dynamic-plugin-toggle", onClick: () => setExpanded((value) => !value) }, expanded ? t("Hide details") : t("View details"))), expanded ? /* @__PURE__ */ import_react12.default.createElement("div", { className: "dsh-dynamic-plugin-details" }, /* @__PURE__ */ import_react12.default.createElement("div", null, /* @__PURE__ */ import_react12.default.createElement("span", null, t("Agent")), /* @__PURE__ */ import_react12.default.createElement("code", null, row.agentId)), row.currentPackageId ? /* @__PURE__ */ import_react12.default.createElement("div", null, /* @__PURE__ */ import_react12.default.createElement("span", null, t("Current package")), /* @__PURE__ */ import_react12.default.createElement("code", null, row.currentPackageId)) : null, row.nextPackageId ? /* @__PURE__ */ import_react12.default.createElement("div", null, /* @__PURE__ */ import_react12.default.createElement("span", null, t("Next package")), /* @__PURE__ */ import_react12.default.createElement("code", null, row.nextPackageId)) : null, latest ? /* @__PURE__ */ import_react12.default.createElement("div", null, /* @__PURE__ */ import_react12.default.createElement("span", null, t("Run")), /* @__PURE__ */ import_react12.default.createElement("code", null, latest.pluginRunId, " \xB7 ", latest.status)) : null, latest?.approvalRequestId ? /* @__PURE__ */ import_react12.default.createElement("div", null, /* @__PURE__ */ import_react12.default.createElement("span", null, t("Approval request")), /* @__PURE__ */ import_react12.default.createElement("code", null, latest.approvalRequestId)) : null, /* @__PURE__ */ import_react12.default.createElement("details", null, /* @__PURE__ */ import_react12.default.createElement("summary", null, t("Packages")), /* @__PURE__ */ import_react12.default.createElement("ul", null, row.packages.map((pkg) => /* @__PURE__ */ import_react12.default.createElement("li", { key: pkg.packageId }, /* @__PURE__ */ import_react12.default.createElement("strong", null, pkg.name), " ", /* @__PURE__ */ import_react12.default.createElement("code", null, pkg.packageId), /* @__PURE__ */ import_react12.default.createElement("small", null, pkg.purpose)))))) : null);
+  }
+  function groupRows(rows, currentSessionId) {
+    if (currentSessionId === void 0) return { current: [], other: [...rows] };
+    return {
+      current: rows.filter((row) => row.agentId === currentSessionId),
+      other: rows.filter((row) => row.agentId !== currentSessionId)
+    };
+  }
+  function DynamicPluginsPanel({
+    plugins,
+    currentSessionId
+  }) {
+    const [showAll, setShowAll] = (0, import_react12.useState)(false);
+    const groups = (0, import_react12.useMemo)(() => groupRows(plugins.rows, currentSessionId), [plugins.rows, currentSessionId]);
+    const rows = showAll || currentSessionId === void 0 ? plugins.rows : groups.current;
+    const hiddenCount = currentSessionId === void 0 || showAll ? 0 : groups.other.length;
+    const awaiting = plugins.rows.filter((row) => statusOf(row) === "awaiting-approval").length;
+    return /* @__PURE__ */ import_react12.default.createElement("div", { className: "dsh-dynamic-plugins", "aria-label": t("Dynamic plugins") }, /* @__PURE__ */ import_react12.default.createElement("div", { className: "dsh-dynamic-plugins-head" }, /* @__PURE__ */ import_react12.default.createElement("div", null, /* @__PURE__ */ import_react12.default.createElement("strong", null, t("Dynamic plugins")), /* @__PURE__ */ import_react12.default.createElement("small", null, t("Read-only state; removal stops future package use"))), /* @__PURE__ */ import_react12.default.createElement(
+      "button",
+      {
+        type: "button",
+        disabled: plugins.loading,
+        title: t("Refresh dynamic plugins"),
+        onClick: () => postAction({ type: "refreshDynamicPlugins" })
+      },
+      t("Refresh")
+    )), plugins.loading && plugins.rows.length === 0 ? /* @__PURE__ */ import_react12.default.createElement("div", { className: "dsh-settings-loading" }, t("Reading dynamic plugins...")) : null, plugins.error ? /* @__PURE__ */ import_react12.default.createElement("div", { className: "dsh-dynamic-plugin-error", role: "alert" }, plugins.error) : null, !plugins.loading && !plugins.error && plugins.rows.length === 0 ? /* @__PURE__ */ import_react12.default.createElement("div", { className: "dsh-settings-empty" }, t("No dynamic plugins.")) : null, awaiting > 0 ? /* @__PURE__ */ import_react12.default.createElement("div", { className: "dsh-dynamic-plugin-approval", role: "status" }, t("{count} plugin approval(s) waiting in the dsh Web UI", { count: awaiting })) : null, hiddenCount > 0 ? /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: "dsh-dynamic-plugin-show-all", onClick: () => setShowAll(true) }, t("Show {count} plugins from other sessions", { count: hiddenCount })) : null, rows.length > 0 ? /* @__PURE__ */ import_react12.default.createElement("ul", { className: "dsh-dynamic-plugin-rows" }, rows.map((row) => /* @__PURE__ */ import_react12.default.createElement(DynamicPluginRow, { key: row.pluginId, row }))) : null);
+  }
+
+  // webview/src/components/dock/GoalPanel.tsx
+  var import_react13 = __toESM(require_react());
+
+  // src/goalActions.ts
+  var GOAL_ACTIONS_BY_PHASE = {
+    active: ["pause", "complete", "edit", "clear"],
+    paused: ["resume", "complete", "edit", "clear"],
+    blocked: ["resume", "complete", "edit", "clear"],
+    complete: ["create", "clear"]
+  };
+  function goalActionAllowed(phase, action, roundsStarted, maxGoalRounds, activation) {
+    if (!(phase === "active" && action === "resume" && activation === "disarmed") && !GOAL_ACTIONS_BY_PHASE[phase].includes(action)) return false;
+    if (action !== "resume") return true;
+    return typeof roundsStarted === "number" && typeof maxGoalRounds === "number" && roundsStarted < maxGoalRounds;
+  }
+
+  // webview/src/components/dock/GoalPanel.tsx
   var GOAL_PHASE_LABELS = {
     active: "In progress",
     paused: "Paused",
@@ -25249,45 +25527,60 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
   function GoalError({ error }) {
     const [summary, ...detailLines] = error.split("\n");
     const detail = detailLines.join("\n").trim();
-    return /* @__PURE__ */ import_react12.default.createElement("div", { className: "dsh-goal-error" }, /* @__PURE__ */ import_react12.default.createElement("div", { className: "dsh-card-error", title: detail || void 0 }, summary || error), detail ? /* @__PURE__ */ import_react12.default.createElement("details", { className: "dsh-goal-error-detail" }, /* @__PURE__ */ import_react12.default.createElement("summary", null, t("Technical details")), /* @__PURE__ */ import_react12.default.createElement("pre", null, detail)) : null);
+    return /* @__PURE__ */ import_react13.default.createElement("div", { className: "dsh-goal-error" }, /* @__PURE__ */ import_react13.default.createElement("div", { className: "dsh-card-error", title: detail || void 0 }, summary || error), detail ? /* @__PURE__ */ import_react13.default.createElement("details", { className: "dsh-goal-error-detail" }, /* @__PURE__ */ import_react13.default.createElement("summary", null, t("Technical details")), /* @__PURE__ */ import_react13.default.createElement("pre", { tabIndex: 0 }, detail)) : null);
   }
   function GoalPending({ goal }) {
     if (!goal.pending) return null;
-    return /* @__PURE__ */ import_react12.default.createElement("div", { className: "dsh-card-detail" }, t("Running {operation}; waiting for the projection to converge...", {
+    return /* @__PURE__ */ import_react13.default.createElement("div", { className: "dsh-card-detail" }, t("Running {operation}; waiting for the projection to converge...", {
       operation: goal.pendingOperation || t("mutation")
     }));
   }
   function GoalHint({ empty }) {
-    return /* @__PURE__ */ import_react12.default.createElement("div", { className: "dsh-card-detail dsh-goal-hint" }, t(empty ? "Use /goal <objective> to create a Goal." : "Use /goal to manage the Goal."));
+    return /* @__PURE__ */ import_react13.default.createElement("div", { className: "dsh-card-detail dsh-goal-hint" }, t(empty ? "Use /goal <objective> to create a Goal." : "Use /goal to manage the Goal."));
   }
   function GoalPanel({ goal }) {
     if (goal.state === "invalid") {
-      return /* @__PURE__ */ import_react12.default.createElement("div", { className: "dsh-card" }, /* @__PURE__ */ import_react12.default.createElement(GoalPending, { goal }), /* @__PURE__ */ import_react12.default.createElement(GoalError, { error: goal.error || t("Invalid Goal projection") }));
+      return /* @__PURE__ */ import_react13.default.createElement("div", { className: "dsh-card" }, /* @__PURE__ */ import_react13.default.createElement(GoalPending, { goal }), /* @__PURE__ */ import_react13.default.createElement(GoalError, { error: goal.error || t("Invalid Goal projection") }));
     }
     if (goal.state === "empty") {
-      return /* @__PURE__ */ import_react12.default.createElement("div", { className: "dsh-card" }, /* @__PURE__ */ import_react12.default.createElement("div", { className: "dsh-card-detail" }, t("This session has no Goal yet.")), /* @__PURE__ */ import_react12.default.createElement(GoalHint, { empty: true }), /* @__PURE__ */ import_react12.default.createElement(GoalPending, { goal }), goal.error ? /* @__PURE__ */ import_react12.default.createElement(GoalError, { error: goal.error }) : null);
+      return /* @__PURE__ */ import_react13.default.createElement("div", { className: "dsh-card" }, /* @__PURE__ */ import_react13.default.createElement("div", { className: "dsh-card-detail" }, t("This session has no Goal yet.")), /* @__PURE__ */ import_react13.default.createElement(GoalHint, { empty: true }), /* @__PURE__ */ import_react13.default.createElement(GoalPending, { goal }), goal.error ? /* @__PURE__ */ import_react13.default.createElement(GoalError, { error: goal.error }) : null);
     }
     const current = goal.goal;
     if (!current) {
-      return /* @__PURE__ */ import_react12.default.createElement("div", { className: "dsh-card" }, /* @__PURE__ */ import_react12.default.createElement("div", { className: "dsh-card-error" }, t("Goal data is missing.")));
+      return /* @__PURE__ */ import_react13.default.createElement("div", { className: "dsh-card" }, /* @__PURE__ */ import_react13.default.createElement("div", { className: "dsh-card-error" }, t("Goal data is missing.")));
     }
     const roundsStarted = Number(goal.roundsStarted || 0);
-    return /* @__PURE__ */ import_react12.default.createElement("div", { className: "dsh-card" }, /* @__PURE__ */ import_react12.default.createElement(
+    return /* @__PURE__ */ import_react13.default.createElement("div", { className: "dsh-card" }, /* @__PURE__ */ import_react13.default.createElement(
       "div",
       {
         className: "dsh-goal-objective",
         title: t("Goal revision {revision}", { revision: current.revision })
       },
       current.objective
-    ), /* @__PURE__ */ import_react12.default.createElement("div", { className: "dsh-card-detail" }, t("{phase} \xB7 round {started}/{maximum}", {
+    ), /* @__PURE__ */ import_react13.default.createElement("div", { className: "dsh-card-detail" }, t("{phase} \xB7 round {started}/{maximum}", {
       phase: t(current.phase === "active" && goal.activation === "disarmed" ? "Waiting for resume" : GOAL_PHASE_LABELS[current.phase]),
       started: roundsStarted,
       maximum: current.maxGoalRounds
-    })), /* @__PURE__ */ import_react12.default.createElement(GoalHint, null), current.phase === "active" && goal.activation === "disarmed" ? import_react12.default.createElement("button", { type: "button", className: "dsh-button", disabled: goal.pending || roundsStarted >= current.maxGoalRounds, onClick: () => postAction({ type: "goalResume" }) }, t("Resume")) : null, current.blockedReason ? /* @__PURE__ */ import_react12.default.createElement("div", { className: "dsh-goal-blocked", role: "status" }, /* @__PURE__ */ import_react12.default.createElement("strong", null, t("Blocked")), /* @__PURE__ */ import_react12.default.createElement("span", null, current.blockedReason.code, " \xB7 ", current.blockedReason.message)) : null, /* @__PURE__ */ import_react12.default.createElement(GoalPending, { goal }), goal.error ? /* @__PURE__ */ import_react12.default.createElement(GoalError, { error: goal.error }) : null);
+    })), /* @__PURE__ */ import_react13.default.createElement(GoalHint, null), current.phase === "active" && goal.activation === "disarmed" ? /* @__PURE__ */ import_react13.default.createElement("div", { className: "dsh-card-actions" }, /* @__PURE__ */ import_react13.default.createElement(
+      "button",
+      {
+        type: "button",
+        className: "dsh-button",
+        disabled: goal.pending || !goalActionAllowed(
+          current.phase,
+          "resume",
+          roundsStarted,
+          current.maxGoalRounds,
+          goal.activation
+        ),
+        onClick: () => postAction({ type: "goalResume" })
+      },
+      t("Resume")
+    )) : null, current.blockedReason ? /* @__PURE__ */ import_react13.default.createElement("div", { className: "dsh-goal-blocked", role: "status" }, /* @__PURE__ */ import_react13.default.createElement("strong", null, t("Blocked")), /* @__PURE__ */ import_react13.default.createElement("span", null, current.blockedReason.code, " \xB7 ", current.blockedReason.message)) : null, /* @__PURE__ */ import_react13.default.createElement(GoalPending, { goal }), goal.error ? /* @__PURE__ */ import_react13.default.createElement(GoalError, { error: goal.error }) : null);
   }
 
   // webview/src/components/dock/JobsPanel.tsx
-  var import_react13 = __toESM(require_react());
+  var import_react14 = __toESM(require_react());
   function isLiveJob(job) {
     return job.status === "running" || job.status === "stopping";
   }
@@ -25301,29 +25594,29 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
     return `${seconds}s`;
   }
   function JobsPanel({ jobs }) {
-    const [now, setNow] = (0, import_react13.useState)(() => Date.now());
+    const [now, setNow] = (0, import_react14.useState)(() => Date.now());
     const hasLiveJob = jobs.some(isLiveJob);
-    (0, import_react13.useEffect)(() => {
+    (0, import_react14.useEffect)(() => {
       if (!hasLiveJob) return;
       const timer = window.setInterval(() => setNow(Date.now()), 1e3);
       return () => window.clearInterval(timer);
     }, [hasLiveJob]);
-    return /* @__PURE__ */ import_react13.default.createElement("div", null, /* @__PURE__ */ import_react13.default.createElement("div", { className: "dsh-card-detail" }, t("Job Center \xB7 read-only")), jobs.map((job) => /* @__PURE__ */ import_react13.default.createElement("div", { className: "dsh-job-row", key: job.id }, /* @__PURE__ */ import_react13.default.createElement("div", { className: "dsh-job-label" }, job.label), /* @__PURE__ */ import_react13.default.createElement("div", { className: "dsh-job-meta" }, job.kind, " \xB7 ", job.status, " \xB7 ", job.id, " \xB7 ", formatJobDuration((job.finishedAt ?? now) - job.startedAt)), /* @__PURE__ */ import_react13.default.createElement("div", { className: "dsh-job-owner" }, t("owner {owner}", { owner: job.ownerSessionId })), job.outputSummary ? /* @__PURE__ */ import_react13.default.createElement("div", { className: "dsh-job-summary" }, job.outputSummary) : null)));
+    return /* @__PURE__ */ import_react14.default.createElement("div", null, /* @__PURE__ */ import_react14.default.createElement("div", { className: "dsh-card-detail" }, t("Job Center \xB7 read-only")), jobs.map((job) => /* @__PURE__ */ import_react14.default.createElement("div", { className: "dsh-job-row", key: job.id }, /* @__PURE__ */ import_react14.default.createElement("div", { className: "dsh-job-label" }, job.label), /* @__PURE__ */ import_react14.default.createElement("div", { className: "dsh-job-meta" }, job.kind, " \xB7 ", job.status, " \xB7 ", job.id, " \xB7 ", formatJobDuration((job.finishedAt ?? now) - job.startedAt)), /* @__PURE__ */ import_react14.default.createElement("div", { className: "dsh-job-owner" }, t("owner {owner}", { owner: job.ownerSessionId })), job.outputSummary ? /* @__PURE__ */ import_react14.default.createElement("div", { className: "dsh-job-summary" }, job.outputSummary) : null)));
   }
 
   // webview/src/components/dock/PermissionsPanel.tsx
-  var import_react14 = __toESM(require_react());
+  var import_react15 = __toESM(require_react());
   function PermissionsPanel({
     permissions,
     switchable
   }) {
-    return /* @__PURE__ */ import_react14.default.createElement("div", { className: "dsh-card" }, /* @__PURE__ */ import_react14.default.createElement("div", { className: "dsh-card-detail" }, t("Current preset: {preset}", { preset: permissions.currentLabel })), permissions.options.map((option) => {
+    return /* @__PURE__ */ import_react15.default.createElement("div", { className: "dsh-card" }, /* @__PURE__ */ import_react15.default.createElement("div", { className: "dsh-card-detail" }, t("Current preset: {preset}", { preset: permissions.currentLabel })), permissions.options.map((option) => {
       const current = option.value === permissions.currentValue;
-      const body = /* @__PURE__ */ import_react14.default.createElement(import_react14.default.Fragment, null, /* @__PURE__ */ import_react14.default.createElement("span", null, option.label, current ? t(" \xB7 current") : ""), option.description ? /* @__PURE__ */ import_react14.default.createElement("span", { className: "dsh-card-detail" }, option.description) : null);
+      const body = /* @__PURE__ */ import_react15.default.createElement(import_react15.default.Fragment, null, /* @__PURE__ */ import_react15.default.createElement("span", null, option.label, current ? t(" \xB7 current") : ""), option.description ? /* @__PURE__ */ import_react15.default.createElement("span", { className: "dsh-card-detail" }, option.description) : null);
       if (!switchable || current) {
-        return /* @__PURE__ */ import_react14.default.createElement("div", { className: `dsh-permission-option${current ? " active" : ""}`, key: option.value }, body);
+        return /* @__PURE__ */ import_react15.default.createElement("div", { className: `dsh-permission-option${current ? " active" : ""}`, key: option.value }, body);
       }
-      return /* @__PURE__ */ import_react14.default.createElement(
+      return /* @__PURE__ */ import_react15.default.createElement(
         "button",
         {
           type: "button",
@@ -25334,13 +25627,13 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
         },
         body
       );
-    }), switchable ? null : /* @__PURE__ */ import_react14.default.createElement("div", { className: "dsh-card-detail" }, t("The connected Runtime exposes no permission command, so switching happens in the dsh Web UI.")));
+    }), switchable ? null : /* @__PURE__ */ import_react15.default.createElement("div", { className: "dsh-card-detail" }, t("The connected Runtime exposes no permission command, so switching happens in the dsh Web UI.")));
   }
 
   // webview/src/components/dock/QueuePanel.tsx
-  var import_react15 = __toESM(require_react());
+  var import_react16 = __toESM(require_react());
   function QueuePanel({ queue, running }) {
-    const [editing, setEditing] = (0, import_react15.useState)(null);
+    const [editing, setEditing] = (0, import_react16.useState)(null);
     const act = (itemId, action, editableText) => {
       if (action === "edit") {
         setEditing({ itemId, text: editableText ?? "" });
@@ -25353,7 +25646,7 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
       postAction({ type: "updateQueue", itemId: editing.itemId, action: "edit", text: editing.text });
       setEditing(null);
     };
-    return /* @__PURE__ */ import_react15.default.createElement("div", null, queue.map((item) => /* @__PURE__ */ import_react15.default.createElement("div", { className: "dsh-queue-row", key: item.id }, editing?.itemId === item.id ? /* @__PURE__ */ import_react15.default.createElement("div", { className: "dsh-dock-form dsh-queue-edit" }, /* @__PURE__ */ import_react15.default.createElement(
+    return /* @__PURE__ */ import_react16.default.createElement("div", null, queue.map((item) => /* @__PURE__ */ import_react16.default.createElement("div", { className: "dsh-queue-row", key: item.id }, editing?.itemId === item.id ? /* @__PURE__ */ import_react16.default.createElement("div", { className: "dsh-dock-form dsh-queue-edit" }, /* @__PURE__ */ import_react16.default.createElement(
       "input",
       {
         className: "dsh-dock-input",
@@ -25371,11 +25664,49 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
           }
         }
       }
-    ), /* @__PURE__ */ import_react15.default.createElement("div", { className: "dsh-card-actions" }, /* @__PURE__ */ import_react15.default.createElement("button", { type: "button", className: "dsh-button", disabled: !editing.text.trim(), onClick: saveEdit }, t("Save")), /* @__PURE__ */ import_react15.default.createElement("button", { type: "button", className: "dsh-button dsh-button-secondary", onClick: () => setEditing(null) }, t("Cancel")))) : /* @__PURE__ */ import_react15.default.createElement(import_react15.default.Fragment, null, /* @__PURE__ */ import_react15.default.createElement("div", { className: "dsh-queue-preview" }, item.placement === "steering" ? "\u21AA " : "", item.preview || t("(no text content)")), /* @__PURE__ */ import_react15.default.createElement("div", { className: "dsh-queue-actions" }, item.editableText !== void 0 ? /* @__PURE__ */ import_react15.default.createElement("button", { type: "button", className: "dsh-button dsh-button-secondary", onClick: () => act(item.id, "edit", item.editableText) }, t("Edit")) : null, /* @__PURE__ */ import_react15.default.createElement("button", { type: "button", className: "dsh-button dsh-button-secondary", onClick: () => act(item.id, "remove") }, t("Remove")), /* @__PURE__ */ import_react15.default.createElement("button", { type: "button", className: "dsh-button dsh-button-secondary", disabled: !running, onClick: () => act(item.id, "steer") }, t("Steer now")))))));
+    ), /* @__PURE__ */ import_react16.default.createElement("div", { className: "dsh-card-actions" }, /* @__PURE__ */ import_react16.default.createElement("button", { type: "button", className: "dsh-button", disabled: !editing.text.trim(), onClick: saveEdit }, t("Save")), /* @__PURE__ */ import_react16.default.createElement("button", { type: "button", className: "dsh-button dsh-button-secondary", onClick: () => setEditing(null) }, t("Cancel")))) : /* @__PURE__ */ import_react16.default.createElement(import_react16.default.Fragment, null, /* @__PURE__ */ import_react16.default.createElement("div", { className: "dsh-queue-preview" }, item.placement === "steering" ? "\u21AA " : "", item.preview || t("(no text content)")), /* @__PURE__ */ import_react16.default.createElement("div", { className: "dsh-queue-actions" }, item.editableText !== void 0 ? /* @__PURE__ */ import_react16.default.createElement("button", { type: "button", className: "dsh-button dsh-button-secondary", onClick: () => act(item.id, "edit", item.editableText) }, t("Edit")) : null, /* @__PURE__ */ import_react16.default.createElement("button", { type: "button", className: "dsh-button dsh-button-secondary", onClick: () => act(item.id, "remove") }, t("Remove")), /* @__PURE__ */ import_react16.default.createElement("button", { type: "button", className: "dsh-button dsh-button-secondary", disabled: !running, onClick: () => act(item.id, "steer") }, t("Steer now")))))));
+  }
+
+  // webview/src/components/dock/SchedulePanel.tsx
+  var import_react17 = __toESM(require_react());
+  function formatInterval(seconds) {
+    let remaining = seconds;
+    const days = Math.floor(remaining / 86400);
+    remaining %= 86400;
+    const hours = Math.floor(remaining / 3600);
+    remaining %= 3600;
+    const minutes = Math.floor(remaining / 60);
+    const values = [
+      days > 0 ? `${days}d` : "",
+      hours > 0 ? `${hours}h` : "",
+      minutes > 0 ? `${minutes}m` : "",
+      remaining % 60 > 0 || days === 0 && hours === 0 && minutes === 0 ? `${remaining % 60}s` : ""
+    ].filter(Boolean);
+    return values.join(" ");
+  }
+  function formatScheduledAt(value) {
+    const date = new Date(value);
+    if (!Number.isFinite(date.valueOf())) return value;
+    try {
+      return new Intl.DateTimeFormat(void 0, {
+        dateStyle: "medium",
+        timeStyle: "short"
+      }).format(date);
+    } catch {
+      return value;
+    }
+  }
+  function ruleLabel(item) {
+    if (item.kind === "after") return t("After {duration}", { duration: formatInterval(item.afterSeconds) });
+    if (item.kind === "every") return t("Every {duration}", { duration: formatInterval(item.everySeconds) });
+    return t("One-time");
+  }
+  function SchedulePanel({ schedule }) {
+    return /* @__PURE__ */ import_react17.default.createElement("div", { className: "dsh-schedule", "aria-label": t("Active reminders") }, /* @__PURE__ */ import_react17.default.createElement("div", { className: "dsh-card-detail" }, t("Active reminders \xB7 read-only")), /* @__PURE__ */ import_react17.default.createElement("ul", { className: "dsh-schedule-items", tabIndex: 0 }, schedule.map((item) => /* @__PURE__ */ import_react17.default.createElement("li", { className: "dsh-schedule-item", key: item.id }, /* @__PURE__ */ import_react17.default.createElement("div", { className: "dsh-schedule-prompt" }, item.prompt), /* @__PURE__ */ import_react17.default.createElement("div", { className: "dsh-schedule-meta" }, /* @__PURE__ */ import_react17.default.createElement("span", null, ruleLabel(item)), /* @__PURE__ */ import_react17.default.createElement("span", { "aria-hidden": "true" }, " \xB7 "), /* @__PURE__ */ import_react17.default.createElement("time", { dateTime: item.scheduledAt, title: item.scheduledAt }, t("Next at {time}", { time: formatScheduledAt(item.scheduledAt) }))), /* @__PURE__ */ import_react17.default.createElement("div", { className: "dsh-schedule-id" }, t("ID {id}", { id: item.id }))))));
   }
 
   // webview/src/components/dock/SubagentsPanel.tsx
-  var import_react16 = __toESM(require_react());
+  var import_react18 = __toESM(require_react());
   function activityDuration(timing, activity, now) {
     if (timing === void 0) return void 0;
     if (timing.active === void 0) return timing.settledMs;
@@ -25434,8 +25765,8 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
       seconds: String(seconds).padStart(2, "0")
     });
   }
-  function SubagentPreviewCard({ preview, now }) {
-    const [followUp, setFollowUp] = (0, import_react16.useState)("");
+  function SubagentPreviewCard({ preview, now, autoOpenReasoning }) {
+    const [followUp, setFollowUp] = (0, import_react18.useState)("");
     const busy = Boolean(preview.pendingAction);
     const canFollowUp = preview.parentAvailable && !busy;
     const durationMs = activityDuration(preview.timing, preview.activity, now);
@@ -25447,16 +25778,16 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
       setFollowUp("");
       postAction({ type: "followUpSubagent", childSessionId: preview.childSessionId, text });
     };
-    return /* @__PURE__ */ import_react16.default.createElement("div", { className: "dsh-card" }, /* @__PURE__ */ import_react16.default.createElement("div", { className: "dsh-feature-head" }, /* @__PURE__ */ import_react16.default.createElement("div", { className: "dsh-card-title" }, preview.label), /* @__PURE__ */ import_react16.default.createElement("button", { type: "button", className: "dsh-button dsh-button-secondary", onClick: () => postAction({ type: "closeSubagent" }) }, t("Close"))), /* @__PURE__ */ import_react16.default.createElement("div", { className: "dsh-card-detail", title: durationTitle === void 0 ? void 0 : t("Total active duration: {duration}", { duration: durationTitle }) }, preview.mode, " \xB7 ", preview.activity, duration === void 0 ? "" : ` \xB7 ${t("duration: {duration}", { duration })}`, " \xB7 ", preview.parentAvailable ? t("parent available") : t("parent unavailable")), preview.state === "loading" ? /* @__PURE__ */ import_react16.default.createElement("div", { className: "dsh-card-detail" }, t("Loading history...")) : null, preview.error ? /* @__PURE__ */ import_react16.default.createElement("div", { className: "dsh-card-error" }, preview.error) : null, preview.pendingAction ? /* @__PURE__ */ import_react16.default.createElement("div", { className: "dsh-card-detail" }, t("Running {operation}...", { operation: preview.pendingAction })) : null, preview.messages.length ? /* @__PURE__ */ import_react16.default.createElement("div", { className: "dsh-subagent-transcript", onClick: (event) => handleMarkdownClick(event.target), onKeyDown: handleMarkdownKeydown }, preview.messages.map((message) => /* @__PURE__ */ import_react16.default.createElement(
+    return /* @__PURE__ */ import_react18.default.createElement("div", { className: "dsh-card" }, /* @__PURE__ */ import_react18.default.createElement("div", { className: "dsh-feature-head" }, /* @__PURE__ */ import_react18.default.createElement("div", { className: "dsh-card-title" }, preview.label), /* @__PURE__ */ import_react18.default.createElement("button", { type: "button", className: "dsh-button dsh-button-secondary", onClick: () => postAction({ type: "closeSubagent" }) }, t("Close"))), /* @__PURE__ */ import_react18.default.createElement("div", { className: "dsh-card-detail", title: durationTitle === void 0 ? void 0 : t("Total active duration: {duration}", { duration: durationTitle }) }, preview.mode, " \xB7 ", preview.activity, duration === void 0 ? "" : ` \xB7 ${t("duration: {duration}", { duration })}`, " \xB7 ", preview.parentAvailable ? t("parent available") : t("parent unavailable")), preview.state === "loading" ? /* @__PURE__ */ import_react18.default.createElement("div", { className: "dsh-card-detail" }, t("Loading history...")) : null, preview.error ? /* @__PURE__ */ import_react18.default.createElement("div", { className: "dsh-card-error" }, preview.error) : null, preview.pendingAction ? /* @__PURE__ */ import_react18.default.createElement("div", { className: "dsh-card-detail" }, t("Running {operation}...", { operation: preview.pendingAction })) : null, preview.messages.length ? /* @__PURE__ */ import_react18.default.createElement("div", { className: "dsh-subagent-transcript", tabIndex: 0, onClick: (event) => handleMarkdownClick(event.target), onKeyDown: handleMarkdownKeydown }, preview.messages.map((message) => /* @__PURE__ */ import_react18.default.createElement(
       "div",
       {
         className: `dsh-message dsh-role-${message.role}`,
         key: message.id,
         ...typeof message.renderId === "string" ? { "data-render-id": message.renderId } : {}
       },
-      /* @__PURE__ */ import_react16.default.createElement("div", { className: "dsh-message-label" }, message.role === "assistant" ? "subagent" : message.role === "user" ? t("You") : t("System")),
-      /* @__PURE__ */ import_react16.default.createElement(MessageContent, { message })
-    ))) : null, preview.mode === "continuable" ? /* @__PURE__ */ import_react16.default.createElement("div", { className: "dsh-follow-up" }, /* @__PURE__ */ import_react16.default.createElement(
+      /* @__PURE__ */ import_react18.default.createElement("div", { className: "dsh-message-label" }, message.role === "assistant" ? "subagent" : message.role === "user" ? t("You") : t("System")),
+      /* @__PURE__ */ import_react18.default.createElement(MessageContent, { message, autoOpenReasoning })
+    ))) : null, preview.mode === "continuable" ? /* @__PURE__ */ import_react18.default.createElement("div", { className: "dsh-follow-up" }, /* @__PURE__ */ import_react18.default.createElement(
       "input",
       {
         placeholder: t("Add a task for the continuable subagent"),
@@ -25470,7 +25801,7 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
           }
         }
       }
-    ), /* @__PURE__ */ import_react16.default.createElement("button", { type: "button", className: "dsh-button", disabled: !canFollowUp || !followUp.trim(), onClick: sendFollowUp }, t("Send"))) : null, preview.mode === "continuable" && preview.activity === "running" ? /* @__PURE__ */ import_react16.default.createElement("div", { className: "dsh-card-actions" }, /* @__PURE__ */ import_react16.default.createElement(
+    ), /* @__PURE__ */ import_react18.default.createElement("button", { type: "button", className: "dsh-button", disabled: !canFollowUp || !followUp.trim(), onClick: sendFollowUp }, t("Send"))) : null, preview.mode === "continuable" && preview.activity === "running" ? /* @__PURE__ */ import_react18.default.createElement("div", { className: "dsh-card-actions" }, /* @__PURE__ */ import_react18.default.createElement(
       "button",
       {
         type: "button",
@@ -25481,21 +25812,21 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
       t("Interrupt")
     )) : null);
   }
-  function SubagentsPanel({ tree, preview }) {
-    const [now, setNow] = (0, import_react16.useState)(() => Date.now());
+  function SubagentsPanel({ tree, preview, autoOpenReasoning }) {
+    const [now, setNow] = (0, import_react18.useState)(() => Date.now());
     const hasRunningTiming = tree.nodes.some(
       (node) => node.kind === "child" && node.activity === "running" && node.timing?.active !== void 0
     ) || preview?.activity === "running" && preview.timing?.active !== void 0;
-    (0, import_react16.useEffect)(() => {
+    (0, import_react18.useEffect)(() => {
       if (!hasRunningTiming) return;
       const timer = window.setInterval(() => setNow(Date.now()), 1e3);
       return () => window.clearInterval(timer);
     }, [hasRunningTiming]);
     const statusText = tree.state === "loading" ? t("Loading...") : tree.state === "error" ? tree.error || t("Loading failed") : tree.nodes.length ? "" : t("No subagents");
-    return /* @__PURE__ */ import_react16.default.createElement("div", null, /* @__PURE__ */ import_react16.default.createElement("div", { className: "dsh-feature-head" }, /* @__PURE__ */ import_react16.default.createElement("div", { className: "dsh-dock-title" }, t("Subagent Tree")), /* @__PURE__ */ import_react16.default.createElement("button", { type: "button", className: "dsh-button dsh-button-secondary", disabled: tree.state === "loading", onClick: () => postAction({ type: "refreshSubagents" }) }, t("Refresh"))), statusText ? /* @__PURE__ */ import_react16.default.createElement("div", { className: "dsh-card-detail" }, statusText) : null, tree.nodes.map((node) => {
+    return /* @__PURE__ */ import_react18.default.createElement("div", null, /* @__PURE__ */ import_react18.default.createElement("div", { className: "dsh-feature-head" }, /* @__PURE__ */ import_react18.default.createElement("div", { className: "dsh-dock-title" }, t("Subagent Tree")), /* @__PURE__ */ import_react18.default.createElement("button", { type: "button", className: "dsh-button dsh-button-secondary", disabled: tree.state === "loading", onClick: () => postAction({ type: "refreshSubagents" }) }, t("Refresh"))), statusText ? /* @__PURE__ */ import_react18.default.createElement("div", { className: "dsh-card-detail" }, statusText) : null, tree.nodes.map((node) => {
       const depthClass = `dsh-tree-depth-${Math.min(8, Math.max(0, Number(node.depth || 1) - 1))}`;
       if (node.kind === "diagnostic") {
-        return /* @__PURE__ */ import_react16.default.createElement("div", { className: `dsh-tree-row ${depthClass}`, key: node.id }, /* @__PURE__ */ import_react16.default.createElement("div", null, /* @__PURE__ */ import_react16.default.createElement("div", { className: "dsh-tree-label" }, node.id), /* @__PURE__ */ import_react16.default.createElement("div", { className: "dsh-tree-meta" }, t("diagnostic \xB7 {reason} \xB7 parent {parent}", { reason: node.reason || "", parent: node.parentSessionId }))));
+        return /* @__PURE__ */ import_react18.default.createElement("div", { className: `dsh-tree-row ${depthClass}`, key: node.id }, /* @__PURE__ */ import_react18.default.createElement("div", null, /* @__PURE__ */ import_react18.default.createElement("div", { className: "dsh-tree-label" }, node.id), /* @__PURE__ */ import_react18.default.createElement("div", { className: "dsh-tree-meta" }, t("diagnostic \xB7 {reason} \xB7 parent {parent}", { reason: node.reason || "", parent: node.parentSessionId }))));
       }
       const durationMs = node.activity === void 0 ? void 0 : activityDuration(node.timing, node.activity, now);
       const duration = durationMs === void 0 ? void 0 : formatDuration(durationMs);
@@ -25507,12 +25838,12 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
         node.hasChildren ? t("has children") : t("leaf"),
         node.parentAvailable ? t("parent available") : t("parent unavailable")
       ].filter(Boolean).join(" \xB7 ");
-      return /* @__PURE__ */ import_react16.default.createElement("div", { className: `dsh-tree-row ${depthClass}`, key: node.id }, /* @__PURE__ */ import_react16.default.createElement("div", null, /* @__PURE__ */ import_react16.default.createElement("div", { className: "dsh-tree-label" }, node.label || node.id), /* @__PURE__ */ import_react16.default.createElement("div", { className: "dsh-tree-meta", title: durationTitle === void 0 ? void 0 : t("Total active duration: {duration}", { duration: durationTitle }) }, meta, /* @__PURE__ */ import_react16.default.createElement("br", null), t("parent {parent}", { parent: node.parentSessionId }))), /* @__PURE__ */ import_react16.default.createElement("button", { type: "button", className: "dsh-button dsh-button-secondary", onClick: () => postAction({ type: "openSubagent", childSessionId: node.id }) }, t("History")));
-    }), preview ? /* @__PURE__ */ import_react16.default.createElement(SubagentPreviewCard, { preview, now }) : null);
+      return /* @__PURE__ */ import_react18.default.createElement("div", { className: `dsh-tree-row ${depthClass}`, key: node.id }, /* @__PURE__ */ import_react18.default.createElement("div", null, /* @__PURE__ */ import_react18.default.createElement("div", { className: "dsh-tree-label" }, node.label || node.id), /* @__PURE__ */ import_react18.default.createElement("div", { className: "dsh-tree-meta", title: durationTitle === void 0 ? void 0 : t("Total active duration: {duration}", { duration: durationTitle }) }, meta, /* @__PURE__ */ import_react18.default.createElement("br", null), t("parent {parent}", { parent: node.parentSessionId }))), /* @__PURE__ */ import_react18.default.createElement("button", { type: "button", className: "dsh-button dsh-button-secondary", onClick: () => postAction({ type: "openSubagent", childSessionId: node.id }) }, t("History")));
+    }), preview ? /* @__PURE__ */ import_react18.default.createElement(SubagentPreviewCard, { preview, now, autoOpenReasoning }) : null);
   }
 
   // webview/src/components/dock/TodosPanel.tsx
-  var import_react17 = __toESM(require_react());
+  var import_react19 = __toESM(require_react());
   function progressLabel(todos) {
     const done = todos.filter((item) => item.status === "completed").length;
     const active = todos.filter((item) => item.status === "in_progress").length;
@@ -25525,11 +25856,11 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
   }
   function TodosPanel({ todos }) {
     if (todos.length === 0) return null;
-    return /* @__PURE__ */ import_react17.default.createElement("div", { className: "dsh-todos", "aria-label": t("Todo list") }, /* @__PURE__ */ import_react17.default.createElement("div", { className: "dsh-todos-progress" }, progressLabel(todos)), /* @__PURE__ */ import_react17.default.createElement("ul", { className: "dsh-todo-items" }, todos.map((item, position) => /* @__PURE__ */ import_react17.default.createElement("li", { key: position, className: `dsh-todo-item ${item.status}` }, /* @__PURE__ */ import_react17.default.createElement("span", { className: "dsh-todo-status", "aria-hidden": "true" }), /* @__PURE__ */ import_react17.default.createElement("span", { className: "dsh-todo-content" }, item.content)))));
+    return /* @__PURE__ */ import_react19.default.createElement("div", { className: "dsh-todos", "aria-label": t("Todo list") }, /* @__PURE__ */ import_react19.default.createElement("div", { className: "dsh-todos-progress" }, progressLabel(todos)), /* @__PURE__ */ import_react19.default.createElement("ul", { className: "dsh-todo-items", tabIndex: 0 }, todos.map((item, position) => /* @__PURE__ */ import_react19.default.createElement("li", { key: position, className: `dsh-todo-item ${item.status}` }, /* @__PURE__ */ import_react19.default.createElement("span", { className: "dsh-todo-status", "aria-hidden": "true" }), /* @__PURE__ */ import_react19.default.createElement("span", { className: "dsh-todo-content" }, item.content)))));
   }
 
   // webview/src/components/dock/ActivityDock.tsx
-  var ActivityDock = import_react18.default.memo(function ActivityDock2({
+  var ActivityDock = import_react20.default.memo(function ActivityDock2({
     goal,
     queue,
     changeReviews,
@@ -25537,15 +25868,18 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
     subagentPreview,
     jobs,
     todos,
+    schedule,
     permissions,
+    dynamicPlugins,
     commands,
     sessionId,
     sessionRunning,
-    agentPresetLabel
+    agentPresetLabel,
+    autoOpenReasoning
   }) {
-    const [active, setActive] = (0, import_react18.useState)(null);
-    const [collapsed, setCollapsed] = (0, import_react18.useState)(true);
-    const tabRefs = (0, import_react18.useRef)(/* @__PURE__ */ new Map());
+    const [active, setActive] = (0, import_react20.useState)(null);
+    const [collapsed, setCollapsed] = (0, import_react20.useState)(true);
+    const tabRefs = (0, import_react20.useRef)(/* @__PURE__ */ new Map());
     const trimmedAgentPresetLabel = agentPresetLabel?.trim();
     const shortAgentPreset = trimmedAgentPresetLabel ? Array.from(trimmedAgentPresetLabel).slice(0, 4).join("") : void 0;
     const tabs = [];
@@ -25562,10 +25896,15 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
     if (subagents && sessionId) {
       tabs.push({ id: "subagents", label: t("Subagents"), count: subagents.nodes.length || void 0 });
     }
-    if (jobs.length) tabs.push({ id: "jobs", label: "Jobs", count: jobs.length });
+    if (jobs.length) tabs.push({ id: "jobs", label: t("Jobs"), count: jobs.length });
+    if (schedule?.length) tabs.push({ id: "schedule", label: t("Schedule"), count: schedule.length });
     if (permissions) tabs.push({ id: "permissions", label: t("Permissions") });
+    if (dynamicPlugins && (dynamicPlugins.loading || dynamicPlugins.error !== void 0 || dynamicPlugins.rows.length > 0)) {
+      const pending = dynamicPlugins.rows.filter((row) => row.latestRun?.status === "awaiting-approval").length;
+      tabs.push({ id: "dynamicPlugins", label: t("Dynamic plugins"), count: pending || dynamicPlugins.rows.length || void 0 });
+    }
     const available = tabs.map((tab) => tab.id).join(",");
-    (0, import_react18.useEffect)(() => {
+    (0, import_react20.useEffect)(() => {
       if (active && !available.split(",").includes(active)) {
         setActive(null);
         setCollapsed(true);
@@ -25586,7 +25925,7 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
       tabRefs.current.get(next.id)?.focus();
     };
     const preview = subagentPreview?.rootSessionId === sessionId ? subagentPreview : void 0;
-    return /* @__PURE__ */ import_react18.default.createElement("div", { className: "dsh-dock" }, /* @__PURE__ */ import_react18.default.createElement(
+    return /* @__PURE__ */ import_react20.default.createElement("div", { className: "dsh-dock" }, /* @__PURE__ */ import_react20.default.createElement(
       "div",
       {
         className: "dsh-dock-tabs",
@@ -25594,7 +25933,7 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
         "aria-label": t("Activity tabs"),
         "aria-orientation": "horizontal"
       },
-      tabs.map((tab, index) => /* @__PURE__ */ import_react18.default.createElement(
+      tabs.map((tab, index) => /* @__PURE__ */ import_react20.default.createElement(
         "button",
         {
           key: tab.id,
@@ -25621,9 +25960,9 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
           onKeyDown: (event) => onTabKeyDown(event, index)
         },
         tab.label,
-        tab.count !== void 0 ? /* @__PURE__ */ import_react18.default.createElement("span", { className: "dsh-badge" }, tab.count) : null
+        tab.count !== void 0 ? /* @__PURE__ */ import_react20.default.createElement("span", { className: "dsh-badge" }, tab.count) : null
       )),
-      shortAgentPreset ? /* @__PURE__ */ import_react18.default.createElement(
+      shortAgentPreset ? /* @__PURE__ */ import_react20.default.createElement(
         "span",
         {
           className: "dsh-dock-preset",
@@ -25632,7 +25971,7 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
         },
         shortAgentPreset
       ) : null
-    ), tabs.map((tab) => /* @__PURE__ */ import_react18.default.createElement(
+    ), tabs.map((tab) => /* @__PURE__ */ import_react20.default.createElement(
       "div",
       {
         key: tab.id,
@@ -25642,21 +25981,23 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
         "aria-labelledby": `dsh-dock-tab-${tab.id}`,
         hidden: collapsed || selectedTab !== tab.id
       },
-      !collapsed && selectedTab === "todos" && tab.id === "todos" && todos ? /* @__PURE__ */ import_react18.default.createElement(TodosPanel, { todos }) : null,
-      !collapsed && selectedTab === "goal" && tab.id === "goal" && goal ? /* @__PURE__ */ import_react18.default.createElement(GoalPanel, { goal }) : null,
-      !collapsed && selectedTab === "queue" && tab.id === "queue" ? /* @__PURE__ */ import_react18.default.createElement(QueuePanel, { queue, running: sessionRunning }) : null,
-      !collapsed && selectedTab === "changes" && tab.id === "changes" ? /* @__PURE__ */ import_react18.default.createElement(ChangesPanel, { reviews: changeReviews, running: sessionRunning }) : null,
-      !collapsed && selectedTab === "subagents" && tab.id === "subagents" && subagents ? /* @__PURE__ */ import_react18.default.createElement(SubagentsPanel, { tree: subagents, preview }) : null,
-      !collapsed && selectedTab === "jobs" && tab.id === "jobs" ? /* @__PURE__ */ import_react18.default.createElement(JobsPanel, { jobs }) : null,
-      !collapsed && selectedTab === "permissions" && tab.id === "permissions" && permissions ? /* @__PURE__ */ import_react18.default.createElement(PermissionsPanel, { permissions, switchable: canSwitchPermissions(commands) }) : null
+      !collapsed && selectedTab === "todos" && tab.id === "todos" && todos ? /* @__PURE__ */ import_react20.default.createElement(TodosPanel, { todos }) : null,
+      !collapsed && selectedTab === "goal" && tab.id === "goal" && goal ? /* @__PURE__ */ import_react20.default.createElement(GoalPanel, { goal }) : null,
+      !collapsed && selectedTab === "queue" && tab.id === "queue" ? /* @__PURE__ */ import_react20.default.createElement(QueuePanel, { queue, running: sessionRunning }) : null,
+      !collapsed && selectedTab === "changes" && tab.id === "changes" ? /* @__PURE__ */ import_react20.default.createElement(ChangesPanel, { reviews: changeReviews, running: sessionRunning }) : null,
+      !collapsed && selectedTab === "subagents" && tab.id === "subagents" && subagents ? /* @__PURE__ */ import_react20.default.createElement(SubagentsPanel, { tree: subagents, preview, autoOpenReasoning }) : null,
+      !collapsed && selectedTab === "jobs" && tab.id === "jobs" ? /* @__PURE__ */ import_react20.default.createElement(JobsPanel, { jobs }) : null,
+      !collapsed && selectedTab === "schedule" && tab.id === "schedule" && schedule ? /* @__PURE__ */ import_react20.default.createElement(SchedulePanel, { schedule }) : null,
+      !collapsed && selectedTab === "permissions" && tab.id === "permissions" && permissions ? /* @__PURE__ */ import_react20.default.createElement(PermissionsPanel, { permissions, switchable: canSwitchPermissions(commands) }) : null,
+      !collapsed && selectedTab === "dynamicPlugins" && tab.id === "dynamicPlugins" && dynamicPlugins ? /* @__PURE__ */ import_react20.default.createElement(DynamicPluginsPanel, { plugins: dynamicPlugins, currentSessionId: sessionId }) : null
     )));
   });
 
   // webview/src/components/Composer.tsx
-  var import_react28 = __toESM(require_react());
+  var import_react32 = __toESM(require_react());
 
   // webview/src/components/ImageDrafts.tsx
-  var import_react19 = __toESM(require_react());
+  var import_react21 = __toESM(require_react());
   var DEFAULT_LIMITS = {
     maxImageBytes: 5 * 1024 * 1024,
     maxImagesPerMessage: 20,
@@ -25676,9 +26017,9 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
   }
   function useImageDrafts(limitsValue) {
     const limits = limitsValue ?? DEFAULT_LIMITS;
-    const [images, setImages] = (0, import_react19.useState)([]);
-    const [error, setError] = (0, import_react19.useState)();
-    const addFiles = (0, import_react19.useCallback)(async (files) => {
+    const [images, setImages] = (0, import_react21.useState)([]);
+    const [error, setError] = (0, import_react21.useState)();
+    const addFiles = (0, import_react21.useCallback)(async (files) => {
       setError(void 0);
       const remainingCount = limits.maxImagesPerMessage - images.length;
       if (files.length > remainingCount) {
@@ -25724,7 +26065,7 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
       }
       setImages((current) => [...current, ...additions]);
     }, [images, limits.maxImageBytes, limits.maxImagesPerMessage, limits.maxMessageImageBytes, limits.mediaTypes]);
-    const addUploads = (0, import_react19.useCallback)((uploads) => {
+    const addUploads = (0, import_react21.useCallback)((uploads) => {
       setError(void 0);
       const existingBytes = images.reduce((sum, image) => sum + image.bytes, 0);
       const additions = [];
@@ -25781,7 +26122,7 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
     onRemove
   }) {
     if (images.length === 0 && !error) return null;
-    return /* @__PURE__ */ import_react19.default.createElement("div", { className: "dsh-image-drafts" }, images.length ? /* @__PURE__ */ import_react19.default.createElement("div", { className: "dsh-image-draft-rail", "aria-label": t("Pending images") }, images.map((image) => /* @__PURE__ */ import_react19.default.createElement("div", { className: "dsh-image-draft", key: image.id }, /* @__PURE__ */ import_react19.default.createElement("img", { src: image.src, alt: image.upload.name || t("Image") }), /* @__PURE__ */ import_react19.default.createElement(
+    return /* @__PURE__ */ import_react21.default.createElement("div", { className: "dsh-image-drafts" }, images.length ? /* @__PURE__ */ import_react21.default.createElement("div", { className: "dsh-image-draft-rail", "aria-label": t("Pending images") }, images.map((image) => /* @__PURE__ */ import_react21.default.createElement("div", { className: "dsh-image-draft", key: image.id }, /* @__PURE__ */ import_react21.default.createElement("img", { src: image.src, alt: image.upload.name || t("Image") }), /* @__PURE__ */ import_react21.default.createElement(
       "button",
       {
         type: "button",
@@ -25789,12 +26130,230 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
         title: t("Remove image"),
         onClick: () => onRemove(image.id)
       },
-      /* @__PURE__ */ import_react19.default.createElement(CloseIcon, null)
-    ), /* @__PURE__ */ import_react19.default.createElement("span", null, image.upload.name || t("Image"))))) : null, error ? /* @__PURE__ */ import_react19.default.createElement("div", { className: "dsh-card-error" }, error) : null, images.length ? /* @__PURE__ */ import_react19.default.createElement("div", { className: "dsh-image-data-notice" }, t("Images are uploaded to Harness when this message is sent.")) : null);
+      /* @__PURE__ */ import_react21.default.createElement(CloseIcon, null)
+    ), /* @__PURE__ */ import_react21.default.createElement("span", null, image.upload.name || t("Image"))))) : null, error ? /* @__PURE__ */ import_react21.default.createElement("div", { className: "dsh-card-error" }, error) : null, images.length ? /* @__PURE__ */ import_react21.default.createElement("div", { className: "dsh-image-data-notice" }, t("Images are uploaded to Harness when this message is sent.")) : null);
+  }
+
+  // webview/src/components/FileDrafts.tsx
+  var import_react23 = __toESM(require_react());
+
+  // webview/src/components/FileTypeIcon.tsx
+  var import_react22 = __toESM(require_react());
+  var PAGE = "M8.48924 28H19.5108C21.6479 28 22.7165 28 23.5594 27.6509C24.6833 27.1853 25.5762 26.2924 26.0417 25.1685C26.3909 24.3256 26.3909 23.257 26.3909 21.1199V8.79443C26.3909 8.32877 26.3909 8.09593 26.3471 7.87507C26.2887 7.58058 26.173 7.30042 26.0067 7.05048C25.882 6.86303 25.7177 6.69799 25.3893 6.36792L20.0611 1.01354C19.7304 0.681235 19.5651 0.515081 19.3769 0.38885C19.126 0.220541 18.8443 0.103463 18.5481 0.0443412C18.3259 0 18.0915 0 17.6226 0H8.48924C6.35209 0 5.28351 0 4.4406 0.349145C3.31672 0.814671 2.4238 1.70759 1.95828 2.83147C1.60913 3.67438 1.60913 4.74296 1.60913 6.88011V21.1199C1.60913 23.257 1.60913 24.3256 1.95828 25.1685C2.4238 26.2924 3.31672 27.1853 4.4406 27.6509C5.28351 28 6.35209 28 8.48924 28Z";
+  var FOLD = "M26.3909 7.37445L19.0525 0V3.77445C19.0525 4.89271 19.0525 5.45184 19.2352 5.89289C19.4788 6.48096 19.946 6.94818 20.5341 7.19176C20.9751 7.37445 21.5342 7.37445 22.6525 7.37445H26.3909Z";
+  var MARK = "translate(14 16) scale(1.12) translate(-14 -16)";
+  var MARK_WIDE = "translate(14 16) scale(1.22) translate(-14 -16)";
+  var BY_EXTENSION = {
+    scss: "code",
+    sass: "code",
+    less: "code",
+    vue: "code",
+    svelte: "code",
+    astro: "code",
+    bat: "code",
+    cmd: "code",
+    csv: "code",
+    tsv: "code",
+    html: "html",
+    htm: "html",
+    png: "image",
+    jpg: "image",
+    jpeg: "image",
+    gif: "image",
+    svg: "image",
+    webp: "image",
+    avif: "image",
+    bmp: "image",
+    ico: "image",
+    tif: "image",
+    tiff: "image",
+    heic: "image",
+    heif: "image",
+    md: "markdown",
+    mdx: "markdown",
+    markdown: "markdown",
+    pdf: "pdf",
+    ppt: "ppt",
+    pptx: "ppt",
+    key: "ppt",
+    mp4: "video",
+    mov: "video",
+    m4v: "video",
+    webm: "video",
+    mkv: "video",
+    avi: "video",
+    mpg: "video",
+    mpeg: "video",
+    doc: "word",
+    docx: "word",
+    rtf: "word",
+    odt: "word",
+    pages: "word",
+    xls: "excel",
+    xlsx: "excel",
+    xlsm: "excel",
+    numbers: "excel",
+    zip: "zip",
+    "7z": "zip",
+    rar: "zip",
+    gz: "zip",
+    tar: "zip"
+  };
+  var BY_NAME = {
+    changelog: "markdown",
+    contributing: "markdown",
+    readme: "markdown"
+  };
+  function fileKind(name) {
+    const leaf = name.slice(Math.max(name.lastIndexOf("/"), name.lastIndexOf("\\")) + 1).toLowerCase();
+    const byName = BY_NAME[leaf];
+    if (byName !== void 0) return byName;
+    const dot = leaf.lastIndexOf(".");
+    const extension = dot < 0 ? "" : leaf.slice(dot + 1);
+    return BY_EXTENSION[extension] ?? "other";
+  }
+  function mark(kind) {
+    switch (kind) {
+      case "code":
+        return /* @__PURE__ */ import_react22.default.createElement(import_react22.default.Fragment, null, /* @__PURE__ */ import_react22.default.createElement("path", { d: "M8.61 16.3601L11.76 18.3901V20.1401L7 17.0601V15.6601L11.76 12.5801V14.3301L8.61 16.3601Z", fill: "currentColor" }), /* @__PURE__ */ import_react22.default.createElement("path", { d: "M16.1918 14.3301V12.5801L20.9518 15.6601V17.0601L16.1918 20.1401V18.3901L19.3418 16.3601L16.1918 14.3301Z", fill: "currentColor" }));
+      case "markdown":
+        return /* @__PURE__ */ import_react22.default.createElement("path", { d: "M8.7588 19.5V14.6H9.8998L11.9298 17.932H11.3278L13.3018 14.6H14.4428L14.4568 19.5H13.1828L13.1688 16.539H13.3858L11.9088 19.017H11.2928L9.7738 16.539H10.0398V19.5H8.7588ZM15.4375 19.5V14.6H17.7545C18.2958 14.6 18.7718 14.7003 19.1825 14.901C19.5932 15.1017 19.9128 15.384 20.1415 15.748C20.3748 16.112 20.4915 16.546 20.4915 17.05C20.4915 17.5493 20.3748 17.9833 20.1415 18.352C19.9128 18.716 19.5932 18.9983 19.1825 19.199C18.7718 19.3997 18.2958 19.5 17.7545 19.5H15.4375ZM16.8235 18.394H17.6985C17.9785 18.394 18.2212 18.3427 18.4265 18.24C18.6365 18.1327 18.7998 17.9787 18.9165 17.778C19.0332 17.5727 19.0915 17.33 19.0915 17.05C19.0915 16.7653 19.0332 16.5227 18.9165 16.322C18.7998 16.1213 18.6365 15.9697 18.4265 15.867C18.2212 15.7597 17.9785 15.706 17.6985 15.706H16.8235V18.394Z", fill: "currentColor" });
+      case "image":
+        return /* @__PURE__ */ import_react22.default.createElement(import_react22.default.Fragment, null, /* @__PURE__ */ import_react22.default.createElement("path", { d: "M10.4212 15.9204C10.5756 15.6558 10.9579 15.6558 11.1123 15.9204L13.6493 20.2696C13.8048 20.5362 13.6125 20.8711 13.3037 20.8711H8.22974C7.92102 20.8711 7.72868 20.5362 7.88423 20.2696L10.4212 15.9204Z", fill: "currentColor" }), /* @__PURE__ */ import_react22.default.createElement("path", { d: "M15.4981 13.186C15.6505 12.9117 16.0451 12.9117 16.1975 13.186L20.1368 20.2769C20.2849 20.5435 20.0922 20.8711 19.7872 20.8711H11.9084C11.6034 20.8711 11.4107 20.5435 11.5588 20.2769L15.4981 13.186Z", fill: "currentColor" }), /* @__PURE__ */ import_react22.default.createElement("path", { d: "M11.8603 11.3997C11.8603 12.286 11.1418 13.0045 10.2555 13.0045C9.36924 13.0045 8.65076 12.286 8.65076 11.3997C8.65076 10.5134 9.36924 9.79492 10.2555 9.79492C11.1418 9.79492 11.8603 10.5134 11.8603 11.3997Z", fill: "currentColor" }));
+      case "zip":
+        return /* @__PURE__ */ import_react22.default.createElement(import_react22.default.Fragment, null, /* @__PURE__ */ import_react22.default.createElement("path", { d: "M13.2 9.5h1.6v1.4h-1.6zM13.2 11.6h1.6v1.4h-1.6zM13.2 13.7h1.6v1.4h-1.6zM13.2 15.8h1.6v1.4h-1.6z", fill: "currentColor" }), /* @__PURE__ */ import_react22.default.createElement("path", { d: "M12.3 17.2h3.4a1.2 1.2 0 0 1 1.2 1.2v1.3a1.2 1.2 0 0 1-1.2 1.2h-3.4a1.2 1.2 0 0 1-1.2-1.2v-1.3a1.2 1.2 0 0 1 1.2-1.2Z", fill: "currentColor" }));
+      case "pdf":
+        return /* @__PURE__ */ import_react22.default.createElement("path", { d: "M6.80616 19.5V14.6H9.04616C9.49416 14.6 9.87916 14.6723 10.2012 14.817C10.5278 14.9617 10.7798 15.1717 10.9572 15.447C11.1345 15.7177 11.2232 16.0397 11.2232 16.413C11.2232 16.7817 11.1345 17.1013 10.9572 17.372C10.7798 17.6427 10.5278 17.8527 10.2012 18.002C9.87916 18.1467 9.49416 18.219 9.04616 18.219H7.57616L8.19216 17.617V19.5H6.80616ZM8.19216 17.764L7.57616 17.127H8.96216C9.2515 17.127 9.46616 17.064 9.60616 16.938C9.75083 16.812 9.82316 16.637 9.82316 16.413C9.82316 16.1843 9.75083 16.007 9.60616 15.881C9.46616 15.755 9.2515 15.692 8.96216 15.692H7.57616L8.19216 15.055V17.764Z", fill: "currentColor" });
+      case "word":
+        return /* @__PURE__ */ import_react22.default.createElement("path", { d: "M8.2 19.4L6.6 14.6H7.98L9.1 18.36H8.72L9.9 14.6H11.06L12.2 18.36H11.84L13 14.6H14.34L12.72 19.4H11.44L10.36 15.95H10.6L9.48 19.4H8.2Z", fill: "currentColor" });
+      case "excel":
+        return /* @__PURE__ */ import_react22.default.createElement("path", { d: "M10.2932 20.5L13.3532 16.25L13.3432 17.66L10.4032 13.5H12.6332L14.5132 16.21L13.5632 16.22L15.4132 13.5H17.5532L14.6132 17.58V16.18L17.7132 20.5H15.4332L13.5232 17.65H14.4332L12.5532 20.5H10.2932Z", fill: "currentColor" });
+      case "ppt":
+        return /* @__PURE__ */ import_react22.default.createElement("path", { d: "M7.2 19.4V14.6H9.44C9.89 14.6 10.28 14.67 10.6 14.82C10.93 14.96 11.18 15.17 11.36 15.45C11.54 15.72 11.62 16.04 11.62 16.41C11.62 16.78 11.54 17.1 11.36 17.37C11.18 17.64 10.93 17.85 10.6 18C10.28 18.15 9.89 18.22 9.44 18.22H7.97L8.58 17.62V19.4H7.2ZM8.58 17.76L7.97 17.13H9.36C9.65 17.13 9.86 17.07 10 16.94C10.15 16.81 10.22 16.64 10.22 16.41C10.22 16.18 10.15 16.01 10 15.88C9.86 15.75 9.65 15.69 9.36 15.69H7.97L8.58 15.05V17.76ZM12.4 19.4V14.6H14.72C15.26 14.6 15.74 14.7 16.15 14.9C16.56 15.1 16.88 15.38 17.11 15.75C17.34 16.11 17.46 16.55 17.46 17.05C17.46 17.55 17.34 17.98 17.11 18.35C16.88 18.72 16.56 19 16.15 19.2C15.74 19.4 15.26 19.5 14.72 19.5H12.4ZM13.78 18.39H14.66C14.94 18.39 15.18 18.34 15.39 18.24C15.6 18.13 15.76 17.98 15.88 17.78C16 17.57 16.05 17.33 16.05 17.05C16.05 16.77 16 16.52 15.88 16.32C15.76 16.12 15.6 15.97 15.39 15.87C15.18 15.76 14.94 15.71 14.66 15.71H13.78V18.39Z", fill: "currentColor" });
+      case "video":
+        return /* @__PURE__ */ import_react22.default.createElement("path", { d: "M11.6 14.6 17.2 17.5 11.6 20.4V14.6Z", fill: "currentColor" });
+      case "html":
+        return /* @__PURE__ */ import_react22.default.createElement("path", { d: "M13.9994 9.68298C17.212 9.68298 19.8167 12.2872 19.8168 15.4997C19.8168 18.7123 17.2121 21.3171 13.9994 21.3171C10.7869 21.3169 8.18274 18.7122 8.18274 15.4997C8.1829 12.2873 10.787 9.68315 13.9994 9.68298ZM12.42 18.95C12.62 19.5 12.83 19.8 14 19.8C15.17 19.8 15.38 19.5 15.58 18.95C15.78 18.4 15.9 17.3 15.9 16.02H12.1C12.1 17.3 12.22 18.4 12.42 18.95ZM9.26 16.02C9.47 17.92 10.79 19.49 12.56 20.05C12.42 19.8 12.3 19.52 12.19 19.21C11.89 18.35 11.69 17.24 11.64 16.02H9.26Z", fill: "currentColor" });
+      default:
+        return null;
+    }
+  }
+  var WIDE = /* @__PURE__ */ new Set(["excel", "markdown", "pdf", "ppt", "word"]);
+  function FileTypeIcon({
+    name,
+    size = 28
+  }) {
+    const kind = fileKind(name);
+    const body = mark(kind);
+    return /* @__PURE__ */ import_react22.default.createElement(
+      "svg",
+      {
+        width: size,
+        height: size,
+        viewBox: "0 0 28 28",
+        fill: "none",
+        xmlns: "http://www.w3.org/2000/svg",
+        "aria-hidden": "true"
+      },
+      /* @__PURE__ */ import_react22.default.createElement("path", { d: PAGE, fill: "currentColor" }),
+      /* @__PURE__ */ import_react22.default.createElement("path", { d: FOLD, fill: "var(--vscode-editor-background)", fillOpacity: "0.7" }),
+      body === null ? null : /* @__PURE__ */ import_react22.default.createElement(
+        "g",
+        {
+          className: "dsh-file-type-mark",
+          transform: WIDE.has(kind) ? MARK_WIDE : MARK
+        },
+        body
+      )
+    );
+  }
+
+  // webview/src/components/FileDrafts.tsx
+  var MAX_FILES_PER_MESSAGE = 20;
+  function splitImageFiles(files) {
+    const images = [];
+    const others = [];
+    for (const file of files) {
+      if (file.type.startsWith("image/")) images.push(file);
+      else others.push(file);
+    }
+    return { images, others };
+  }
+  function fileExtension(name) {
+    const leaf = name.slice(Math.max(name.lastIndexOf("/"), name.lastIndexOf("\\")) + 1);
+    const dot = leaf.lastIndexOf(".");
+    return dot <= 0 ? "" : leaf.slice(dot + 1);
+  }
+  function fileSizeText(bytes) {
+    if (bytes < 1024) return `${bytes}B`;
+    const kilobytes = bytes / 1024;
+    if (kilobytes < 1024) return `${kilobytes < 10 ? kilobytes.toFixed(1) : Math.round(kilobytes)}KB`;
+    const megabytes = kilobytes / 1024;
+    if (megabytes < 1024) return `${megabytes < 10 ? megabytes.toFixed(1) : Math.round(megabytes)}MB`;
+    const gigabytes = megabytes / 1024;
+    return `${gigabytes < 10 ? gigabytes.toFixed(1) : Math.round(gigabytes)}GB`;
+  }
+  function fileMeta(name, bytes) {
+    const extension = fileExtension(name).toUpperCase().slice(0, 8);
+    return [extension, fileSizeText(bytes)].filter((part) => part !== "").join(" ");
+  }
+  function useFileDrafts() {
+    const [files, setFiles] = (0, import_react23.useState)([]);
+    const [error, setError] = (0, import_react23.useState)();
+    const pending = (0, import_react23.useRef)([]);
+    const addFiles = (0, import_react23.useCallback)(async (incoming) => {
+      setError(void 0);
+      if (incoming.length === 0) return;
+      const existing = pending.current;
+      if (existing.length + incoming.length > MAX_FILES_PER_MESSAGE) {
+        setError(t("A message can contain at most {count} files.", { count: MAX_FILES_PER_MESSAGE }));
+        return;
+      }
+      const additions = [];
+      for (const file of incoming) {
+        const bytes = new Uint8Array(await file.arrayBuffer());
+        additions.push({
+          id: crypto.randomUUID(),
+          name: file.name || t("file"),
+          bytes: bytes.byteLength,
+          data: toBase64(bytes)
+        });
+      }
+      pending.current = [...existing, ...additions];
+      setFiles(pending.current);
+    }, []);
+    const remove = (0, import_react23.useCallback)((id) => {
+      pending.current = pending.current.filter((item) => item.id !== id);
+      setFiles(pending.current);
+    }, []);
+    const clear = (0, import_react23.useCallback)(() => {
+      pending.current = [];
+      setFiles([]);
+      setError(void 0);
+    }, []);
+    return { files, error, addFiles, remove, clear };
+  }
+  function FileDraftRail({
+    files,
+    error,
+    onRemove
+  }) {
+    if (files.length === 0 && !error) return null;
+    return /* @__PURE__ */ import_react23.default.createElement("div", { className: "dsh-file-drafts" }, files.length ? /* @__PURE__ */ import_react23.default.createElement("div", { className: "dsh-file-draft-rail", "aria-label": t("Pending files") }, files.map((file) => /* @__PURE__ */ import_react23.default.createElement("div", { className: "dsh-file-card", title: file.name, key: file.id }, /* @__PURE__ */ import_react23.default.createElement("span", { className: "dsh-file-card-icon", "aria-hidden": "true" }, /* @__PURE__ */ import_react23.default.createElement(FileTypeIcon, { name: file.name })), /* @__PURE__ */ import_react23.default.createElement("span", { className: "dsh-file-card-body" }, /* @__PURE__ */ import_react23.default.createElement("span", { className: "dsh-file-card-name" }, file.name), /* @__PURE__ */ import_react23.default.createElement("span", { className: "dsh-file-card-meta" }, fileMeta(file.name, file.bytes))), /* @__PURE__ */ import_react23.default.createElement(
+      "button",
+      {
+        type: "button",
+        className: "dsh-file-card-remove",
+        title: t("Remove file"),
+        "aria-label": t("Remove file"),
+        onClick: () => onRemove(file.id)
+      },
+      /* @__PURE__ */ import_react23.default.createElement(CloseIcon, null)
+    )))) : null, error ? /* @__PURE__ */ import_react23.default.createElement("div", { className: "dsh-card-error" }, error) : null);
   }
 
   // webview/src/components/ContextChips.tsx
-  var import_react20 = __toESM(require_react());
+  var import_react24 = __toESM(require_react());
   function ContextChips({
     context,
     selection,
@@ -25815,14 +26374,14 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
     const overContextWindow = contextWindow !== void 0 && projectedTokens !== void 0 && projectedWithAttachments > contextWindow;
     const sensitiveItems = promptItems.filter((item) => /(^|[/\\.])(env|env\..*|pem|key|p12|pfx|secret|credentials?)([/\\.]|$)/iu.test(item.path ?? item.label));
     const truncatedItems = promptItems.filter((item) => item.truncated);
-    return /* @__PURE__ */ import_react20.default.createElement(import_react20.default.Fragment, null, selection || context.length ? /* @__PURE__ */ import_react20.default.createElement("div", { className: "dsh-context-items" }, selection ? /* @__PURE__ */ import_react20.default.createElement(
+    return /* @__PURE__ */ import_react24.default.createElement(import_react24.default.Fragment, null, selection || context.length ? /* @__PURE__ */ import_react24.default.createElement("div", { className: "dsh-context-items" }, selection ? /* @__PURE__ */ import_react24.default.createElement(
       "div",
       {
         className: `dsh-chip${selectionEnabled ? "" : " dsh-chip-disabled"}`,
         title: t("The current selection is read again when sending")
       },
-      /* @__PURE__ */ import_react20.default.createElement("span", { className: "dsh-chip-label" }, "Selection \xB7 ", selection.label, " \xB7 ", selectionLines, " lines \xB7 ", selection.byteLength.toLocaleString(), " B", selection.truncated ? ` \xB7 ${t("truncated")}` : ""),
-      /* @__PURE__ */ import_react20.default.createElement(
+      /* @__PURE__ */ import_react24.default.createElement("span", { className: "dsh-chip-label" }, "Selection \xB7 ", selection.label, " \xB7 ", selectionLines, " lines \xB7 ", selection.byteLength.toLocaleString(), " B", selection.truncated ? ` \xB7 ${t("truncated")}` : ""),
+      /* @__PURE__ */ import_react24.default.createElement(
         "button",
         {
           type: "button",
@@ -25830,9 +26389,9 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
           title: t("Toggle automatic selection context"),
           onClick: () => postAction({ type: "toggleSelection" })
         },
-        selectionEnabled ? /* @__PURE__ */ import_react20.default.createElement(EyeIcon, null) : /* @__PURE__ */ import_react20.default.createElement(EyeOffIcon, null)
+        selectionEnabled ? /* @__PURE__ */ import_react24.default.createElement(EyeIcon, null) : /* @__PURE__ */ import_react24.default.createElement(EyeOffIcon, null)
       )
-    ) : null, context.map((item) => /* @__PURE__ */ import_react20.default.createElement("div", { className: "dsh-chip", title: t("One-shot attachment"), key: item.id }, /* @__PURE__ */ import_react20.default.createElement("span", { className: "dsh-chip-label" }, item.label, " \xB7 ", item.byteLength.toLocaleString(), " B", item.truncated ? ` \xB7 ${t("truncated")}` : ""), /* @__PURE__ */ import_react20.default.createElement(
+    ) : null, context.map((item) => /* @__PURE__ */ import_react24.default.createElement("div", { className: "dsh-chip", title: t("One-shot attachment"), key: item.id }, /* @__PURE__ */ import_react24.default.createElement("span", { className: "dsh-chip-label" }, item.label, " \xB7 ", item.byteLength.toLocaleString(), " B", item.truncated ? ` \xB7 ${t("truncated")}` : ""), /* @__PURE__ */ import_react24.default.createElement(
       "button",
       {
         type: "button",
@@ -25840,33 +26399,33 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
         title: t("Remove"),
         onClick: () => postAction({ type: "removeContext", id: item.id })
       },
-      /* @__PURE__ */ import_react20.default.createElement(CloseIcon, null)
-    )))) : null, promptItems.length ? /* @__PURE__ */ import_react20.default.createElement("div", { className: "dsh-context-summary" }, t("This send includes {count} context item(s), {bytes} B in the prompt", {
+      /* @__PURE__ */ import_react24.default.createElement(CloseIcon, null)
+    )))) : null, promptItems.length ? /* @__PURE__ */ import_react24.default.createElement("div", { className: "dsh-context-summary" }, t("This send includes {count} context item(s), {bytes} B in the prompt", {
       count: promptItems.length,
       bytes: promptBytes.toLocaleString()
-    })) : null, promptItems.length ? /* @__PURE__ */ import_react20.default.createElement("div", { className: "dsh-context-notices", role: "status" }, overContextWindow ? /* @__PURE__ */ import_react20.default.createElement("div", { className: "dsh-context-warning" }, t("This send may exceed the model context window ({used} / {window} tokens). Remove a large attachment before sending.", {
+    })) : null, promptItems.length ? /* @__PURE__ */ import_react24.default.createElement("div", { className: "dsh-context-notices", role: "status" }, overContextWindow ? /* @__PURE__ */ import_react24.default.createElement("div", { className: "dsh-context-warning" }, t("This send may exceed the model context window ({used} / {window} tokens). Remove a large attachment before sending.", {
       used: projectedWithAttachments.toLocaleString(),
       window: contextWindow.toLocaleString()
-    })) : null, truncatedItems.length ? /* @__PURE__ */ import_react20.default.createElement("div", { className: "dsh-context-warning" }, t("{count} attachment(s) will be truncated before entering the prompt.", { count: truncatedItems.length })) : null, sensitiveItems.length ? /* @__PURE__ */ import_react20.default.createElement("div", { className: "dsh-context-warning" }, t("Check {count} attachment(s): their path looks like it may contain secrets or credentials.", { count: sensitiveItems.length })) : null) : null);
+    })) : null, truncatedItems.length ? /* @__PURE__ */ import_react24.default.createElement("div", { className: "dsh-context-warning" }, t("{count} attachment(s) will be truncated before entering the prompt.", { count: truncatedItems.length })) : null, sensitiveItems.length ? /* @__PURE__ */ import_react24.default.createElement("div", { className: "dsh-context-warning" }, t("Check {count} attachment(s): their path looks like it may contain secrets or credentials.", { count: sensitiveItems.length })) : null) : null);
   }
 
   // webview/src/components/FileReferenceMenu.tsx
-  var import_react21 = __toESM(require_react());
+  var import_react25 = __toESM(require_react());
   var FILE_REFERENCE_MENU_ID = "dsh-file-reference-completion";
   function FileReferenceMenu({
     candidates,
     activeIndex,
     onSelect
   }) {
-    return /* @__PURE__ */ import_react21.default.createElement(
+    return /* @__PURE__ */ import_react25.default.createElement(
       "div",
       {
         className: "dsh-file-reference-menu",
         id: FILE_REFERENCE_MENU_ID,
         role: "listbox",
-        "aria-label": t("File references")
+        "aria-label": t("References")
       },
-      candidates.map((candidate, index) => /* @__PURE__ */ import_react21.default.createElement(
+      candidates.map((candidate, index) => /* @__PURE__ */ import_react25.default.createElement(
         "button",
         {
           type: "button",
@@ -25878,14 +26437,14 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
           onMouseDown: (event) => event.preventDefault(),
           onClick: () => onSelect(candidate)
         },
-        /* @__PURE__ */ import_react21.default.createElement("span", { className: "dsh-reference-label" }, "@", candidate.label),
-        candidate.description ? /* @__PURE__ */ import_react21.default.createElement("small", null, candidate.description) : null
+        /* @__PURE__ */ import_react25.default.createElement("span", { className: "dsh-reference-label" }, "@", candidate.label),
+        candidate.description ? /* @__PURE__ */ import_react25.default.createElement("small", null, candidate.description) : null
       ))
     );
   }
 
   // webview/src/components/PermissionModeChip.tsx
-  var import_react22 = __toESM(require_react());
+  var import_react26 = __toESM(require_react());
   function PermissionModeChip({
     permissions,
     switchable
@@ -25895,13 +26454,13 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
     const fullLabel = t("Permissions: {preset}", { preset: permissions.currentLabel });
     const danger = permissions.currentValue.includes("danger");
     const className = `dsh-permission-chip${danger ? " dsh-permission-chip-danger" : ""}`;
-    const content = /* @__PURE__ */ import_react22.default.createElement(import_react22.default.Fragment, null, /* @__PURE__ */ import_react22.default.createElement(ShieldIcon, null), permissions.currentLabel);
+    const content = /* @__PURE__ */ import_react26.default.createElement(import_react26.default.Fragment, null, /* @__PURE__ */ import_react26.default.createElement(ShieldIcon, null), permissions.currentLabel);
     if (!switchable || selectable.length < 2) {
-      return /* @__PURE__ */ import_react22.default.createElement("span", { className, title: fullLabel, "aria-label": fullLabel }, content);
+      return /* @__PURE__ */ import_react26.default.createElement("span", { className, title: fullLabel, "aria-label": fullLabel }, content);
     }
     const index = selectable.findIndex((option) => option.value === permissions.currentValue);
     const next = selectable[(index + 1) % selectable.length];
-    return /* @__PURE__ */ import_react22.default.createElement(
+    return /* @__PURE__ */ import_react26.default.createElement(
       "button",
       {
         type: "button",
@@ -25915,7 +26474,7 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
   }
 
   // webview/src/components/ReasoningEffortControl.tsx
-  var import_react23 = __toESM(require_react());
+  var import_react27 = __toESM(require_react());
   function cssImageUrl(url) {
     return url.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
   }
@@ -25925,18 +26484,18 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
     busy,
     onDismiss
   }) {
-    const panelRef = (0, import_react23.useRef)(null);
+    const panelRef = (0, import_react27.useRef)(null);
     const options = control?.options ?? [];
     const currentIndex = control ? Math.max(0, options.findIndex((option) => option.id === control.current)) : 0;
     const current = options[currentIndex] ?? options[0];
     const optionKey = options.map((option) => option.id).join("\0");
-    const [draftIndex, setDraftIndex] = (0, import_react23.useState)(currentIndex);
-    const draftIndexRef = (0, import_react23.useRef)(currentIndex);
-    (0, import_react23.useEffect)(() => {
+    const [draftIndex, setDraftIndex] = (0, import_react27.useState)(currentIndex);
+    const draftIndexRef = (0, import_react27.useRef)(currentIndex);
+    (0, import_react27.useEffect)(() => {
       draftIndexRef.current = currentIndex;
       setDraftIndex(currentIndex);
     }, [currentIndex, optionKey, control?.current]);
-    (0, import_react23.useEffect)(() => {
+    (0, import_react27.useEffect)(() => {
       const onPointerDown = (event) => {
         if (event.target instanceof Node && !panelRef.current?.contains(event.target)) {
           onDismiss();
@@ -25962,7 +26521,7 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
       }
     };
     const fillPercent = options.length > 1 ? draftIndex / (options.length - 1) * 100 : 100;
-    return /* @__PURE__ */ import_react23.default.createElement("div", { ref: panelRef, className: "dsh-reasoning-control", "aria-label": t("Set reasoning effort") }, /* @__PURE__ */ import_react23.default.createElement("div", { className: "dsh-reasoning-control-head" }, /* @__PURE__ */ import_react23.default.createElement("span", null, t("Reasoning effort")), /* @__PURE__ */ import_react23.default.createElement("span", { className: "dsh-reasoning-control-actions" }, /* @__PURE__ */ import_react23.default.createElement("span", { className: "dsh-reasoning-value" }, draft.label), /* @__PURE__ */ import_react23.default.createElement(
+    return /* @__PURE__ */ import_react27.default.createElement("div", { ref: panelRef, className: "dsh-reasoning-control", "aria-label": t("Set reasoning effort") }, /* @__PURE__ */ import_react27.default.createElement("div", { className: "dsh-reasoning-control-head" }, /* @__PURE__ */ import_react27.default.createElement("span", null, t("Reasoning effort")), /* @__PURE__ */ import_react27.default.createElement("span", { className: "dsh-reasoning-control-actions" }, /* @__PURE__ */ import_react27.default.createElement("span", { className: "dsh-reasoning-value" }, draft.label), /* @__PURE__ */ import_react27.default.createElement(
       "button",
       {
         type: "button",
@@ -25970,8 +26529,8 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
         title: t("Close"),
         onClick: onDismiss
       },
-      /* @__PURE__ */ import_react23.default.createElement(CloseIcon, null)
-    ))), /* @__PURE__ */ import_react23.default.createElement("div", { className: "dsh-reasoning-slider-row" }, /* @__PURE__ */ import_react23.default.createElement("div", { className: "dsh-reasoning-slider-wrap" }, /* @__PURE__ */ import_react23.default.createElement(
+      /* @__PURE__ */ import_react27.default.createElement(CloseIcon, null)
+    ))), /* @__PURE__ */ import_react27.default.createElement("div", { className: "dsh-reasoning-slider-row" }, /* @__PURE__ */ import_react27.default.createElement("div", { className: "dsh-reasoning-slider-wrap" }, /* @__PURE__ */ import_react27.default.createElement(
       "input",
       {
         className: "dsh-reasoning-slider",
@@ -25995,10 +26554,10 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
           }
         }
       }
-    ), /* @__PURE__ */ import_react23.default.createElement("div", { className: "dsh-reasoning-slider-dots", "aria-hidden": "true" }, options.map((option, index) => {
+    ), /* @__PURE__ */ import_react27.default.createElement("div", { className: "dsh-reasoning-slider-dots", "aria-hidden": "true" }, options.map((option, index) => {
       if (index === draftIndex) return null;
       const left = options.length > 1 ? index / (options.length - 1) * 100 : 50;
-      return /* @__PURE__ */ import_react23.default.createElement(
+      return /* @__PURE__ */ import_react27.default.createElement(
         "button",
         {
           type: "button",
@@ -26016,7 +26575,7 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
           }
         }
       );
-    })), draft.image ? /* @__PURE__ */ import_react23.default.createElement(
+    })), draft.image ? /* @__PURE__ */ import_react27.default.createElement(
       "span",
       {
         className: "dsh-reasoning-knob",
@@ -26030,7 +26589,7 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
   }
 
   // webview/src/components/SessionStats.tsx
-  var import_react24 = __toESM(require_react());
+  var import_react28 = __toESM(require_react());
   function formatStatsDuration(milliseconds) {
     const totalSeconds = Math.round(Math.max(0, milliseconds) / 1e3);
     if (totalSeconds < 60) return `${totalSeconds}s`;
@@ -26058,11 +26617,11 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
   function SessionStats({ stats }) {
     const groups = sessionStatsGroups(stats);
     if (groups.length === 0) return null;
-    return /* @__PURE__ */ import_react24.default.createElement("div", { className: "dsh-stats", "aria-label": t("Session statistics") }, /* @__PURE__ */ import_react24.default.createElement("div", { className: "dsh-stats-top" }, groups.slice(0, 2).map((group, index) => /* @__PURE__ */ import_react24.default.createElement(import_react24.default.Fragment, { key: group }, index > 0 ? /* @__PURE__ */ import_react24.default.createElement("span", { className: "dsh-stats-separator", "aria-hidden": "true" }, "|") : null, /* @__PURE__ */ import_react24.default.createElement("span", null, group)))), groups[2] ? /* @__PURE__ */ import_react24.default.createElement("div", { className: "dsh-stats-bottom" }, groups[2]) : null);
+    return /* @__PURE__ */ import_react28.default.createElement("div", { className: "dsh-stats", "aria-label": t("Session statistics") }, /* @__PURE__ */ import_react28.default.createElement("div", { className: "dsh-stats-top" }, groups.slice(0, 2).map((group, index) => /* @__PURE__ */ import_react28.default.createElement(import_react28.default.Fragment, { key: group }, index > 0 ? /* @__PURE__ */ import_react28.default.createElement("span", { className: "dsh-stats-separator", "aria-hidden": "true" }, "|") : null, /* @__PURE__ */ import_react28.default.createElement("span", null, group)))), groups[2] ? /* @__PURE__ */ import_react28.default.createElement("div", { className: "dsh-stats-bottom" }, groups[2]) : null);
   }
 
   // webview/src/components/TokenUsageBar.tsx
-  var import_react25 = __toESM(require_react());
+  var import_react29 = __toESM(require_react());
   function compactTokens(tokens) {
     if (tokens < 1e3) return numberFormatter.format(tokens);
     if (tokens < 1e6) return `${numberFormatter.format(tokens / 1e3)}K`;
@@ -26070,7 +26629,7 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
   }
   function UsageRing({ percent, size, severity }) {
     const progress = Math.min(100, Math.max(0, percent ?? 0));
-    return /* @__PURE__ */ import_react25.default.createElement("span", { className: `dsh-usage-ring ${size} ${severity}`, "aria-hidden": "true" }, /* @__PURE__ */ import_react25.default.createElement("svg", { viewBox: "0 0 36 36" }, /* @__PURE__ */ import_react25.default.createElement("circle", { className: "track", cx: "18", cy: "18", r: "14.5", pathLength: "100" }), /* @__PURE__ */ import_react25.default.createElement(
+    return /* @__PURE__ */ import_react29.default.createElement("span", { className: `dsh-usage-ring ${size} ${severity}`, "aria-hidden": "true" }, /* @__PURE__ */ import_react29.default.createElement("svg", { viewBox: "0 0 36 36" }, /* @__PURE__ */ import_react29.default.createElement("circle", { className: "track", cx: "18", cy: "18", r: "14.5", pathLength: "100" }), /* @__PURE__ */ import_react29.default.createElement(
       "circle",
       {
         className: "progress",
@@ -26080,7 +26639,7 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
         pathLength: "100",
         strokeDasharray: `${progress} 100`
       }
-    )), /* @__PURE__ */ import_react25.default.createElement("span", null, percent === void 0 ? "--" : `${Math.round(percent)}%`));
+    )), /* @__PURE__ */ import_react29.default.createElement("span", null, percent === void 0 ? "--" : `${Math.round(percent)}%`));
   }
   function ChartRow({
     label,
@@ -26091,16 +26650,16 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
     title
   }) {
     const width = tokens === void 0 ? 0 : Math.min(100, Math.max(2, tokens / maximum * 100));
-    return /* @__PURE__ */ import_react25.default.createElement("div", { className: "dsh-token-chart-row", title }, /* @__PURE__ */ import_react25.default.createElement("span", { className: "dsh-token-chart-label" }, label), /* @__PURE__ */ import_react25.default.createElement("span", { className: "dsh-token-chart-track" }, /* @__PURE__ */ import_react25.default.createElement("span", { className: `dsh-token-chart-fill ${kind}`, style: { width: `${width}%` } })), /* @__PURE__ */ import_react25.default.createElement("span", { className: "dsh-token-chart-value" }, tokens === void 0 ? "--" : compactTokens(tokens), suffix ? /* @__PURE__ */ import_react25.default.createElement("small", null, suffix) : null));
+    return /* @__PURE__ */ import_react29.default.createElement("div", { className: "dsh-token-chart-row", title }, /* @__PURE__ */ import_react29.default.createElement("span", { className: "dsh-token-chart-label" }, label), /* @__PURE__ */ import_react29.default.createElement("span", { className: "dsh-token-chart-track" }, /* @__PURE__ */ import_react29.default.createElement("span", { className: `dsh-token-chart-fill ${kind}`, style: { width: `${width}%` } })), /* @__PURE__ */ import_react29.default.createElement("span", { className: "dsh-token-chart-value" }, tokens === void 0 ? "--" : compactTokens(tokens), suffix ? /* @__PURE__ */ import_react29.default.createElement("small", null, suffix) : null));
   }
   function TokenUsageBar({ usage }) {
-    const [hovered, setHovered] = (0, import_react25.useState)(false);
-    const [focused, setFocused] = (0, import_react25.useState)(false);
-    const anchorRef = (0, import_react25.useRef)(null);
-    const panelRef = (0, import_react25.useRef)(null);
-    const [panelLeft, setPanelLeft] = (0, import_react25.useState)(0);
+    const [hovered, setHovered] = (0, import_react29.useState)(false);
+    const [focused, setFocused] = (0, import_react29.useState)(false);
+    const anchorRef = (0, import_react29.useRef)(null);
+    const panelRef = (0, import_react29.useRef)(null);
+    const [panelLeft, setPanelLeft] = (0, import_react29.useState)(0);
     const open = hovered || focused;
-    (0, import_react25.useLayoutEffect)(() => {
+    (0, import_react29.useLayoutEffect)(() => {
       if (!open || !usage) return;
       const anchor = anchorRef.current;
       const panel = panelRef.current;
@@ -26122,7 +26681,7 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
         window.removeEventListener("resize", position);
       };
     }, [open, usage]);
-    (0, import_react25.useEffect)(() => {
+    (0, import_react29.useEffect)(() => {
       if (!open) return;
       const onEscape = (event) => {
         if (event.key === "Escape") {
@@ -26153,7 +26712,7 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
     ) : 1;
     const breakdownTotal = breakdown ? breakdown.systemTokens + breakdown.toolsTokens + breakdown.messageTokens : 0;
     const breakdownMaximum = Math.max(1, breakdownTotal);
-    return /* @__PURE__ */ import_react25.default.createElement("section", { className: "dsh-usage", "aria-label": t("Token and context usage") }, /* @__PURE__ */ import_react25.default.createElement(
+    return /* @__PURE__ */ import_react29.default.createElement("section", { className: "dsh-usage", "aria-label": t("Token and context usage") }, /* @__PURE__ */ import_react29.default.createElement(
       "div",
       {
         className: "dsh-usage-context",
@@ -26167,7 +26726,7 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
           }
         }
       },
-      /* @__PURE__ */ import_react25.default.createElement(
+      /* @__PURE__ */ import_react29.default.createElement(
         "button",
         {
           type: "button",
@@ -26177,10 +26736,10 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
           title: t("Show context breakdown"),
           onClick: () => setFocused(true)
         },
-        /* @__PURE__ */ import_react25.default.createElement(UsageRing, { percent: occupancy, size: "small", severity }),
-        /* @__PURE__ */ import_react25.default.createElement("span", { className: "dsh-usage-summary-context" }, occupied === void 0 ? "--" : compactTokens(occupied), " / ", capacity === void 0 ? "--" : compactTokens(capacity))
+        /* @__PURE__ */ import_react29.default.createElement(UsageRing, { percent: occupancy, size: "small", severity }),
+        /* @__PURE__ */ import_react29.default.createElement("span", { className: "dsh-usage-summary-context" }, occupied === void 0 ? "--" : compactTokens(occupied), " / ", capacity === void 0 ? "--" : compactTokens(capacity))
       ),
-      open ? /* @__PURE__ */ import_react25.default.createElement(
+      open ? /* @__PURE__ */ import_react29.default.createElement(
         "div",
         {
           id: "dsh-context-breakdown",
@@ -26190,17 +26749,17 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
           role: "dialog",
           "aria-label": t("Token statistics")
         },
-        /* @__PURE__ */ import_react25.default.createElement("div", { className: "dsh-usage-panel-head" }, /* @__PURE__ */ import_react25.default.createElement("div", null, /* @__PURE__ */ import_react25.default.createElement("strong", null, t("Token statistics")), /* @__PURE__ */ import_react25.default.createElement("span", null, routeLabel, " \xB7 effort ", route.reasoningEffort || t("Default")))),
-        /* @__PURE__ */ import_react25.default.createElement(
+        /* @__PURE__ */ import_react29.default.createElement("div", { className: "dsh-usage-panel-head" }, /* @__PURE__ */ import_react29.default.createElement("div", null, /* @__PURE__ */ import_react29.default.createElement("strong", null, t("Token statistics")), /* @__PURE__ */ import_react29.default.createElement("span", null, routeLabel, " \xB7 effort ", route.reasoningEffort || t("Default")))),
+        /* @__PURE__ */ import_react29.default.createElement(
           "div",
           {
             className: "dsh-usage-context-stat",
             title: t("Estimate based on the latest provider usage and current Surface changes")
           },
-          /* @__PURE__ */ import_react25.default.createElement(UsageRing, { percent: occupancy, size: "large", severity }),
-          /* @__PURE__ */ import_react25.default.createElement("div", null, /* @__PURE__ */ import_react25.default.createElement("span", null, t("Context usage \xB7 estimated")), /* @__PURE__ */ import_react25.default.createElement("strong", null, occupied === void 0 ? "--" : compactTokens(occupied), /* @__PURE__ */ import_react25.default.createElement("small", null, " / ", capacity === void 0 ? "--" : compactTokens(capacity))))
+          /* @__PURE__ */ import_react29.default.createElement(UsageRing, { percent: occupancy, size: "large", severity }),
+          /* @__PURE__ */ import_react29.default.createElement("div", null, /* @__PURE__ */ import_react29.default.createElement("span", null, t("Context usage \xB7 estimated")), /* @__PURE__ */ import_react29.default.createElement("strong", null, occupied === void 0 ? "--" : compactTokens(occupied), /* @__PURE__ */ import_react29.default.createElement("small", null, " / ", capacity === void 0 ? "--" : compactTokens(capacity))))
         ),
-        breakdown ? /* @__PURE__ */ import_react25.default.createElement("div", { className: "dsh-token-chart", "aria-label": t("Context composition") }, /* @__PURE__ */ import_react25.default.createElement("div", { className: "dsh-token-chart-head" }, /* @__PURE__ */ import_react25.default.createElement("span", null, t("What fills the context")), /* @__PURE__ */ import_react25.default.createElement("span", null, t("Harness estimate"))), /* @__PURE__ */ import_react25.default.createElement(
+        breakdown ? /* @__PURE__ */ import_react29.default.createElement("div", { className: "dsh-token-chart", "aria-label": t("Context composition") }, /* @__PURE__ */ import_react29.default.createElement("div", { className: "dsh-token-chart-head" }, /* @__PURE__ */ import_react29.default.createElement("span", null, t("What fills the context")), /* @__PURE__ */ import_react29.default.createElement("span", null, t("Harness estimate"))), /* @__PURE__ */ import_react29.default.createElement(
           ChartRow,
           {
             label: t("System prompt"),
@@ -26209,7 +26768,7 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
             kind: "system",
             title: t("System prompt sections")
           }
-        ), /* @__PURE__ */ import_react25.default.createElement(
+        ), /* @__PURE__ */ import_react29.default.createElement(
           ChartRow,
           {
             label: t("Tools"),
@@ -26218,7 +26777,7 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
             kind: "tools",
             title: t("Tool schemas offered to the model")
           }
-        ), /* @__PURE__ */ import_react25.default.createElement(
+        ), /* @__PURE__ */ import_react29.default.createElement(
           ChartRow,
           {
             label: t("Messages"),
@@ -26228,7 +26787,7 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
             title: t("Conversation history after compaction")
           }
         )) : null,
-        billing ? /* @__PURE__ */ import_react25.default.createElement("div", { className: "dsh-token-chart", "aria-label": t("Billed session token distribution") }, /* @__PURE__ */ import_react25.default.createElement("div", { className: "dsh-token-chart-head" }, /* @__PURE__ */ import_react25.default.createElement("span", null, t("Billed session tokens")), /* @__PURE__ */ import_react25.default.createElement("span", null, t("Provider usage"))), /* @__PURE__ */ import_react25.default.createElement(
+        billing ? /* @__PURE__ */ import_react29.default.createElement("div", { className: "dsh-token-chart", "aria-label": t("Billed session token distribution") }, /* @__PURE__ */ import_react29.default.createElement("div", { className: "dsh-token-chart-head" }, /* @__PURE__ */ import_react29.default.createElement("span", null, t("Billed session tokens")), /* @__PURE__ */ import_react29.default.createElement("span", null, t("Provider usage"))), /* @__PURE__ */ import_react29.default.createElement(
           ChartRow,
           {
             label: t("Input"),
@@ -26237,7 +26796,7 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
             kind: "input",
             title: t("Uncached input tokens")
           }
-        ), /* @__PURE__ */ import_react25.default.createElement(
+        ), /* @__PURE__ */ import_react29.default.createElement(
           ChartRow,
           {
             label: t("Output"),
@@ -26246,7 +26805,7 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
             kind: "output",
             title: t("Output tokens")
           }
-        ), /* @__PURE__ */ import_react25.default.createElement(
+        ), /* @__PURE__ */ import_react29.default.createElement(
           ChartRow,
           {
             label: t("Reasoning"),
@@ -26256,7 +26815,7 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
             suffix: t("Output subset"),
             title: t("Reasoning tokens are included in output")
           }
-        ), /* @__PURE__ */ import_react25.default.createElement(
+        ), /* @__PURE__ */ import_react29.default.createElement(
           ChartRow,
           {
             label: t("Cache read"),
@@ -26266,7 +26825,7 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
             suffix: cacheHitRate === void 0 ? void 0 : t("{rate}% hit", { rate: numberFormatter.format(cacheHitRate) }),
             title: t("Cache-read tokens and hit rate")
           }
-        ), /* @__PURE__ */ import_react25.default.createElement(
+        ), /* @__PURE__ */ import_react29.default.createElement(
           ChartRow,
           {
             label: t("Cache write"),
@@ -26275,9 +26834,9 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
             kind: "cache-write",
             title: t("Cache-write tokens")
           }
-        )) : /* @__PURE__ */ import_react25.default.createElement("div", { className: "dsh-usage-empty" }, t("No provider billing data"))
+        )) : /* @__PURE__ */ import_react29.default.createElement("div", { className: "dsh-usage-empty" }, t("No provider billing data"))
       ) : null
-    ), /* @__PURE__ */ import_react25.default.createElement(
+    ), /* @__PURE__ */ import_react29.default.createElement(
       "button",
       {
         type: "button",
@@ -26285,12 +26844,12 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
         title: t("Select the current session model"),
         onClick: () => postAction({ type: "selectModel" })
       },
-      /* @__PURE__ */ import_react25.default.createElement("strong", null, routeLabel)
+      /* @__PURE__ */ import_react29.default.createElement("strong", null, routeLabel)
     ));
   }
 
   // webview/src/components/useSlashCompletion.ts
-  var import_react26 = __toESM(require_react());
+  var import_react30 = __toESM(require_react());
 
   // webview/src/components/slashCommands.ts
   var IDE_SLASH_COMMANDS = [
@@ -26315,12 +26874,15 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
     const claimed = new Set(fromHost.map((command) => command.name));
     return [
       ...fromHost,
-      ...IDE_SLASH_COMMANDS.filter((command) => !claimed.has(command.name) && (modeSelectionEnabled || !["/mode", "/preset"].includes(command.name)))
+      ...IDE_SLASH_COMMANDS.filter((command) => !claimed.has(command.name) && (modeSelectionEnabled || command.action?.type !== "selectAgentPreset"))
     ].sort((left, right) => left.name.localeCompare(right.name));
   }
   function runSlashCommand(name, context) {
     const mode = name.match(/^\/(?:mode|preset)(?:\s+(.+))?$/iu);
-    if (mode && context.modeSelectionEnabled !== false && !context.commands.some((entry) => entry.origin === "host" && /^\/(?:mode|preset)$/iu.test(entry.name))) {
+    const ideModeSelectionEnabled = context.commands.some(
+      (entry) => entry.origin === "ide" && entry.action?.type === "selectAgentPreset"
+    );
+    if (mode && ideModeSelectionEnabled && !context.commands.some((entry) => entry.origin === "host" && /^\/(?:mode|preset)$/iu.test(entry.name))) {
       const agentPreset = mode[1]?.trim();
       postAction({
         type: "selectAgentPreset",
@@ -26352,25 +26914,26 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
     text,
     setText,
     skills,
+    modeSelectionEnabled,
     commands,
     reasoningEffort,
     onShowEffort,
     focusTextarea
-  , modeSelectionEnabled = true }) {
-    const [slashIndex, setSlashIndex] = (0, import_react26.useState)(0);
-    const resetSlashIndex = (0, import_react26.useCallback)(() => setSlashIndex(0), []);
-    const available = (0, import_react26.useMemo)(() => mergeSlashCommands(commands, modeSelectionEnabled), [commands, modeSelectionEnabled]);
-    const executeSlashCommand = (0, import_react26.useCallback)((name) => {
+  }) {
+    const [slashIndex, setSlashIndex] = (0, import_react30.useState)(0);
+    const resetSlashIndex = (0, import_react30.useCallback)(() => setSlashIndex(0), []);
+    const available = (0, import_react30.useMemo)(() => mergeSlashCommands(commands, modeSelectionEnabled), [commands, modeSelectionEnabled]);
+    const executeSlashCommand = (0, import_react30.useCallback)((name) => {
       const handled = runSlashCommand(name, {
         reasoningEffortAvailable: !!reasoningEffort?.options.length,
         onShowEffort,
-        commands: available, modeSelectionEnabled
+        commands: available
       });
       if (!handled) return false;
       setText("");
       setSlashIndex(0);
       return true;
-    }, [reasoningEffort, onShowEffort, setText, available, modeSelectionEnabled]);
+    }, [reasoningEffort, onShowEffort, setText, available]);
     const slashQuery = text.match(/^\/(\S*)$/u)?.[1]?.toLowerCase();
     const slashMatches = slashQuery === void 0 ? [] : available.filter((command) => command.name.slice(1).startsWith(slashQuery));
     const slashSkillMatches = slashQuery === void 0 ? [] : skills.filter(
@@ -26383,11 +26946,11 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
       const query = skillQuery.trim();
       return !query || skill.name.toLowerCase().includes(query) || skill.description.toLowerCase().includes(query) || skill.whenToUse?.toLowerCase().includes(query);
     });
-    const chooseSlashCommand = (0, import_react26.useCallback)((name) => {
+    const chooseSlashCommand = (0, import_react30.useCallback)((name) => {
       executeSlashCommand(name);
       window.requestAnimationFrame(focusTextarea);
     }, [executeSlashCommand, focusTextarea]);
-    const chooseSkill = (0, import_react26.useCallback)((name) => {
+    const chooseSkill = (0, import_react30.useCallback)((name) => {
       const match = text.match(/(?:^|\s)\$([^\s$]*)$/u);
       if (match && match.index !== void 0) {
         const dollarOffset = match[0].lastIndexOf("$");
@@ -26460,7 +27023,7 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
   }
 
   // webview/src/components/CompletionMenu.tsx
-  var import_react27 = __toESM(require_react());
+  var import_react31 = __toESM(require_react());
   function SlashCompletionMenu({
     commands,
     skills,
@@ -26469,7 +27032,7 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
     onChooseSkill
   }) {
     if (commands.length + skills.length === 0) return null;
-    return /* @__PURE__ */ import_react27.default.createElement("div", { className: "dsh-slash-menu", role: "listbox", "aria-label": t("Slash commands"), id: SLASH_MENU_ID }, commands.map((command, index) => /* @__PURE__ */ import_react27.default.createElement(
+    return /* @__PURE__ */ import_react31.default.createElement("div", { className: "dsh-slash-menu", role: "listbox", "aria-label": t("Slash commands"), id: SLASH_MENU_ID }, commands.map((command, index) => /* @__PURE__ */ import_react31.default.createElement(
       "button",
       {
         type: "button",
@@ -26481,12 +27044,12 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
         onMouseDown: (event) => event.preventDefault(),
         onClick: () => onChooseCommand(command.name)
       },
-      /* @__PURE__ */ import_react27.default.createElement("strong", null, command.name),
-      /* @__PURE__ */ import_react27.default.createElement("span", null, command.description, command.hint ? ` \xB7 ${command.hint}` : ""),
-      command.origin === "ide" ? /* @__PURE__ */ import_react27.default.createElement("em", { className: "dsh-slash-origin" }, t("IDE")) : null
+      /* @__PURE__ */ import_react31.default.createElement("strong", null, command.name),
+      /* @__PURE__ */ import_react31.default.createElement("span", null, command.description, command.hint ? ` \xB7 ${command.hint}` : ""),
+      command.origin === "ide" ? /* @__PURE__ */ import_react31.default.createElement("em", { className: "dsh-slash-origin" }, t("IDE")) : null
     )), skills.map((skill, offset) => {
       const index = commands.length + offset;
-      return /* @__PURE__ */ import_react27.default.createElement(
+      return /* @__PURE__ */ import_react31.default.createElement(
         "button",
         {
           type: "button",
@@ -26499,8 +27062,8 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
           onMouseDown: (event) => event.preventDefault(),
           onClick: () => onChooseSkill(skill.name)
         },
-        /* @__PURE__ */ import_react27.default.createElement("strong", null, "/", skill.name),
-        /* @__PURE__ */ import_react27.default.createElement("span", null, skill.whenToUse || skill.description)
+        /* @__PURE__ */ import_react31.default.createElement("strong", null, "/", skill.name),
+        /* @__PURE__ */ import_react31.default.createElement("span", null, skill.whenToUse || skill.description)
       );
     }));
   }
@@ -26510,7 +27073,7 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
     onChooseSkill
   }) {
     if (skills.length === 0) return null;
-    return /* @__PURE__ */ import_react27.default.createElement("div", { className: "dsh-slash-menu", role: "listbox", "aria-label": t("Skill candidates"), id: SKILL_MENU_ID }, skills.map((skill, index) => /* @__PURE__ */ import_react27.default.createElement(
+    return /* @__PURE__ */ import_react31.default.createElement("div", { className: "dsh-slash-menu", role: "listbox", "aria-label": t("Skill candidates"), id: SKILL_MENU_ID }, skills.map((skill, index) => /* @__PURE__ */ import_react31.default.createElement(
       "button",
       {
         type: "button",
@@ -26523,22 +27086,22 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
         onMouseDown: (event) => event.preventDefault(),
         onClick: () => onChooseSkill(skill.name)
       },
-      /* @__PURE__ */ import_react27.default.createElement("strong", null, "$", skill.name),
-      /* @__PURE__ */ import_react27.default.createElement("span", null, skill.whenToUse || skill.description)
+      /* @__PURE__ */ import_react31.default.createElement("strong", null, "$", skill.name),
+      /* @__PURE__ */ import_react31.default.createElement("span", null, skill.whenToUse || skill.description)
     )));
   }
 
   // webview/src/components/Composer.tsx
   var MIN_HEIGHT = 56;
   var MAX_HEIGHT = 180;
-  var Composer = import_react28.default.memo(function Composer2({
+  var Composer = import_react32.default.memo(function Composer2({
     context,
     selection,
     selectionEnabled,
     fileReferenceCandidates,
     skills,
+    modeSelectionEnabled,
     commands,
-    modeSelectionEnabled = true,
     permissions,
     tokenUsage,
     sessionStats,
@@ -26550,20 +27113,22 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
     cancelling,
     sessionId
   }) {
-    const [text, setText] = (0, import_react28.useState)("");
-    const [promptMode, setPromptMode] = (0, import_react28.useState)("queue");
-    const [effortVisible, setEffortVisible] = (0, import_react28.useState)(false);
-    const [attachmentMenuVisible, setAttachmentMenuVisible] = (0, import_react28.useState)(false);
-    const [referenceIndex, setReferenceIndex] = (0, import_react28.useState)(0);
-    const [dismissedReferenceKey, setDismissedReferenceKey] = (0, import_react28.useState)();
-    const textareaRef = (0, import_react28.useRef)(null);
-    const attachmentMenuRef = (0, import_react28.useRef)(null);
-    const imageInputRef = (0, import_react28.useRef)(null);
-    const planToggleTargetRef = (0, import_react28.useRef)();
+    const [text, setText] = (0, import_react32.useState)("");
+    const [promptMode, setPromptMode] = (0, import_react32.useState)("queue");
+    const [effortVisible, setEffortVisible] = (0, import_react32.useState)(false);
+    const [attachmentMenuVisible, setAttachmentMenuVisible] = (0, import_react32.useState)(false);
+    const [referenceIndex, setReferenceIndex] = (0, import_react32.useState)(0);
+    const [dismissedReferenceKey, setDismissedReferenceKey] = (0, import_react32.useState)();
+    const textareaRef = (0, import_react32.useRef)(null);
+    const attachmentMenuRef = (0, import_react32.useRef)(null);
+    const imageInputRef = (0, import_react32.useRef)(null);
+    const fileInputRef = (0, import_react32.useRef)(null);
+    const planToggleTargetRef = (0, import_react32.useRef)();
     const imageDrafts = useImageDrafts(imageLimits);
+    const fileDrafts = useFileDrafts();
     const planActive = plan !== void 0 && (plan.pending ? !plan.active : plan.active);
     const planCommandAvailable = canTogglePlan(commands);
-    const togglePlan = (0, import_react28.useCallback)(() => {
+    const togglePlan = (0, import_react32.useCallback)(() => {
       if (!planCommandAvailable) return;
       const next = !(planToggleTargetRef.current ?? planActive);
       planToggleTargetRef.current = next;
@@ -26572,34 +27137,34 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
         active: next
       });
     }, [planActive, planCommandAvailable]);
-    (0, import_react28.useEffect)(() => {
+    (0, import_react32.useEffect)(() => {
       if (plan === void 0 || !plan.pending) planToggleTargetRef.current = void 0;
     }, [plan?.active, plan?.pending]);
-    (0, import_react28.useEffect)(() => {
+    (0, import_react32.useEffect)(() => {
       planToggleTargetRef.current = void 0;
     }, [sessionId]);
-    (0, import_react28.useEffect)(() => {
+    (0, import_react32.useEffect)(() => {
       return subscribeAddImageDraft((image) => imageDrafts.addUploads([image]));
     }, [imageDrafts.addUploads]);
-    const focusTextarea = (0, import_react28.useCallback)(() => {
+    const focusTextarea = (0, import_react32.useCallback)(() => {
       textareaRef.current?.focus();
     }, []);
-    const onShowEffort = (0, import_react28.useCallback)(() => setEffortVisible(true), []);
+    const onShowEffort = (0, import_react32.useCallback)(() => setEffortVisible(true), []);
     const completion = useSlashCompletion({
       text,
       setText,
       skills,
-      commands,
       modeSelectionEnabled,
+      commands,
       reasoningEffort,
       onShowEffort,
       focusTextarea
     });
-    (0, import_react28.useEffect)(() => {
+    (0, import_react32.useEffect)(() => {
       if (!busy) setPromptMode("queue");
     }, [busy]);
-    (0, import_react28.useEffect)(() => setEffortVisible(false), [sessionId]);
-    (0, import_react28.useEffect)(() => {
+    (0, import_react32.useEffect)(() => setEffortVisible(false), [sessionId]);
+    (0, import_react32.useEffect)(() => {
       if (!attachmentMenuVisible) return;
       const onPointerDown = (event) => {
         if (event.target instanceof Node && !attachmentMenuRef.current?.contains(event.target)) {
@@ -26616,16 +27181,16 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
         document.removeEventListener("keydown", onKeyDown);
       };
     }, [attachmentMenuVisible]);
-    const autoGrow = (0, import_react28.useCallback)(() => {
+    const autoGrow = (0, import_react32.useCallback)(() => {
       const textarea = textareaRef.current;
       if (!textarea) return;
       textarea.style.height = "auto";
       textarea.style.height = `${Math.min(MAX_HEIGHT, Math.max(MIN_HEIGHT, textarea.scrollHeight))}px`;
     }, [reasoningEffort]);
-    (0, import_react28.useEffect)(() => {
+    (0, import_react32.useEffect)(() => {
       autoGrow();
     }, [text, autoGrow]);
-    (0, import_react28.useEffect)(() => {
+    (0, import_react32.useEffect)(() => {
       return subscribeInsertText((insertion) => {
         const textarea = textareaRef.current;
         if (!textarea) return;
@@ -26642,7 +27207,7 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
         });
       });
     }, []);
-    (0, import_react28.useEffect)(() => {
+    (0, import_react32.useEffect)(() => {
       return subscribeSetText((draft) => {
         setText(draft);
         completion.resetSlashIndex();
@@ -26654,38 +27219,49 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
         });
       });
     }, [completion.resetSlashIndex]);
-    const send = (0, import_react28.useCallback)(() => {
+    const send = (0, import_react32.useCallback)(() => {
       if (submitting) return;
       const value = textareaRef.current?.value ?? text;
-      if (!value.trim() && imageDrafts.images.length === 0) return;
-      if (imageDrafts.images.length === 0 && completion.executeSlashCommand(value.trim())) return;
+      const attached = imageDrafts.images.length > 0 || fileDrafts.files.length > 0;
+      if (!value.trim() && !attached) return;
+      if (!attached && completion.executeSlashCommand(value.trim())) return;
       postAction({
         type: "sendPrompt",
         text: value,
         mode: busy ? promptMode : "queue",
-        images: imageDrafts.images.map((image) => image.upload)
+        images: imageDrafts.images.map((image) => image.upload),
+        files: fileDrafts.files.map(({ name, data }) => ({ name, data }))
       });
       setText("");
       imageDrafts.clear();
-    }, [completion.executeSlashCommand, imageDrafts, busy, submitting, promptMode, text]);
+      fileDrafts.clear();
+    }, [completion.executeSlashCommand, imageDrafts, fileDrafts, busy, submitting, promptMode, text]);
     const sendLabel = t("Send");
-    const referenceMatch = text.match(/(?:^|\s)@([^\s@]*)$/u);
+    const quotedReferenceMatch = text.match(/(?:^|\s)@"([^"]*)$/u);
+    const plainReferenceMatch = text.match(/(?:^|\s)@([^\s@]*)$/u);
+    const referenceMatch = quotedReferenceMatch ?? plainReferenceMatch;
+    const referenceQuoted = quotedReferenceMatch !== null;
     const referenceQuery = referenceMatch?.[1] ?? "";
     const referenceCandidates = referenceMatch && fileReferenceCandidates?.length ? fileReferenceCandidates : [];
     const referenceCandidateKey = referenceCandidates.map((candidate) => `${candidate.kind}:${candidate.insertText}`).join("\0");
-    const referenceContextKey = `${referenceQuery}\0${referenceCandidateKey}`;
+    const referenceContextKey = (referenceQuoted ? "quoted" : "plain") + "\0" + referenceQuery + "\0" + referenceCandidateKey;
     const referenceMenuVisible = referenceCandidates.length > 0 && dismissedReferenceKey !== referenceContextKey;
-    (0, import_react28.useEffect)(() => {
-      postAction({ type: "fileReferenceQuery", query: referenceQuery });
-    }, [referenceQuery]);
-    (0, import_react28.useEffect)(() => {
+    (0, import_react32.useEffect)(() => {
+      postAction({
+        type: "fileReferenceQuery",
+        query: referenceQuery,
+        ...referenceQuoted ? { quoted: true } : {}
+      });
+    }, [referenceQuery, referenceQuoted, sessionId]);
+    (0, import_react32.useEffect)(() => {
       setReferenceIndex(0);
       setDismissedReferenceKey(void 0);
     }, [referenceContextKey]);
     const chooseFileReference = (candidate) => {
-      const referenceStart = text.length - referenceQuery.length - 1;
+      const referenceStart = text.length - referenceQuery.length - (referenceQuoted ? 2 : 1);
       const prefix = text.slice(0, Math.max(0, referenceStart));
-      setText(`${prefix}${candidate.insertText} `);
+      const suffix = candidate.kind === "directory" ? "" : " ";
+      setText(prefix + candidate.insertText + suffix);
       setReferenceIndex(0);
       window.requestAnimationFrame(focusTextarea);
     };
@@ -26715,7 +27291,7 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
     };
     const activeMenuId = referenceMenuVisible ? FILE_REFERENCE_MENU_ID : completion.skillMatches.length ? SKILL_MENU_ID : completion.slashCandidateCount ? SLASH_MENU_ID : void 0;
     const activeDescendant = activeMenuId === FILE_REFERENCE_MENU_ID ? `${FILE_REFERENCE_MENU_ID}-option-${referenceIndex}` : activeMenuId ? `${activeMenuId}-option-${completion.slashIndex}` : void 0;
-    return /* @__PURE__ */ import_react28.default.createElement("div", { className: "dsh-composer" }, /* @__PURE__ */ import_react28.default.createElement(
+    return /* @__PURE__ */ import_react32.default.createElement("div", { className: "dsh-composer" }, /* @__PURE__ */ import_react32.default.createElement(
       ContextChips,
       {
         context,
@@ -26723,14 +27299,14 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
         selectionEnabled,
         tokenUsage
       }
-    ), referenceMenuVisible ? /* @__PURE__ */ import_react28.default.createElement(
+    ), referenceMenuVisible ? /* @__PURE__ */ import_react32.default.createElement(
       FileReferenceMenu,
       {
         candidates: referenceCandidates,
         activeIndex: referenceIndex,
         onSelect: chooseFileReference
       }
-    ) : null, effortVisible ? /* @__PURE__ */ import_react28.default.createElement(
+    ) : null, effortVisible ? /* @__PURE__ */ import_react32.default.createElement(
       ReasoningEffortControl,
       {
         control: reasoningEffort,
@@ -26738,7 +27314,7 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
         busy,
         onDismiss: () => setEffortVisible(false)
       }
-    ) : null, busy ? /* @__PURE__ */ import_react28.default.createElement("div", { className: "dsh-send-mode", "aria-label": t("Runtime message mode") }, /* @__PURE__ */ import_react28.default.createElement(
+    ) : null, busy ? /* @__PURE__ */ import_react32.default.createElement("div", { className: "dsh-send-mode", "aria-label": t("Runtime message mode") }, /* @__PURE__ */ import_react32.default.createElement(
       "button",
       {
         type: "button",
@@ -26747,7 +27323,7 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
         onClick: () => setPromptMode("queue")
       },
       t("Queue")
-    ), /* @__PURE__ */ import_react28.default.createElement(
+    ), /* @__PURE__ */ import_react32.default.createElement(
       "button",
       {
         type: "button",
@@ -26756,14 +27332,21 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
         onClick: () => setPromptMode("steer")
       },
       t("Steer")
-    )) : null, /* @__PURE__ */ import_react28.default.createElement(
+    )) : null, /* @__PURE__ */ import_react32.default.createElement(
       ImageDraftRail,
       {
         images: imageDrafts.images,
         error: imageDrafts.error,
         onRemove: imageDrafts.remove
       }
-    ), /* @__PURE__ */ import_react28.default.createElement(
+    ), /* @__PURE__ */ import_react32.default.createElement(
+      FileDraftRail,
+      {
+        files: fileDrafts.files,
+        error: fileDrafts.error,
+        onRemove: fileDrafts.remove
+      }
+    ), /* @__PURE__ */ import_react32.default.createElement(
       "div",
       {
         className: "dsh-composer-row",
@@ -26774,13 +27357,15 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
           }
         },
         onDrop: (event) => {
-          const files = Array.from(event.dataTransfer.files).filter((file) => file.type.startsWith("image/"));
+          const files = Array.from(event.dataTransfer.files);
           if (files.length === 0) return;
           event.preventDefault();
-          void imageDrafts.addFiles(files);
+          const { images, others } = splitImageFiles(files);
+          if (images.length) void imageDrafts.addFiles(images);
+          if (others.length) void fileDrafts.addFiles(others);
         }
       },
-      /* @__PURE__ */ import_react28.default.createElement("div", { className: "dsh-menu-anchor dsh-attachment-anchor", ref: attachmentMenuRef }, /* @__PURE__ */ import_react28.default.createElement(
+      /* @__PURE__ */ import_react32.default.createElement("div", { className: "dsh-menu-anchor dsh-attachment-anchor", ref: attachmentMenuRef }, /* @__PURE__ */ import_react32.default.createElement(
         "button",
         {
           type: "button",
@@ -26790,10 +27375,10 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
           disabled: submitting,
           onClick: () => setAttachmentMenuVisible((visible) => !visible)
         },
-        /* @__PURE__ */ import_react28.default.createElement(PlusIcon, null)
+        /* @__PURE__ */ import_react32.default.createElement(PlusIcon, null)
       ), attachmentMenuVisible ? (
         // Disclosure, not the ARIA menu pattern — see the note in Header.tsx.
-        /* @__PURE__ */ import_react28.default.createElement("div", { className: "dsh-menu dsh-attachment-menu" }, /* @__PURE__ */ import_react28.default.createElement(
+        /* @__PURE__ */ import_react32.default.createElement("div", { className: "dsh-menu dsh-attachment-menu" }, /* @__PURE__ */ import_react32.default.createElement(
           "button",
           {
             type: "button",
@@ -26803,9 +27388,9 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
               postAction({ type: "openIdeContextPicker" });
             }
           },
-          /* @__PURE__ */ import_react28.default.createElement(PlusIcon, null),
+          /* @__PURE__ */ import_react32.default.createElement(PlusIcon, null),
           t("Add one-shot IDE context")
-        ), /* @__PURE__ */ import_react28.default.createElement(
+        ), /* @__PURE__ */ import_react32.default.createElement(
           "button",
           {
             type: "button",
@@ -26815,9 +27400,21 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
               postAction({ type: "openTerminalCommandPicker" });
             }
           },
-          /* @__PURE__ */ import_react28.default.createElement(TerminalIcon, null),
+          /* @__PURE__ */ import_react32.default.createElement(TerminalIcon, null),
           t("Recent terminal command")
-        ), /* @__PURE__ */ import_react28.default.createElement(
+        ), /* @__PURE__ */ import_react32.default.createElement(
+          "button",
+          {
+            type: "button",
+            className: "dsh-menu-item",
+            onClick: () => {
+              setAttachmentMenuVisible(false);
+              fileInputRef.current?.click();
+            }
+          },
+          /* @__PURE__ */ import_react32.default.createElement(FileIcon, null),
+          t("Add files")
+        ), /* @__PURE__ */ import_react32.default.createElement(
           "button",
           {
             type: "button",
@@ -26827,9 +27424,9 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
               imageInputRef.current?.click();
             }
           },
-          /* @__PURE__ */ import_react28.default.createElement(ImageIcon, null),
+          /* @__PURE__ */ import_react32.default.createElement(ImageIcon, null),
           t("Add images")
-        ), /* @__PURE__ */ import_react28.default.createElement(
+        ), /* @__PURE__ */ import_react32.default.createElement(
           "button",
           {
             type: "button",
@@ -26839,10 +27436,10 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
               postAction({ type: "captureAppShot" });
             }
           },
-          /* @__PURE__ */ import_react28.default.createElement(AppShotIcon, null),
+          /* @__PURE__ */ import_react32.default.createElement(AppShotIcon, null),
           t("Capture AppShot")
         ))
-      ) : null, /* @__PURE__ */ import_react28.default.createElement(
+      ) : null, /* @__PURE__ */ import_react32.default.createElement(
         "input",
         {
           ref: imageInputRef,
@@ -26857,8 +27454,22 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
             void imageDrafts.addFiles(files);
           }
         }
+      ), /* @__PURE__ */ import_react32.default.createElement(
+        "input",
+        {
+          ref: fileInputRef,
+          className: "dsh-image-input",
+          type: "file",
+          multiple: true,
+          tabIndex: -1,
+          onChange: (event) => {
+            const files = Array.from(event.target.files ?? []);
+            event.target.value = "";
+            void fileDrafts.addFiles(files);
+          }
+        }
       )),
-      /* @__PURE__ */ import_react28.default.createElement(
+      /* @__PURE__ */ import_react32.default.createElement(
         "textarea",
         {
           ref: textareaRef,
@@ -26875,10 +27486,12 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
             completion.resetSlashIndex();
           },
           onPaste: (event) => {
-            const files = Array.from(event.clipboardData.files).filter((file) => file.type.startsWith("image/"));
+            const files = Array.from(event.clipboardData.files);
             if (files.length === 0) return;
             event.preventDefault();
-            void imageDrafts.addFiles(files);
+            const { images, others } = splitImageFiles(files);
+            if (images.length) void imageDrafts.addFiles(images);
+            if (others.length) void fileDrafts.addFiles(others);
           },
           onKeyDown: (event) => {
             if (event.key === "Tab" && event.shiftKey && !event.altKey && !event.ctrlKey && !event.metaKey && !event.repeat && !referenceMenuVisible && completion.skillMatches.length === 0 && completion.slashCandidateCount === 0) {
@@ -26897,7 +27510,7 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
           }
         }
       ),
-      /* @__PURE__ */ import_react28.default.createElement(
+      /* @__PURE__ */ import_react32.default.createElement(
         SlashCompletionMenu,
         {
           commands: completion.slashMatches,
@@ -26907,7 +27520,7 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
           onChooseSkill: completion.chooseSkill
         }
       ),
-      /* @__PURE__ */ import_react28.default.createElement(
+      /* @__PURE__ */ import_react32.default.createElement(
         SkillCompletionMenu,
         {
           skills: completion.skillMatches,
@@ -26915,13 +27528,13 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
           onChooseSkill: completion.chooseSkill
         }
       ),
-      /* @__PURE__ */ import_react28.default.createElement(
+      /* @__PURE__ */ import_react32.default.createElement(
         "button",
         {
           type: "button",
           className: `dsh-send-button${busy ? " dsh-button-secondary" : ""}`,
           title: busy ? t("Stop") : sendLabel,
-          disabled: busy ? cancelling : submitting || !text.trim() && imageDrafts.images.length === 0,
+          disabled: busy ? cancelling : submitting || !text.trim() && imageDrafts.images.length === 0 && fileDrafts.files.length === 0,
           onClick: () => {
             if (busy) {
               postAction({ type: "cancel" });
@@ -26930,44 +27543,199 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
             }
           }
         },
-        busy ? /* @__PURE__ */ import_react28.default.createElement(StopIcon, null) : /* @__PURE__ */ import_react28.default.createElement(SendIcon, null),
+        busy ? /* @__PURE__ */ import_react32.default.createElement(StopIcon, null) : /* @__PURE__ */ import_react32.default.createElement(SendIcon, null),
         busy ? cancelling ? t("Stopping...") : t("Stop") : sendLabel
       )
-    ), /* @__PURE__ */ import_react28.default.createElement("div", { className: "dsh-composer-footer" }, planActive || planCommandAvailable ? /* @__PURE__ */ import_react28.default.createElement(
+    ), /* @__PURE__ */ import_react32.default.createElement("div", { className: "dsh-composer-footer" }, planActive || planCommandAvailable ? /* @__PURE__ */ import_react32.default.createElement(
       "button",
       {
         type: "button",
         className: `dsh-plan-chip${planActive ? "" : " dsh-plan-chip-off"}`,
-        title: planActive ? t("Plan mode on \u2014 click to turn off (/plan off)") : t("Plan mode off \u2014 click to turn on (/plan)"),
+        title: planActive ? t("Plan mode on \u2014 click to turn off (/plan off)") : t("Plan mode off \u2014 click to turn on (/plan on)"),
         "aria-label": planActive ? t("Plan mode on, click to turn off") : t("Plan mode off, click to turn on"),
         "aria-pressed": planActive,
         disabled: !planCommandAvailable,
         onClick: togglePlan
       },
-      /* @__PURE__ */ import_react28.default.createElement("span", null, "Plan"),
-      planActive ? /* @__PURE__ */ import_react28.default.createElement("span", { "aria-hidden": "true" }, "\xD7") : null
-    ) : null, /* @__PURE__ */ import_react28.default.createElement(
+      /* @__PURE__ */ import_react32.default.createElement("span", null, "Plan"),
+      planActive ? /* @__PURE__ */ import_react32.default.createElement("span", { "aria-hidden": "true" }, "\xD7") : null
+    ) : null, /* @__PURE__ */ import_react32.default.createElement(
       PermissionModeChip,
       {
         permissions,
         switchable: canSwitchPermissions(commands)
       }
-    ), /* @__PURE__ */ import_react28.default.createElement(TokenUsageBar, { usage: tokenUsage }), /* @__PURE__ */ import_react28.default.createElement(SessionStats, { stats: sessionStats })));
+    ), /* @__PURE__ */ import_react32.default.createElement(TokenUsageBar, { usage: tokenUsage }), /* @__PURE__ */ import_react32.default.createElement(SessionStats, { stats: sessionStats })));
   });
 
   // webview/src/components/SettingsPanel.tsx
-  var import_react29 = __toESM(require_react());
+  var import_react34 = __toESM(require_react());
+
+  // webview/src/components/PluginInventoryPanel.tsx
+  var import_react33 = __toESM(require_react());
+  var PHASE_LABELS = {
+    pending: "Waiting for dependencies",
+    loading: "Loading",
+    active: "Running",
+    failed: "Failed to start",
+    unloading: "Unloading"
+  };
+  function phaseLabel(phase) {
+    return phase === null ? t("Not running") : t(PHASE_LABELS[phase]);
+  }
+  function moduleShortName(moduleName) {
+    const unscoped = moduleName.startsWith("@") && moduleName.includes("/") ? moduleName.slice(moduleName.indexOf("/") + 1) : moduleName;
+    return unscoped.replace(/^cordis:/u, "").replace(/^cordis-plugin-/u, "").replace(/^dsh-(?:host-|client-)?/u, "");
+  }
+  function presetName(preset) {
+    return preset.name?.trim() || preset.id;
+  }
+  function presetLabel(preset) {
+    const name = presetName(preset);
+    if (preset.broken !== void 0) return t("{name} (failed to load)", { name });
+    return preset.isDefault ? t("{name} (default)", { name }) : name;
+  }
+  function matches(moduleName, entryId, query) {
+    if (!query) return true;
+    return [moduleName, ...entryId === null || entryId === void 0 ? [] : [entryId]].some((value) => value.toLocaleLowerCase().includes(query));
+  }
+  function statusLabel3(enabled, failed) {
+    if (failed) return t("Failed to start");
+    if (enabled === "conditional") return t("Conditional");
+    return enabled ? t("Enabled") : t("Disabled");
+  }
+  function InventoryCard({
+    moduleName,
+    entryId,
+    status,
+    phase,
+    facts
+  }) {
+    const failed = phase === "failed";
+    return /* @__PURE__ */ import_react33.default.createElement("details", { className: `dsh-plugin-card${failed ? " failed" : ""}` }, /* @__PURE__ */ import_react33.default.createElement("summary", { className: "dsh-plugin-card-summary" }, /* @__PURE__ */ import_react33.default.createElement("strong", { title: moduleName }, moduleShortName(moduleName)), /* @__PURE__ */ import_react33.default.createElement("span", null, status, phase !== void 0 && phase !== null ? ` \xB7 ${phaseLabel(phase)}` : "")), /* @__PURE__ */ import_react33.default.createElement("div", { className: "dsh-plugin-card-details" }, entryId !== null ? /* @__PURE__ */ import_react33.default.createElement("code", null, entryId) : null, /* @__PURE__ */ import_react33.default.createElement("dl", null, facts.map(([label, value]) => /* @__PURE__ */ import_react33.default.createElement("div", { key: label }, /* @__PURE__ */ import_react33.default.createElement("dt", null, label), /* @__PURE__ */ import_react33.default.createElement("dd", null, value))))));
+  }
+  function presetRowCard(preset, row, index) {
+    const failed = row.fiberPhase === "failed";
+    const status = statusLabel3(row.enabled, failed);
+    return /* @__PURE__ */ import_react33.default.createElement("li", { key: `${preset.id}:${String(index)}` }, /* @__PURE__ */ import_react33.default.createElement(
+      InventoryCard,
+      {
+        moduleName: row.moduleName,
+        entryId: row.entryId,
+        status,
+        phase: row.fiberPhase,
+        facts: [
+          [t("Module"), row.moduleName],
+          [t("From"), presetName(preset)],
+          [t("Configuration"), status],
+          ...row.fiberPhase === null ? [] : [[t("Status"), phaseLabel(row.fiberPhase)]],
+          ...row.condition === void 0 ? [] : [[t("Disabled when"), /* @__PURE__ */ import_react33.default.createElement("code", { key: "condition" }, row.condition)]]
+        ]
+      }
+    ));
+  }
+  function globalEntryCard(entry, enabledIn) {
+    const failed = entry.fiberPhase === "failed";
+    const presetProvided = !entry.enabled && enabledIn !== void 0 && enabledIn.length > 0;
+    const status = failed ? t("Failed to start") : presetProvided ? t("Enabled via presets") : entry.enabled ? t("Enabled") : t("Disabled");
+    const phase = entry.enabled || failed ? entry.fiberPhase : void 0;
+    const facts = [
+      [t("Module"), entry.moduleName],
+      [t("Configuration"), presetProvided ? t("Preset provides this plugin") : status]
+    ];
+    if (presetProvided) {
+      facts.push([t("Enabled in"), enabledIn?.join(" \xB7 ") ?? ""]);
+    } else if (phase !== void 0) {
+      facts.push([t("Status"), phaseLabel(phase)]);
+    }
+    return /* @__PURE__ */ import_react33.default.createElement("li", { key: entry.entryId }, /* @__PURE__ */ import_react33.default.createElement(
+      InventoryCard,
+      {
+        moduleName: entry.moduleName,
+        entryId: entry.entryId,
+        status,
+        phase,
+        facts
+      }
+    ));
+  }
+  function PluginInventoryPanel({ inventory }) {
+    const [query, setQuery] = (0, import_react33.useState)("");
+    const [selectedPresetId, setSelectedPresetId] = (0, import_react33.useState)();
+    const presets = inventory.agentPresets ?? [];
+    const fallbackPreset = presets.find((preset) => preset.isDefault) ?? presets[0];
+    const selectedPreset = presets.find((preset) => preset.id === selectedPresetId) ?? fallbackPreset;
+    const normalizedQuery = query.trim().toLocaleLowerCase();
+    (0, import_react33.useEffect)(() => {
+      if (selectedPreset?.id !== selectedPresetId) setSelectedPresetId(selectedPreset?.id);
+    }, [selectedPreset?.id, selectedPresetId]);
+    const enabledIn = (0, import_react33.useMemo)(() => {
+      const found = /* @__PURE__ */ new Map();
+      for (const preset of presets) {
+        for (const row of preset.rows) {
+          if (row.enabled !== true) continue;
+          const names = found.get(row.moduleName) ?? [];
+          if (!names.includes(presetName(preset))) names.push(presetName(preset));
+          found.set(row.moduleName, names);
+        }
+      }
+      return found;
+    }, [presets]);
+    const failedEntries = inventory.entries.filter((entry) => entry.fiberPhase === "failed" && matches(entry.moduleName, entry.entryId, normalizedQuery));
+    const regularEntries = inventory.entries.filter((entry) => entry.fiberPhase !== "failed" && matches(entry.moduleName, entry.entryId, normalizedQuery));
+    const selectedRows = selectedPreset?.rows.filter((row) => matches(row.moduleName, row.entryId, normalizedQuery)) ?? [];
+    const otherPresetMatches = normalizedQuery ? presets.filter((preset) => preset !== selectedPreset && preset.rows.some((row) => matches(row.moduleName, row.entryId, normalizedQuery))) : [];
+    const otherMatchCount = otherPresetMatches.reduce(
+      (total, preset) => total + preset.rows.filter((row) => matches(row.moduleName, row.entryId, normalizedQuery)).length,
+      0
+    );
+    const hasMatches = failedEntries.length > 0 || regularEntries.length > 0 || selectedRows.length > 0 || otherMatchCount > 0;
+    if (inventory.loading) {
+      return /* @__PURE__ */ import_react33.default.createElement("section", { className: "dsh-plugin-inventory" }, /* @__PURE__ */ import_react33.default.createElement("div", { className: "dsh-settings-loading" }, t("Reading plugins...")));
+    }
+    if (inventory.error) {
+      return /* @__PURE__ */ import_react33.default.createElement("section", { className: "dsh-plugin-inventory" }, /* @__PURE__ */ import_react33.default.createElement("div", { className: "dsh-settings-error" }, inventory.error), /* @__PURE__ */ import_react33.default.createElement("button", { type: "button", onClick: () => postAction({ type: "refreshPluginInventory" }) }, t("Retry")));
+    }
+    return /* @__PURE__ */ import_react33.default.createElement("section", { className: "dsh-plugin-inventory", "aria-label": t("Plugin inventory") }, /* @__PURE__ */ import_react33.default.createElement("div", { className: "dsh-plugin-inventory-head" }, /* @__PURE__ */ import_react33.default.createElement("div", null, /* @__PURE__ */ import_react33.default.createElement("strong", null, t("Plugin inventory")), /* @__PURE__ */ import_react33.default.createElement("small", null, t("Read-only plugin inventory"))), /* @__PURE__ */ import_react33.default.createElement(
+      "button",
+      {
+        type: "button",
+        disabled: inventory.loading,
+        title: t("Refresh plugin inventory"),
+        onClick: () => postAction({ type: "refreshPluginInventory" })
+      },
+      t("Refresh")
+    )), /* @__PURE__ */ import_react33.default.createElement("label", { className: "dsh-plugin-inventory-search" }, /* @__PURE__ */ import_react33.default.createElement("span", null, t("Search plugins")), /* @__PURE__ */ import_react33.default.createElement(
+      "input",
+      {
+        type: "search",
+        value: query,
+        placeholder: t("Search plugins"),
+        onChange: (event) => setQuery(event.target.value)
+      }
+    )), inventory.entries.length === 0 && presets.length === 0 ? /* @__PURE__ */ import_react33.default.createElement("div", { className: "dsh-settings-empty" }, t("No plugins are available.")) : null, normalizedQuery && !hasMatches ? /* @__PURE__ */ import_react33.default.createElement("div", { className: "dsh-settings-empty" }, t("No matching plugins.")) : null, selectedPreset ? /* @__PURE__ */ import_react33.default.createElement("details", { className: "dsh-plugin-group", open: true }, /* @__PURE__ */ import_react33.default.createElement("summary", null, /* @__PURE__ */ import_react33.default.createElement("strong", null, t("Session plugins")), /* @__PURE__ */ import_react33.default.createElement("span", null, t("{count} plugins", { count: selectedRows.length }))), /* @__PURE__ */ import_react33.default.createElement("div", { className: "dsh-plugin-group-head" }, /* @__PURE__ */ import_react33.default.createElement("small", null, t("Composed per session by agent presets")), /* @__PURE__ */ import_react33.default.createElement(
+      "select",
+      {
+        "aria-label": t("Choose agent preset"),
+        value: selectedPreset.id,
+        onChange: (event) => setSelectedPresetId(event.target.value)
+      },
+      presets.map((preset) => /* @__PURE__ */ import_react33.default.createElement("option", { key: preset.id, value: preset.id }, presetLabel(preset)))
+    )), selectedPreset.broken !== void 0 ? /* @__PURE__ */ import_react33.default.createElement("div", { className: "dsh-plugin-broken", role: "alert" }, selectedPreset.broken) : null, selectedRows.length > 0 ? /* @__PURE__ */ import_react33.default.createElement("ul", { className: "dsh-plugin-cards" }, selectedRows.map((row, index) => presetRowCard(selectedPreset, row, index))) : null, otherMatchCount > 0 ? /* @__PURE__ */ import_react33.default.createElement("div", { className: "dsh-plugin-hint" }, t("{count} more matches in other presets", { count: otherMatchCount }), otherPresetMatches.map((preset) => /* @__PURE__ */ import_react33.default.createElement("button", { type: "button", key: preset.id, onClick: () => setSelectedPresetId(preset.id) }, presetName(preset)))) : null) : null, inventory.entries.length > 0 ? /* @__PURE__ */ import_react33.default.createElement("details", { className: "dsh-plugin-group", open: !selectedPreset }, /* @__PURE__ */ import_react33.default.createElement("summary", null, /* @__PURE__ */ import_react33.default.createElement("strong", null, t("Global plugins")), /* @__PURE__ */ import_react33.default.createElement("span", null, t("{count} plugins", { count: failedEntries.length + regularEntries.length }))), /* @__PURE__ */ import_react33.default.createElement("small", null, t("Shared by the system and every session")), failedEntries.length + regularEntries.length > 0 ? /* @__PURE__ */ import_react33.default.createElement("ul", { className: "dsh-plugin-cards" }, failedEntries.map((entry) => globalEntryCard(entry, enabledIn.get(entry.moduleName))), regularEntries.map((entry) => globalEntryCard(entry, enabledIn.get(entry.moduleName)))) : null) : null);
+  }
+
+  // webview/src/components/SettingsPanel.tsx
   function fieldKey(field) {
     return field.path.join("\0");
   }
   function SettingsCard({ card, writable }) {
-    const [open, setOpen] = (0, import_react29.useState)(false);
-    const [drafts, setDrafts] = (0, import_react29.useState)({});
+    const [open, setOpen] = (0, import_react34.useState)(false);
+    const [drafts, setDrafts] = (0, import_react34.useState)({});
     const signature = `${card.revision}:${card.fields.map((field) => `${fieldKey(field)}=${field.value}`).join("|")}`;
-    (0, import_react29.useEffect)(() => {
+    (0, import_react34.useEffect)(() => {
       setDrafts(Object.fromEntries(card.fields.map((field) => [fieldKey(field), field.value])));
     }, [signature]);
-    const changes = (0, import_react29.useMemo)(
+    const changes = (0, import_react34.useMemo)(
       () => card.fields.filter((field) => !field.secret && drafts[fieldKey(field)] !== field.value).map((field) => {
         const value = drafts[fieldKey(field)] ?? "";
         return {
@@ -26978,7 +27746,7 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
       }),
       [card.fields, drafts]
     );
-    return /* @__PURE__ */ import_react29.default.createElement("section", { className: `dsh-settings-card${open ? " open" : ""}` }, /* @__PURE__ */ import_react29.default.createElement(
+    return /* @__PURE__ */ import_react34.default.createElement("section", { className: `dsh-settings-card${open ? " open" : ""}` }, /* @__PURE__ */ import_react34.default.createElement(
       "button",
       {
         type: "button",
@@ -26986,32 +27754,32 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
         "aria-expanded": open,
         onClick: () => setOpen((value) => !value)
       },
-      /* @__PURE__ */ import_react29.default.createElement("span", null, /* @__PURE__ */ import_react29.default.createElement("strong", null, card.title), /* @__PURE__ */ import_react29.default.createElement("small", null, card.ns, " \xB7 ", card.applies === "restart" ? t("Applies after restart") : t("Applies immediately"))),
-      changes.length ? /* @__PURE__ */ import_react29.default.createElement("em", null, t("Unsaved")) : null,
-      /* @__PURE__ */ import_react29.default.createElement("span", { "aria-hidden": "true" }, open ? "\u2303" : "\u2304")
-    ), open ? /* @__PURE__ */ import_react29.default.createElement("div", { className: "dsh-settings-card-body" }, !writable || !card.writable ? /* @__PURE__ */ import_react29.default.createElement("div", { className: "dsh-settings-readonly" }, t("Settings are read-only")) : null, card.fields.length === 0 ? /* @__PURE__ */ import_react29.default.createElement("div", { className: "dsh-settings-empty" }, t("No editable settings exposed")) : null, card.fields.map((field) => {
+      /* @__PURE__ */ import_react34.default.createElement("span", null, /* @__PURE__ */ import_react34.default.createElement("strong", null, card.title), /* @__PURE__ */ import_react34.default.createElement("small", null, card.ns, " \xB7 ", card.applies === "restart" ? t("Applies after restart") : t("Applies immediately"))),
+      changes.length ? /* @__PURE__ */ import_react34.default.createElement("em", null, t("Unsaved")) : null,
+      /* @__PURE__ */ import_react34.default.createElement("span", { "aria-hidden": "true" }, open ? "\u2303" : "\u2304")
+    ), open ? /* @__PURE__ */ import_react34.default.createElement("div", { className: "dsh-settings-card-body" }, !writable || !card.writable ? /* @__PURE__ */ import_react34.default.createElement("div", { className: "dsh-settings-readonly" }, t("Settings are read-only")) : null, card.fields.length === 0 ? /* @__PURE__ */ import_react34.default.createElement("div", { className: "dsh-settings-empty" }, t("No editable settings exposed")) : null, card.fields.map((field) => {
       const key = fieldKey(field);
       if (field.secret) {
-        return /* @__PURE__ */ import_react29.default.createElement("div", { className: "dsh-settings-field", key }, /* @__PURE__ */ import_react29.default.createElement("div", { className: "dsh-settings-field-head" }, /* @__PURE__ */ import_react29.default.createElement("strong", null, field.label), /* @__PURE__ */ import_react29.default.createElement("span", null, field.secretSet ? t("Configured") : t("Not configured"))), /* @__PURE__ */ import_react29.default.createElement("small", null, t("Secret values are managed by the credential provider and never shown here.")));
+        return /* @__PURE__ */ import_react34.default.createElement("div", { className: "dsh-settings-field", key }, /* @__PURE__ */ import_react34.default.createElement("div", { className: "dsh-settings-field-head" }, /* @__PURE__ */ import_react34.default.createElement("strong", null, field.label), /* @__PURE__ */ import_react34.default.createElement("span", null, field.secretSet ? t("Configured") : t("Not configured"))), /* @__PURE__ */ import_react34.default.createElement("small", null, t("Secret values are managed by the credential provider and never shown here.")));
       }
       const value = drafts[key] ?? field.value;
-      return /* @__PURE__ */ import_react29.default.createElement("label", { className: "dsh-settings-field", key }, /* @__PURE__ */ import_react29.default.createElement("span", { className: "dsh-settings-field-head" }, /* @__PURE__ */ import_react29.default.createElement("strong", null, field.label), field.overridden ? /* @__PURE__ */ import_react29.default.createElement("em", null, t("Overridden")) : null), field.type === "boolean" ? /* @__PURE__ */ import_react29.default.createElement(
+      return /* @__PURE__ */ import_react34.default.createElement("label", { className: "dsh-settings-field", key }, /* @__PURE__ */ import_react34.default.createElement("span", { className: "dsh-settings-field-head" }, /* @__PURE__ */ import_react34.default.createElement("strong", null, field.label), field.overridden ? /* @__PURE__ */ import_react34.default.createElement("em", null, t("Overridden")) : null), field.type === "boolean" ? /* @__PURE__ */ import_react34.default.createElement(
         "select",
         {
           value,
           disabled: !writable || !card.writable,
           onChange: (event) => setDrafts((current) => ({ ...current, [key]: event.target.value }))
         },
-        /* @__PURE__ */ import_react29.default.createElement("option", { value: "true" }, "true"),
-        /* @__PURE__ */ import_react29.default.createElement("option", { value: "false" }, "false")
-      ) : field.type === "json" ? /* @__PURE__ */ import_react29.default.createElement(
+        /* @__PURE__ */ import_react34.default.createElement("option", { value: "true" }, "true"),
+        /* @__PURE__ */ import_react34.default.createElement("option", { value: "false" }, "false")
+      ) : field.type === "json" ? /* @__PURE__ */ import_react34.default.createElement(
         "textarea",
         {
           value,
           disabled: !writable || !card.writable,
           onChange: (event) => setDrafts((current) => ({ ...current, [key]: event.target.value }))
         }
-      ) : /* @__PURE__ */ import_react29.default.createElement(
+      ) : /* @__PURE__ */ import_react34.default.createElement(
         "input",
         {
           type: field.type === "number" ? "number" : "text",
@@ -27019,7 +27787,7 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
           disabled: !writable || !card.writable,
           onChange: (event) => setDrafts((current) => ({ ...current, [key]: event.target.value }))
         }
-      ), /* @__PURE__ */ import_react29.default.createElement("small", null, field.description || field.path.join(".")), field.overridden ? /* @__PURE__ */ import_react29.default.createElement(
+      ), /* @__PURE__ */ import_react34.default.createElement("small", null, field.description || field.path.join(".")), field.overridden ? /* @__PURE__ */ import_react34.default.createElement(
         "button",
         {
           type: "button",
@@ -27029,7 +27797,7 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
         },
         t("Reset")
       ) : null);
-    }), /* @__PURE__ */ import_react29.default.createElement("div", { className: "dsh-settings-card-actions" }, /* @__PURE__ */ import_react29.default.createElement(
+    }), /* @__PURE__ */ import_react34.default.createElement("div", { className: "dsh-settings-card-actions" }, /* @__PURE__ */ import_react34.default.createElement(
       "button",
       {
         type: "button",
@@ -27042,7 +27810,7 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
         })
       },
       t("Save")
-    ), /* @__PURE__ */ import_react29.default.createElement(
+    ), /* @__PURE__ */ import_react34.default.createElement(
       "button",
       {
         type: "button",
@@ -27053,11 +27821,11 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
     ))) : null);
   }
   function SettingsPanel({ settings }) {
-    return /* @__PURE__ */ import_react29.default.createElement("section", { className: "dsh-settings-panel", "aria-label": t("Plugin settings") }, /* @__PURE__ */ import_react29.default.createElement("div", { className: "dsh-settings-panel-head" }, /* @__PURE__ */ import_react29.default.createElement("div", null, /* @__PURE__ */ import_react29.default.createElement("strong", null, t("Plugin settings")), /* @__PURE__ */ import_react29.default.createElement("small", null, t("Public Harness settings namespaces"))), /* @__PURE__ */ import_react29.default.createElement("button", { type: "button", onClick: () => postAction({ type: "manageSettings" }) }, t("Close"))), settings.loading ? /* @__PURE__ */ import_react29.default.createElement("div", { className: "dsh-settings-loading" }, t("Loading...")) : null, settings.error ? /* @__PURE__ */ import_react29.default.createElement("div", { className: "dsh-settings-error" }, settings.error) : null, !settings.loading && !settings.error && settings.cards.length === 0 ? /* @__PURE__ */ import_react29.default.createElement("div", { className: "dsh-settings-empty" }, t("No plugin settings exposed")) : null, /* @__PURE__ */ import_react29.default.createElement("div", { className: "dsh-settings-cards" }, settings.cards.map((card) => /* @__PURE__ */ import_react29.default.createElement(SettingsCard, { key: card.ns, card, writable: settings.writable }))), /* @__PURE__ */ import_react29.default.createElement("button", { type: "button", className: "dsh-settings-document", onClick: () => postAction({ type: "openBrowser" }) }, t("Open advanced configuration in the dsh Web UI")));
+    return /* @__PURE__ */ import_react34.default.createElement("section", { className: "dsh-settings-panel", "aria-label": t("Plugin settings") }, /* @__PURE__ */ import_react34.default.createElement("div", { className: "dsh-settings-panel-head" }, /* @__PURE__ */ import_react34.default.createElement("div", null, /* @__PURE__ */ import_react34.default.createElement("strong", null, t("Plugin settings")), /* @__PURE__ */ import_react34.default.createElement("small", null, t("Public Harness settings namespaces"))), /* @__PURE__ */ import_react34.default.createElement("button", { type: "button", onClick: () => postAction({ type: "manageSettings" }) }, t("Close"))), settings.loading ? /* @__PURE__ */ import_react34.default.createElement("div", { className: "dsh-settings-loading" }, t("Loading...")) : null, settings.error ? /* @__PURE__ */ import_react34.default.createElement("div", { className: "dsh-settings-error" }, settings.error) : null, settings.pluginInventory ? /* @__PURE__ */ import_react34.default.createElement(PluginInventoryPanel, { inventory: settings.pluginInventory }) : null, !settings.loading && !settings.error && settings.cards.length === 0 ? /* @__PURE__ */ import_react34.default.createElement("div", { className: "dsh-settings-empty" }, t("No plugin settings exposed")) : null, /* @__PURE__ */ import_react34.default.createElement("div", { className: "dsh-settings-cards" }, settings.cards.map((card) => /* @__PURE__ */ import_react34.default.createElement(SettingsCard, { key: card.ns, card, writable: settings.writable }))), /* @__PURE__ */ import_react34.default.createElement("button", { type: "button", className: "dsh-settings-document", onClick: () => postAction({ type: "openBrowser" }) }, t("Open advanced configuration in the dsh Web UI")));
   }
 
   // webview/src/components/StatusBanner.tsx
-  var import_react30 = __toESM(require_react());
+  var import_react35 = __toESM(require_react());
   var ACTION_LABELS = {
     cancelRecovery: "Cancel recovery",
     openLogs: "View details",
@@ -27073,8 +27841,8 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
     const sessionError = sessionStatus?.error;
     const message = sessionError || runtimeError;
     const messageKey = message ? `${sessionError ? "session" : "runtime"}:${message}:${recovery?.phase ?? ""}` : recovery?.sessionId ? `recovery:${recovery.sessionId}:${recovery.phase}` : void 0;
-    const [dismissedKey, setDismissedKey] = (0, import_react30.useState)();
-    (0, import_react30.useEffect)(() => {
+    const [dismissedKey, setDismissedKey] = (0, import_react35.useState)();
+    (0, import_react35.useEffect)(() => {
       setDismissedKey(void 0);
     }, [messageKey]);
     if (!recovering && messageKey !== void 0 && messageKey === dismissedKey) return null;
@@ -27083,14 +27851,14 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
     const actions = recovering ? ["cancelRecovery", "openLogs"] : recovered ? ["restoreRecovery", "exportRecoveryDiagnostics"] : [sessionError ? "openLogs" : terminalRecovery ? "exportRecoveryDiagnostics" : "start"];
     if (!recovering && !recovered && recovery?.canRestore) actions.push("restoreRecovery");
     const bannerMessage = recovering ? `${status.message || t("Automatic recovery is in progress")} (${recovery?.usedBoots ?? 0}/${recovery?.maxBoots ?? 8})` : recovered ? status.message || t("Automatic recovery completed") : message;
-    return /* @__PURE__ */ import_react30.default.createElement(
+    return /* @__PURE__ */ import_react35.default.createElement(
       "div",
       {
         className: `dsh-error-banner${recovering || recovered ? " dsh-recovery-banner" : ""}`,
         role: recovering || recovered ? "status" : "alert",
         "aria-live": recovering || recovered ? "polite" : "assertive"
       },
-      /* @__PURE__ */ import_react30.default.createElement("div", { className: "dsh-error-banner-content" }, /* @__PURE__ */ import_react30.default.createElement("span", { className: "dsh-error-banner-message" }, bannerMessage), /* @__PURE__ */ import_react30.default.createElement("div", { className: "dsh-error-banner-actions" }, actions.map((type) => /* @__PURE__ */ import_react30.default.createElement(
+      /* @__PURE__ */ import_react35.default.createElement("div", { className: "dsh-error-banner-content" }, /* @__PURE__ */ import_react35.default.createElement("span", { className: "dsh-error-banner-message" }, bannerMessage), /* @__PURE__ */ import_react35.default.createElement("div", { className: "dsh-error-banner-actions" }, actions.map((type) => /* @__PURE__ */ import_react35.default.createElement(
         "button",
         {
           key: type,
@@ -27099,7 +27867,7 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
           onClick: () => postAction({ type })
         },
         t(ACTION_LABELS[type])
-      )), !recovering && /* @__PURE__ */ import_react30.default.createElement(
+      )), !recovering && /* @__PURE__ */ import_react35.default.createElement(
         "button",
         {
           type: "button",
@@ -27108,7 +27876,7 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
           title: t("Dismiss"),
           onClick: () => setDismissedKey(messageKey)
         },
-        /* @__PURE__ */ import_react30.default.createElement(CloseIcon, null)
+        /* @__PURE__ */ import_react35.default.createElement(CloseIcon, null)
       )))
     );
   }
@@ -27116,7 +27884,7 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
   // webview/src/App.tsx
   function App() {
     const state = useHostState();
-    return /* @__PURE__ */ import_react31.default.createElement("div", { className: `dsh-shell${state.focusMode ? " dsh-focus-mode" : ""}` }, /* @__PURE__ */ import_react31.default.createElement(
+    return /* @__PURE__ */ import_react36.default.createElement("div", { className: `dsh-shell${state.focusMode ? " dsh-focus-mode" : ""}` }, /* @__PURE__ */ import_react36.default.createElement(
       Header,
       {
         status: state.status,
@@ -27129,14 +27897,15 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
         focusMode: state.focusMode,
         pendingRequestCount: state.interactions.filter((interaction) => interaction.status === "pending").length
       }
-    ), /* @__PURE__ */ import_react31.default.createElement(StatusBanner, { status: state.status, sessionStatus: state.sessionStatus }), !state.focusMode && state.settings ? /* @__PURE__ */ import_react31.default.createElement(SettingsPanel, { settings: state.settings }) : null, /* @__PURE__ */ import_react31.default.createElement(
+    ), /* @__PURE__ */ import_react36.default.createElement(StatusBanner, { status: state.status, sessionStatus: state.sessionStatus }), !state.focusMode && state.settings ? /* @__PURE__ */ import_react36.default.createElement(SettingsPanel, { settings: state.settings }) : null, /* @__PURE__ */ import_react36.default.createElement(
       MessageList,
       {
         messages: state.messages,
         submitting: state.submitting,
-        agentStatusLabel: state.agentStatusLabel
+        agentStatusLabel: state.agentStatusLabel,
+        autoOpenReasoning: state.autoOpenReasoning
       }
-    ), !state.focusMode ? /* @__PURE__ */ import_react31.default.createElement(Interactions, { interactions: state.interactions }) : null, !state.focusMode ? /* @__PURE__ */ import_react31.default.createElement(
+    ), !state.focusMode ? /* @__PURE__ */ import_react36.default.createElement(Interactions, { interactions: state.interactions }) : null, !state.focusMode ? /* @__PURE__ */ import_react36.default.createElement(
       ActivityDock,
       {
         goal: state.goal,
@@ -27146,14 +27915,16 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
         subagentPreview: state.subagentPreview,
         jobs: state.jobs,
         todos: state.todos,
+        schedule: state.schedule,
         permissions: state.permissions,
+        dynamicPlugins: state.dynamicPlugins,
         commands: state.commands,
-        modeSelectionEnabled: state.modeSelectionEnabled,
         sessionId: state.sessionId,
         sessionRunning: state.sessionStatus?.running === true,
-        agentPresetLabel: state.agentPresetLabel
+        agentPresetLabel: state.agentPresetLabel,
+        autoOpenReasoning: state.autoOpenReasoning
       }
-    ) : null, /* @__PURE__ */ import_react31.default.createElement(
+    ) : null, /* @__PURE__ */ import_react36.default.createElement(
       Composer,
       {
         context: state.context,
@@ -27161,8 +27932,8 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
         selectionEnabled: state.selectionEnabled,
         fileReferenceCandidates: state.fileReferenceCandidates,
         skills: state.skills,
-        commands: state.commands,
         modeSelectionEnabled: state.modeSelectionEnabled,
+        commands: state.commands,
         permissions: state.permissions,
         tokenUsage: state.tokenUsage,
         sessionStats: state.sessionStats,
@@ -27180,7 +27951,7 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
   // webview/src/main.tsx
   var mount = document.getElementById("root");
   if (mount) {
-    (0, import_client.createRoot)(mount).render(/* @__PURE__ */ import_react32.default.createElement(App, null));
+    (0, import_client.createRoot)(mount).render(/* @__PURE__ */ import_react37.default.createElement(App, null));
   }
 })();
 /*! Bundled license information:

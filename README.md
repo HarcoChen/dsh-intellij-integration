@@ -52,6 +52,8 @@ Review file edits in the IDE's own diff viewer. For supported tool diff cards, D
 
 Use **DSH: Ask About Selection** for an open-ended question, or the **DSH** context menu for explain / fix / review / documentation tasks. The context picker also supports attaching the current unstaged Git diff. Editor context is bounded by the configurable byte limit.
 
+The composer accepts files pasted from the clipboard, dropped from the desktop, or chosen with the file picker. Files are uploaded to the connected Runtime and represented in the prompt by session-scoped receipts; the host never sends a client file path to the model. Use the copy button on a user or assistant message to place its text on the system clipboard.
+
 ### Plan before implementing
 
 Use the composer's **Plan** toggle or `/plan` to enter plan mode; `/plan off` leaves it.

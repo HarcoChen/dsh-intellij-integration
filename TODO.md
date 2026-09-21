@@ -23,6 +23,10 @@ Status: `[x]` implemented, `[-]` usable but not yet at VS Code parity, `[ ]` not
 - [x] Attach an unstaged Git diff as one-shot context and clear it only after a successful send.
 - [x] Keep multiple one-shot items in `state.context`, including diagnostics and folder attachments.
 - [x] Implement AppShot capture, reporting the gap plainly on hosts without the native selector.
+- [x] Attach arbitrary files from paste, drag-and-drop, or the file picker; upload them through the
+      Runtime binary route and submit only session-scoped receipts.
+- [x] Copy finalized user and assistant messages through the native system clipboard, including a
+      bounded host-side cache for stream-to-history races.
 
 ## P1 — runtime projections and controls
 
@@ -113,6 +117,16 @@ Runtime 0.1.5 migration batch (2026-09-15):
 - Browser smoke verified the recovering banner, Chinese status and cancel action. Remaining banner
   clicks were not completed because UI approval timed out twice; they remain a manual check.
 - No unit tests were added. Windows/Linux execution and installed-IDE interaction remain manual gates.
+
+Chat parity batch (2026-09-21):
+
+- [x] Migrated dsh-ide file drafts and message-copy WebView behavior without exposing the deferred
+      feedback surface; the host validates drafts, uploads raw bytes, and verifies opaque receipts.
+- [x] Added English and Simplified Chinese failure messages for invalid, oversized, and unavailable
+      attachments/messages.
+- `compileJava`, `spotlessCheck`, and `checkstyleMain` passed with the repository's JDK 21 toolchain.
+- No unit tests were added. Real Runtime file-upload and installed-IDE clipboard smoke checks remain
+  manual gates.
 
 - [x] Reject malformed or surplus WebView action fields at the host boundary for the completed batch.
 - [x] Keep IntelliJ model reads inside read actions and mutations inside write commands for the completed batch.

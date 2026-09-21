@@ -9,6 +9,14 @@ import java.util.Set;
 
 /** Validates messages crossing the untrusted JCEF-to-host boundary. */
 final class DshWebviewActionSanitizer {
+    private static final int MAX_FILES_PER_MESSAGE = 20;
+    private static final int MAX_FILE_NAME_CHARACTERS = 512;
+
+    /** Bounds the untrusted JCEF payload before the host decodes file bytes. */
+    private static final long MAX_FILE_BASE64_CHARACTERS = 2L * 1024 * 1024 * 1024 - 4;
+
+    private static final long MAX_TOTAL_FILE_BASE64_CHARACTERS = 8L * 1024 * 1024 * 1024;
+
     private DshWebviewActionSanitizer() {}
 
     private static boolean validAnswers(JsonArray answers) {
@@ -54,7 +62,7 @@ final class DshWebviewActionSanitizer {
             return null;
         }
         if ("sendPrompt".equals(type)) {
-            if (!hasOnly(input, "type", "text", "mode", "images")) {
+            if (!hasOnly(input, "type", "text", "mode", "images", "files")) {
                 return null;
             }
             String text = DshJson.string(input, "text");
@@ -91,7 +99,40 @@ final class DshWebviewActionSanitizer {
                     }
                 }
             }
+            if (input.has("files")) {
+                if (!input.get("files").isJsonArray()
+                        || input.getAsJsonArray("files").size() > MAX_FILES_PER_MESSAGE) {
+                    return null;
+                }
+                long totalCharacters = 0;
+                for (JsonElement file : input.getAsJsonArray("files")) {
+                    if (!file.isJsonObject()) return null;
+                    JsonObject fileObject = file.getAsJsonObject();
+                    if (!hasOnly(fileObject, "name", "data")) return null;
+                    String name = strictString(fileObject, "name");
+                    String data = strictString(fileObject, "data");
+                    if (name == null
+                            || name.isBlank()
+                            || name.length() > MAX_FILE_NAME_CHARACTERS
+                            || data == null
+                            || data.isBlank()
+                            || data.length() > MAX_FILE_BASE64_CHARACTERS) {
+                        return null;
+                    }
+                    totalCharacters += data.length();
+                    if (totalCharacters > MAX_TOTAL_FILE_BASE64_CHARACTERS) return null;
+                }
+            }
             return input;
+        }
+        if ("copyMessage".equals(type)) {
+            String messageId = strictString(input, "messageId");
+            return hasOnly(input, "type", "messageId")
+                            && messageId != null
+                            && !messageId.isBlank()
+                            && messageId.length() <= 512
+                    ? input
+                    : null;
         }
         if ("openFileLocation".equals(type)) {
             if (!hasOnly(input, "type", "path", "line", "column")) {
@@ -452,5 +493,12 @@ final class DshWebviewActionSanitizer {
             }
         }
         return true;
+    }
+
+    private static String strictString(JsonObject input, String key) {
+        JsonElement value = input == null ? null : input.get(key);
+        return value != null && value.isJsonPrimitive() && value.getAsJsonPrimitive().isString()
+                ? value.getAsString()
+                : null;
     }
 }
