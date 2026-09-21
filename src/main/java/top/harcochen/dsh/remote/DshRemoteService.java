@@ -644,14 +644,41 @@ public final class DshRemoteService implements Disposable {
     }
 
     public JsonArray providers() throws DshRemoteException {
-        JsonElement value =
-                unary.call(DshRemoteContracts.LLM_PROVIDERS, DshRemoteContracts.argsEmpty());
-        return value != null && value.isJsonArray() ? value.getAsJsonArray() : new JsonArray();
+        JsonArray configurable =
+                arrayValue(
+                        unary.call(
+                                DshRemoteContracts.LLM_PROVIDERS, DshRemoteContracts.argsEmpty()));
+        java.util.Set<String> active = new java.util.HashSet<>();
+        try {
+            JsonArray activeRows =
+                    arrayValue(
+                            unary.call(
+                                    DshRemoteContracts.LLM_LIST_PROVIDERS,
+                                    DshRemoteContracts.argsEmpty()));
+            for (JsonElement candidate : activeRows) {
+                if (!candidate.isJsonObject()) continue;
+                String id = stringOf(candidate.getAsJsonObject(), "id");
+                if (!id.isBlank()) active.add(id);
+            }
+        } catch (DshRemoteException error) {
+            // Older Runtimes may expose only the configurable directory. Keep
+            // that useful surface available and treat activity as unknown.
+            if (!error.isCapabilityMissing()) throw error;
+        }
+        JsonArray result = new JsonArray();
+        for (JsonElement candidate : configurable) {
+            if (!candidate.isJsonObject()) continue;
+            JsonObject provider = candidate.getAsJsonObject().deepCopy();
+            String id = stringOf(provider, "provider");
+            if (!id.isBlank()) provider.addProperty("active", active.contains(id));
+            result.add(provider);
+        }
+        return result;
     }
 
-    public JsonObject discoverLlmModels(String settingsNs, JsonObject draft)
+    public JsonArray discoverLlmModels(String settingsNs, JsonObject draft)
             throws DshRemoteException {
-        return objectValue(
+        return arrayValue(
                 unary.call(
                         DshRemoteContracts.LLM_DISCOVER_MODELS,
                         DshRemoteContracts.argsLlmDiscoverModels(settingsNs, draft)));
@@ -673,6 +700,127 @@ public final class DshRemoteService implements Disposable {
     public void unsetCredential(String ref) throws DshRemoteException {
         unary.call(
                 DshRemoteContracts.CREDENTIALS_UNSET, DshRemoteContracts.argsCredentialsUnset(ref));
+    }
+
+    /** Read the optional point-in-time Runtime plugin inventory. */
+    public JsonObject pluginInventory() throws DshRemoteException {
+        JsonObject value =
+                DshPluginInventory.normalize(
+                        unary.call(
+                                DshRemoteContracts.PLUGIN_INVENTORY_LIST,
+                                DshRemoteContracts.argsEmpty()));
+        if (value == null) {
+            throw DshRemoteException.protocol(
+                    DshRemoteContracts.PLUGIN_INVENTORY_LIST,
+                    "Remote plugin inventory has an invalid shape",
+                    null);
+        }
+        return value;
+    }
+
+    /** Read the optional frame-wide dynamic Cordis plugin registry. */
+    public JsonArray dynamicPluginInventory() throws DshRemoteException {
+        JsonArray value =
+                DshDynamicPlugin.normalizeInventory(
+                        unary.call(
+                                DshRemoteContracts.DYNAMIC_PLUGIN_INVENTORY,
+                                DshRemoteContracts.argsEmpty()));
+        if (value == null) {
+            throw DshRemoteException.protocol(
+                    DshRemoteContracts.DYNAMIC_PLUGIN_INVENTORY,
+                    "Remote dynamic plugin inventory has an invalid shape",
+                    null);
+        }
+        return value;
+    }
+
+    public JsonObject stopDynamicPlugin(String agentId, String pluginId) throws DshRemoteException {
+        JsonObject value =
+                DshDynamicPlugin.normalizeReceipt(
+                        unary.call(
+                                DshRemoteContracts.DYNAMIC_PLUGIN_STOP,
+                                DshRemoteContracts.argsDynamicPluginPanel(agentId, pluginId)),
+                        "stop");
+        if (value == null) {
+            throw DshRemoteException.protocol(
+                    DshRemoteContracts.DYNAMIC_PLUGIN_STOP,
+                    "Remote dynamic plugin stop returned an invalid shape",
+                    null);
+        }
+        return value;
+    }
+
+    public JsonObject removeDynamicPlugin(String agentId, String pluginId)
+            throws DshRemoteException {
+        JsonObject value =
+                DshDynamicPlugin.normalizeReceipt(
+                        unary.call(
+                                DshRemoteContracts.DYNAMIC_PLUGIN_REMOVE,
+                                DshRemoteContracts.argsDynamicPluginPanel(agentId, pluginId)),
+                        "remove");
+        if (value == null) {
+            throw DshRemoteException.protocol(
+                    DshRemoteContracts.DYNAMIC_PLUGIN_REMOVE,
+                    "Remote dynamic plugin removal returned an invalid shape",
+                    null);
+        }
+        return value;
+    }
+
+    public JsonObject declineDynamicPlugin(String requestId, String pluginRunId)
+            throws DshRemoteException {
+        JsonObject value =
+                DshDynamicPlugin.normalizeResolve(
+                        unary.call(
+                                DshRemoteContracts.DYNAMIC_PLUGIN_RESOLVE,
+                                DshRemoteContracts.argsDynamicPluginResolve(
+                                        requestId, pluginRunId, false)));
+        if (value == null) {
+            throw DshRemoteException.protocol(
+                    DshRemoteContracts.DYNAMIC_PLUGIN_RESOLVE,
+                    "Remote dynamic plugin decision returned an invalid shape",
+                    null);
+        }
+        return value;
+    }
+
+    public JsonObject listMessageFeedback(String sessionId) throws DshRemoteException {
+        return objectValue(
+                unary.call(
+                        DshRemoteContracts.MESSAGE_FEEDBACK_LIST,
+                        DshRemoteContracts.argsMessageFeedbackList(sessionId)));
+    }
+
+    public JsonObject putMessageFeedback(
+            String sessionId,
+            String messageId,
+            String rating,
+            String note,
+            String category,
+            String ifVersion)
+            throws DshRemoteException {
+        return objectValue(
+                unary.call(
+                        DshRemoteContracts.MESSAGE_FEEDBACK_PUT,
+                        DshRemoteContracts.argsMessageFeedbackPut(
+                                sessionId, messageId, rating, note, category, ifVersion)));
+    }
+
+    public JsonObject deleteMessageFeedback(String sessionId, String messageId, String ifVersion)
+            throws DshRemoteException {
+        return objectValue(
+                unary.call(
+                        DshRemoteContracts.MESSAGE_FEEDBACK_DELETE,
+                        DshRemoteContracts.argsMessageFeedbackDelete(
+                                sessionId, messageId, ifVersion)));
+    }
+
+    public JsonObject recordSessionFeedback(String sessionId, String text, String category)
+            throws DshRemoteException {
+        return objectValue(
+                unary.call(
+                        DshRemoteContracts.SESSION_FEEDBACK_RECORD,
+                        DshRemoteContracts.argsSessionFeedbackRecord(sessionId, text, category)));
     }
 
     /** One message-aligned backwards history page for any session address. */
@@ -874,6 +1022,10 @@ public final class DshRemoteService implements Disposable {
 
     private static JsonObject objectValue(JsonElement value) {
         return value != null && value.isJsonObject() ? value.getAsJsonObject() : new JsonObject();
+    }
+
+    private static JsonArray arrayValue(JsonElement value) {
+        return value != null && value.isJsonArray() ? value.getAsJsonArray() : new JsonArray();
     }
 
     private static JsonObject objectValue(JsonObject object, String key) {

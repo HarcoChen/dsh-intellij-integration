@@ -134,6 +134,10 @@ public final class DshMessageProjector {
                     reasoning = partial.reasoning.toString();
                 String key = "event:" + seq;
                 JsonObject row = message(key, "assistant", text, time, seq, "committed");
+                String messageId = string(message, "id");
+                if (messageId == null || messageId.isBlank()) messageId = string(data, "messageId");
+                if (messageId != null && !messageId.isBlank())
+                    row.addProperty("messageId", messageId);
                 addImages(row, message.has("content") ? message.get("content") : null);
                 if (!reasoning.isBlank()) {
                     row.addProperty("reasoning", reasoning);

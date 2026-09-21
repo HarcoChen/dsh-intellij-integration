@@ -18,7 +18,11 @@
             <li><b>Balance at a glance:</b> view your DeepSeek balance and pricing
             information in the status bar when available.</li>
             <li><b>Local Runtime management:</b> start, stop, restart, or connect
-            to a compatible existing Harness Runtime across editor windows.</li>
+            to a compatible existing Harness Runtime across editor windows. A pinned,
+            integrity-checked managed distribution is available as the final local fallback.</li>
+            <li><b>Provider and conversation controls:</b> configure provider endpoints,
+            credentials, and models; navigate conversation turns; and submit optional
+            message or session feedback when the Runtime advertises those capabilities.</li>
             <li><b>Secure credentials:</b> store API keys in IntelliJ Password Safe.</li>
             <li>English and Simplified Chinese interface resources.</li>
         </ul>
@@ -26,8 +30,9 @@
         and ask a question or right-click a code selection. Runtime settings
         are under Settings &gt; Tools &gt; DeepSeek Harness.</p>
         <p><b>Requirements:</b> IntelliJ Platform 2024.3 or later with JCEF.
-        Local Runtime startup requires Node.js with pnpm or npm/npx, or an
-        installed dsh command. You can also connect to an existing Runtime.</p>
+        Local Runtime startup uses the verified managed distribution when enabled and
+        falls back to Node.js with pnpm or npm/npx, or an installed dsh command. The
+        bundled lifecycle helper requires Node.js 24+. You can also connect to an existing Runtime.</p>
         <p><a href="https://github.com/HarcoChen/dsh-intellij-integration#readme">Getting started and configuration</a>
         | <a href="https://github.com/HarcoChen/dsh-intellij-integration/blob/main/README.zh-CN.md">简体中文指南</a>
         | <a href="https://github.com/HarcoChen/dsh-intellij-integration/issues">Report an issue</a></p>
@@ -76,6 +81,7 @@
         <action id="Dsh.ConfigureApiKey" class="top.harcochen.dsh.action.DshCommandAction" />
         <action id="Dsh.ManageProviders" class="top.harcochen.dsh.action.DshCommandAction" />
         <action id="Dsh.ManageAgentPresets" class="top.harcochen.dsh.action.DshCommandAction" />
+        <action id="Dsh.ConversationOutline" class="top.harcochen.dsh.action.DshCommandAction" />
         <action id="Dsh.Diagnose" class="top.harcochen.dsh.action.DshCommandAction" />
         <action id="Dsh.AskAboutSelection" class="top.harcochen.dsh.action.DshAskAboutSelectionAction">
             <add-to-group group-id="EditorPopupMenu" anchor="last" />

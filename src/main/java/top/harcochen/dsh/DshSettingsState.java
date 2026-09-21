@@ -29,6 +29,10 @@ public final class DshSettingsState implements PersistentStateComponent<DshSetti
     public String lastSessionId = "";
 
     public boolean installWhenMissing = true;
+
+    /** Prefer the signed, cached platform Runtime before package-manager fallbacks. */
+    public boolean useManagedRuntime = true;
+
     public boolean recoveryEnabled = true;
     public boolean recoveryAutoPersistBundleIsolation = true;
 
@@ -77,6 +81,7 @@ public final class DshSettingsState implements PersistentStateComponent<DshSetti
         persistSession = state.persistSession;
         lastSessionId = state.lastSessionId;
         installWhenMissing = state.installWhenMissing;
+        useManagedRuntime = state.useManagedRuntime;
         recoveryEnabled = state.recoveryEnabled;
         recoveryAutoPersistBundleIsolation = state.recoveryAutoPersistBundleIsolation;
         enableCompaction = state.enableCompaction;

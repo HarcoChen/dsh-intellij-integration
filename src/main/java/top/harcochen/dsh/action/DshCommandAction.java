@@ -25,6 +25,7 @@ public final class DshCommandAction extends DumbAwareAction {
                     case "Dsh.ConfigureApiKey" -> "configureApiKey";
                     case "Dsh.ManageProviders" -> "manageProviders";
                     case "Dsh.ManageAgentPresets" -> "manageAgentPresets";
+                    case "Dsh.ConversationOutline" -> "openConversationOutline";
                     case "Dsh.Diagnose" -> "diagnoseEnvironment";
                     default -> "openBrowser";
                 };

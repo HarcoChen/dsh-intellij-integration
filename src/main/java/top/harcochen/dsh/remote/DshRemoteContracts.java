@@ -72,16 +72,26 @@ public final class DshRemoteContracts {
     public static final String COMMANDS_LIST = "commands/list";
     public static final String COMMANDS_EXECUTE = "commands/execute";
     public static final String LLM_PROVIDERS = "llm/listConfigurableProviders";
+    public static final String LLM_LIST_PROVIDERS = "llm/listProviders";
     public static final String LLM_DISCOVER_MODELS = "llm/discoverModels";
     public static final String CREDENTIALS_DESCRIBE = "credentials/describe";
     public static final String CREDENTIALS_SET = "credentials/set";
     public static final String CREDENTIALS_UNSET = "credentials/unset";
+    public static final String PLUGIN_INVENTORY_LIST = "pluginInventory/list";
+    public static final String DYNAMIC_PLUGIN_INVENTORY = "dynamicCordisRunner/inventory";
+    public static final String DYNAMIC_PLUGIN_STOP = "dynamicCordisRunner/stopFromPanel";
+    public static final String DYNAMIC_PLUGIN_REMOVE = "dynamicCordisRunner/undefineFromPanel";
+    public static final String DYNAMIC_PLUGIN_RESOLVE = "dynamicCordisRunner/resolveRequestRun";
 
     /** Binary HTTP route used by {@code session/prompt} file content parts. */
     public static final String SESSION_UPLOAD_FILE_BINARY = "session/uploadFileBinary";
 
-    /** Recorded for capability documentation; no IntelliJ UI exposes it yet. */
+    /** Optional per-message feedback sidecar endpoints. */
     public static final String MESSAGE_FEEDBACK_LIST = "messageFeedback/list";
+
+    public static final String MESSAGE_FEEDBACK_PUT = "messageFeedback/put";
+    public static final String MESSAGE_FEEDBACK_DELETE = "messageFeedback/delete";
+    public static final String SESSION_FEEDBACK_RECORD = "sessionFeedback/record";
 
     // Stream endpoints opened through /api/remote.mux.
     public static final String STREAM_WORKSPACE_FOLLOW = "workspace/follow";
@@ -639,6 +649,81 @@ public final class DshRemoteContracts {
         JsonObject args = new JsonObject();
         args.addProperty("ref", ref);
         return args;
+    }
+
+    /** `dynamicCordisRunner/stopFromPanel(agentId, pluginId)`. */
+    public static JsonObject argsDynamicPluginPanel(String agentId, String pluginId) {
+        JsonObject args = new JsonObject();
+        args.addProperty("agentId", agentId);
+        args.addProperty("pluginId", pluginId);
+        return args;
+    }
+
+    /** `dynamicCordisRunner/resolveRequestRun(requestId, resolution)`. */
+    public static JsonObject argsDynamicPluginResolve(
+            String requestId, String pluginRunId, boolean accepted) {
+        JsonObject args = new JsonObject();
+        args.addProperty("requestId", requestId);
+        JsonObject resolution = new JsonObject();
+        resolution.addProperty("ok", accepted);
+        if (accepted) {
+            if (pluginRunId != null && !pluginRunId.isBlank()) {
+                resolution.addProperty("pluginRunId", pluginRunId);
+            }
+        } else {
+            resolution.addProperty("reason", "rejected");
+            if (pluginRunId != null && !pluginRunId.isBlank()) {
+                resolution.addProperty("pluginRunId", pluginRunId);
+            }
+        }
+        args.add("resolution", resolution);
+        return args;
+    }
+
+    /** `messageFeedback/list(request)` with `{request:{sessionId}}`. */
+    public static JsonObject argsMessageFeedbackList(String sessionId) {
+        JsonObject request = new JsonObject();
+        request.addProperty("sessionId", sessionId);
+        return withRequest(request);
+    }
+
+    /** `messageFeedback/put(request)` with a versioned feedback item. */
+    public static JsonObject argsMessageFeedbackPut(
+            String sessionId,
+            String messageId,
+            String rating,
+            String note,
+            String category,
+            String ifVersion) {
+        JsonObject request = new JsonObject();
+        request.addProperty("sessionId", sessionId);
+        request.addProperty("messageId", messageId);
+        request.addProperty("rating", rating);
+        if (note != null && !note.isBlank()) request.addProperty("note", note);
+        if (category != null && !category.isBlank()) request.addProperty("category", category);
+        if (ifVersion == null) request.add("ifVersion", com.google.gson.JsonNull.INSTANCE);
+        else request.addProperty("ifVersion", ifVersion);
+        return withRequest(request);
+    }
+
+    /** `messageFeedback/delete(request)` with a versioned feedback item. */
+    public static JsonObject argsMessageFeedbackDelete(
+            String sessionId, String messageId, String ifVersion) {
+        JsonObject request = new JsonObject();
+        request.addProperty("sessionId", sessionId);
+        request.addProperty("messageId", messageId);
+        request.addProperty("ifVersion", ifVersion);
+        return withRequest(request);
+    }
+
+    /** `sessionFeedback/record(request)` with an optional category and note. */
+    public static JsonObject argsSessionFeedbackRecord(
+            String sessionId, String text, String category) {
+        JsonObject request = new JsonObject();
+        request.addProperty("sessionId", sessionId);
+        if (text != null && !text.isBlank()) request.addProperty("text", text);
+        if (category != null && !category.isBlank()) request.addProperty("category", category);
+        return withRequest(request);
     }
 
     /** `session/openWorkspacePath(request)` with `{request:{path}}`. */

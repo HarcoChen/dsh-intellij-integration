@@ -42,6 +42,7 @@ import top.harcochen.dsh.remote.DshRemoteUnaryClient;
 public final class DshRuntimeService implements Disposable {
     private static final Logger LOG = Logger.getInstance(DshRuntimeService.class);
     private static final int DEFAULT_PORT = 3080;
+    private static final String MANAGED_LAUNCHER = "__dsh_managed_runtime__";
 
     /** The npm package the Runtime ships as; see {@link #pinRuntimeVersion}. */
     private static final String RUNTIME_PACKAGE = "@deepseek-ai/dsh";
@@ -362,12 +363,23 @@ public final class DshRuntimeService implements Disposable {
         Throwable last = null;
         for (List<String> command : candidates) {
             try {
-                List<String> resolvedCommand = new ArrayList<>(command);
-                resolvedCommand.set(0, resolveExecutable(command.get(0), environment));
+                List<String> candidateCommand = command;
+                if (MANAGED_LAUNCHER.equals(command.get(0))) {
+                    Path managed =
+                            DshManagedRuntime.ensure(settings.runtimeVersion, this::appendLog);
+                    if (managed == null) {
+                        throw new IOException(DshBundle.message("dsh.runtime.managed.unavailable"));
+                    }
+                    candidateCommand = new ArrayList<>(command);
+                    candidateCommand.set(0, managed.toString());
+                }
+                List<String> resolvedCommand = new ArrayList<>(candidateCommand);
+                resolvedCommand.set(0, resolveExecutable(candidateCommand.get(0), environment));
                 if (isWindows()) resolvedCommand = prepareCommand(resolvedCommand, environment);
-                String version = probeVersion(command, environment);
-                if (!DshRuntimeVersion.compatible(version) && !isNodePackageManager(command.get(0)))
-                    version = offerLocalUpgrade(command, version, settings);
+                String version = probeVersion(candidateCommand, environment);
+                if (!DshRuntimeVersion.compatible(version)
+                        && !isNodePackageManager(candidateCommand.get(0)))
+                    version = offerLocalUpgrade(candidateCommand, version, settings);
                 if (!DshRuntimeVersion.compatible(version)) {
                     throw new IOException(
                             "DSH Runtime "
@@ -390,7 +402,7 @@ public final class DshRuntimeService implements Disposable {
                 builder.redirectErrorStream(true);
                 builder.environment().putAll(environment);
                 if (settings.npmRegistry != null && !settings.npmRegistry.isBlank()) {
-                    if (isNodePackageManager(command.get(0))) {
+                    if (isNodePackageManager(candidateCommand.get(0))) {
                         builder.environment()
                                 .putIfAbsent("npm_config_registry", settings.npmRegistry.trim());
                     }
@@ -419,7 +431,7 @@ public final class DshRuntimeService implements Disposable {
                                 settings,
                                 overlay));
                 runtimeLock.publishProcess(
-                        child, launchedVersion, isNodePackageManager(command.get(0)));
+                        child, launchedVersion, isNodePackageManager(candidateCommand.get(0)));
                 appendLog(DshBundle.message("dsh.runtime.log.started.pid", child.pid()));
                 return child;
             } catch (IOException error) {
@@ -448,6 +460,19 @@ public final class DshRuntimeService implements Disposable {
         List<String> args = pinRuntimeVersion(splitArguments(settings.commandArgs), version);
         List<List<String>> result = new ArrayList<>();
         boolean auto = "auto".equals(command);
+        if ("managed".equalsIgnoreCase(command)) {
+            Path managed = DshManagedRuntime.ensure(version, this::appendLog);
+            if (managed == null) {
+                throw new IllegalStateException(
+                        DshBundle.message("dsh.runtime.managed.unavailable"));
+            }
+            result.add(
+                    launchCommand(
+                            managed.toString(),
+                            args.isEmpty() ? List.of("web", "--no-open") : args,
+                            settings.serverPort));
+            return result;
+        }
         if (auto) {
             int packageIndex = -1;
             for (int i = 0; i < args.size(); i++)
@@ -470,6 +495,14 @@ public final class DshRuntimeService implements Disposable {
                 npx.addAll(app);
                 result.add(launchCommand(platformCommand("pnpm"), pnpm, settings.serverPort));
                 result.add(launchCommand(platformCommand("npx"), npx, settings.serverPort));
+            }
+            if (settings.installWhenMissing && settings.useManagedRuntime) {
+                List<String> app =
+                        packageIndex < 0
+                                ? (args.isEmpty() ? List.of("web", "--no-open") : args)
+                                : new ArrayList<>(args.subList(packageIndex + 1, args.size()));
+                if (app.isEmpty()) app = List.of("web", "--no-open");
+                result.add(launchCommand(MANAGED_LAUNCHER, app, settings.serverPort));
             }
         } else {
             if (args.isEmpty()) {

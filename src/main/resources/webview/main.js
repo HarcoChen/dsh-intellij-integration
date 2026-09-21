@@ -26,9 +26,9 @@
     mod
   ));
 
-  // ../../../Users/harco/Programs/dsh-ide/node_modules/react/cjs/react.development.js
+  // node_modules/react/cjs/react.development.js
   var require_react_development = __commonJS({
-    "../../../Users/harco/Programs/dsh-ide/node_modules/react/cjs/react.development.js"(exports, module) {
+    "node_modules/react/cjs/react.development.js"(exports, module) {
       "use strict";
       if (true) {
         (function() {
@@ -1085,7 +1085,7 @@
             }
             return dispatcher.useContext(Context);
           }
-          function useState20(initialState) {
+          function useState21(initialState) {
             var dispatcher = resolveDispatcher();
             return dispatcher.useState(initialState);
           }
@@ -1097,7 +1097,7 @@
             var dispatcher = resolveDispatcher();
             return dispatcher.useRef(initialValue);
           }
-          function useEffect16(create, deps) {
+          function useEffect17(create, deps) {
             var dispatcher = resolveDispatcher();
             return dispatcher.useEffect(create, deps);
           }
@@ -1135,7 +1135,7 @@
             var dispatcher = resolveDispatcher();
             return dispatcher.useDeferredValue(value);
           }
-          function useId() {
+          function useId2() {
             var dispatcher = resolveDispatcher();
             return dispatcher.useId();
           }
@@ -1880,15 +1880,15 @@
           exports.useContext = useContext;
           exports.useDebugValue = useDebugValue;
           exports.useDeferredValue = useDeferredValue;
-          exports.useEffect = useEffect16;
-          exports.useId = useId;
+          exports.useEffect = useEffect17;
+          exports.useId = useId2;
           exports.useImperativeHandle = useImperativeHandle;
           exports.useInsertionEffect = useInsertionEffect;
           exports.useLayoutEffect = useLayoutEffect4;
           exports.useMemo = useMemo6;
           exports.useReducer = useReducer;
           exports.useRef = useRef11;
-          exports.useState = useState20;
+          exports.useState = useState21;
           exports.useSyncExternalStore = useSyncExternalStore;
           exports.useTransition = useTransition;
           exports.version = ReactVersion;
@@ -1900,9 +1900,9 @@
     }
   });
 
-  // ../../../Users/harco/Programs/dsh-ide/node_modules/react/index.js
+  // node_modules/react/index.js
   var require_react = __commonJS({
-    "../../../Users/harco/Programs/dsh-ide/node_modules/react/index.js"(exports, module) {
+    "node_modules/react/index.js"(exports, module) {
       "use strict";
       if (false) {
         module.exports = null;
@@ -1912,9 +1912,9 @@
     }
   });
 
-  // ../../../Users/harco/Programs/dsh-ide/node_modules/scheduler/cjs/scheduler.development.js
+  // node_modules/scheduler/cjs/scheduler.development.js
   var require_scheduler_development = __commonJS({
-    "../../../Users/harco/Programs/dsh-ide/node_modules/scheduler/cjs/scheduler.development.js"(exports) {
+    "node_modules/scheduler/cjs/scheduler.development.js"(exports) {
       "use strict";
       if (true) {
         (function() {
@@ -2362,9 +2362,9 @@
     }
   });
 
-  // ../../../Users/harco/Programs/dsh-ide/node_modules/scheduler/index.js
+  // node_modules/scheduler/index.js
   var require_scheduler = __commonJS({
-    "../../../Users/harco/Programs/dsh-ide/node_modules/scheduler/index.js"(exports, module) {
+    "node_modules/scheduler/index.js"(exports, module) {
       "use strict";
       if (false) {
         module.exports = null;
@@ -2374,9 +2374,9 @@
     }
   });
 
-  // ../../../Users/harco/Programs/dsh-ide/node_modules/react-dom/cjs/react-dom.development.js
+  // node_modules/react-dom/cjs/react-dom.development.js
   var require_react_dom_development = __commonJS({
-    "../../../Users/harco/Programs/dsh-ide/node_modules/react-dom/cjs/react-dom.development.js"(exports) {
+    "node_modules/react-dom/cjs/react-dom.development.js"(exports) {
       "use strict";
       if (true) {
         (function() {
@@ -2384,9 +2384,9 @@
           if (typeof __REACT_DEVTOOLS_GLOBAL_HOOK__ !== "undefined" && typeof __REACT_DEVTOOLS_GLOBAL_HOOK__.registerInternalModuleStart === "function") {
             __REACT_DEVTOOLS_GLOBAL_HOOK__.registerInternalModuleStart(new Error());
           }
-          var React36 = require_react();
+          var React37 = require_react();
           var Scheduler = require_scheduler();
-          var ReactSharedInternals = React36.__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED;
+          var ReactSharedInternals = React37.__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED;
           var suppressWarning = false;
           function setSuppressWarning(newSuppressWarning) {
             {
@@ -3993,7 +3993,7 @@
             {
               if (props.value == null) {
                 if (typeof props.children === "object" && props.children !== null) {
-                  React36.Children.forEach(props.children, function(child) {
+                  React37.Children.forEach(props.children, function(child) {
                     if (child == null) {
                       return;
                     }
@@ -23538,9 +23538,9 @@
     }
   });
 
-  // ../../../Users/harco/Programs/dsh-ide/node_modules/react-dom/index.js
+  // node_modules/react-dom/index.js
   var require_react_dom = __commonJS({
-    "../../../Users/harco/Programs/dsh-ide/node_modules/react-dom/index.js"(exports, module) {
+    "node_modules/react-dom/index.js"(exports, module) {
       "use strict";
       if (false) {
         checkDCE();
@@ -23551,9 +23551,9 @@
     }
   });
 
-  // ../../../Users/harco/Programs/dsh-ide/node_modules/react-dom/client.js
+  // node_modules/react-dom/client.js
   var require_client = __commonJS({
-    "../../../Users/harco/Programs/dsh-ide/node_modules/react-dom/client.js"(exports) {
+    "node_modules/react-dom/client.js"(exports) {
       "use strict";
       var m = require_react_dom();
       if (false) {
@@ -23583,11 +23583,11 @@
   });
 
   // webview/src/main.tsx
-  var import_react37 = __toESM(require_react());
+  var import_react38 = __toESM(require_react());
   var import_client = __toESM(require_client());
 
   // webview/src/App.tsx
-  var import_react36 = __toESM(require_react());
+  var import_react37 = __toESM(require_react());
 
   // webview/src/bridge.ts
   var import_react = __toESM(require_react());
@@ -23851,6 +23851,22 @@
     "Feedback note": "\u53CD\u9988\u5907\u6CE8",
     "Optional feedback note": "\u53EF\u9009\uFF1A\u544A\u8BC9\u6211\u4EEC\u66F4\u591A\u4FE1\u606F",
     "Save feedback note": "\u4FDD\u5B58\u53CD\u9988\u5907\u6CE8",
+    "Submit feedback": "\u63D0\u4EA4\u53CD\u9988",
+    "Your feedback helps us improve this Session.": "\u4F60\u7684\u53CD\u9988\u5C06\u5E2E\u52A9\u6211\u4EEC\u6539\u8FDB\u6B64 Session\u3002",
+    "Your feedback helps us improve this response.": "\u4F60\u7684\u53CD\u9988\u5C06\u5E2E\u52A9\u6211\u4EEC\u6539\u8FDB\u8FD9\u6761\u56DE\u590D\u3002",
+    "Feedback category": "\u53CD\u9988\u7C7B\u522B",
+    "Task result": "\u4EFB\u52A1\u7ED3\u679C",
+    "Instruction following": "\u6307\u4EE4\u9075\u5FAA",
+    "Product interaction": "\u4EA7\u54C1\u4EA4\u4E92",
+    "Service stability": "\u670D\u52A1\u7A33\u5B9A\u6027",
+    "Resource cost": "\u8D44\u6E90\u6210\u672C",
+    "Security, privacy, or permissions": "\u5B89\u5168\u3001\u9690\u79C1\u6216\u6743\u9650",
+    "Other": "\u5176\u4ED6",
+    "Feedback details": "\u53CD\u9988\u8BE6\u60C5",
+    "Add details to help us improve. Your submission will include the current conversation log.": "\u8865\u5145\u4FE1\u606F\u4EE5\u5E2E\u52A9\u6211\u4EEC\u6539\u8FDB\u3002\u63D0\u4EA4\u5185\u5BB9\u5C06\u5305\u542B\u5F53\u524D\u5BF9\u8BDD\u65E5\u5FD7\u3002",
+    "Add details about this response.": "\u8865\u5145\u8FD9\u6761\u56DE\u590D\u7684\u5177\u4F53\u60C5\u51B5\u3002",
+    "Thanks for your feedback": "\u611F\u8C22\u4F60\u7684\u53CD\u9988",
+    "Session feedback is unavailable in this Runtime.": "\u5F53\u524D Runtime \u4E0D\u63D0\u4F9B\u4F1A\u8BDD\u53CD\u9988\u3002",
     "Describe a task.": "\u76F4\u63A5\u63CF\u8FF0\u4EFB\u52A1\u3002",
     "The current selection is attached automatically. You can also use @ to reference files.": "\u5F53\u524D\u9009\u533A\u4F1A\u81EA\u52A8\u9644\u52A0\uFF0C\u4E5F\u53EF\u4EE5\u7528 @ \u5F15\u7528\u6587\u4EF6\u3002",
     "Ctrl/Cmd + Enter to send.": "Ctrl/Cmd + Enter \u53D1\u9001\u3002",
@@ -24241,6 +24257,12 @@
   function CopyIcon({ size = 14 }) {
     return /* @__PURE__ */ import_react2.default.createElement("svg", { ...base(size) }, /* @__PURE__ */ import_react2.default.createElement("rect", { x: "5.5", y: "5.5", width: "8", height: "8", rx: "1.2" }), /* @__PURE__ */ import_react2.default.createElement("path", { d: "M10.5 5.5V3.7c0-1-.7-1.7-1.7-1.7H3.7C2.7 2 2 2.7 2 3.7v5.1c0 1 .7 1.7 1.7 1.7h1.8" }));
   }
+  function LikeIcon({ size = 14 }) {
+    return /* @__PURE__ */ import_react2.default.createElement("svg", { ...base(size) }, /* @__PURE__ */ import_react2.default.createElement("path", { d: "M6.2 7V4.8c0-.9.4-1.8 1-2.4l.4-.4c.3-.3.8-.1.9.3l.2 1c.1.7-.1 1.4-.5 2l-.4.7h4.8c.9 0 1.6.8 1.4 1.7l-.9 4.6c-.2.9-.9 1.5-1.8 1.5H6.2" }), /* @__PURE__ */ import_react2.default.createElement("path", { d: "M6.2 7H3.8c-.8 0-1.3.5-1.3 1.3v3.8c0 .8.5 1.3 1.3 1.3h2.4" }));
+  }
+  function DislikeIcon({ size = 14 }) {
+    return /* @__PURE__ */ import_react2.default.createElement("svg", { ...base(size) }, /* @__PURE__ */ import_react2.default.createElement("path", { d: "M6.2 9V11.2c0 .9.4 1.8 1 2.4l.4.4c.3.3.8.1.9-.3l.2-1c.1-.7-.1-1.4-.5-2l-.4-.7h4.8c.9 0 1.6-.8 1.4-1.7l-.9-4.6c-.2-.9-.9-1.5-1.8-1.5H6.2" }), /* @__PURE__ */ import_react2.default.createElement("path", { d: "M6.2 9H3.8c-.8 0-1.3-.5-1.3-1.3V3.9c0-.8.5-1.3 1.3-1.3h2.4" }));
+  }
   function SendIcon({ size = 14 }) {
     return /* @__PURE__ */ import_react2.default.createElement("svg", { ...base(size) }, /* @__PURE__ */ import_react2.default.createElement("path", { d: "M2.5 8 13.5 2.5 10 13.5 7.2 9.2 2.5 8Z" }), /* @__PURE__ */ import_react2.default.createElement("path", { d: "M13.5 2.5 7.2 9.2" }));
   }
@@ -24321,6 +24343,7 @@
       { key: "fork", label: t("Fork session"), action: { type: "forkSession" }, disabled: !hasSession },
       { key: "archive", label: t("Archive session"), action: { type: "archiveSession" }, disabled: !hasSession },
       { key: "trace", label: t("Open session trace"), action: { type: "openTrace" }, disabled: !hasSession },
+      { key: "feedback", label: t("Submit feedback"), action: { type: "openSessionFeedback" }, disabled: !hasSession },
       {
         key: "runtime",
         label: recoveryRunning ? t("Cancel automatic recovery") : runtimeRunning ? t("Stop runtime") : t("Start runtime"),
@@ -24908,6 +24931,24 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
   }
 
   // webview/src/components/MessageItem.tsx
+  var MESSAGE_FEEDBACK_CATEGORIES = [
+    "task-result",
+    "instruction-following",
+    "product-interaction",
+    "service-stability",
+    "resource-cost",
+    "security-privacy-permission",
+    "other"
+  ];
+  var MESSAGE_FEEDBACK_CATEGORY_LABELS = {
+    "task-result": "Task result",
+    "instruction-following": "Instruction following",
+    "product-interaction": "Product interaction",
+    "service-stability": "Service stability",
+    "resource-cost": "Resource cost",
+    "security-privacy-permission": "Security, privacy, or permissions",
+    other: "Other"
+  };
   function canCopyMessage(message) {
     return (message.role === "user" || message.role === "assistant") && (message.text.trim().length > 0 || Boolean(message.skillInvocation));
   }
@@ -24992,6 +25033,185 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
       run("forkAndRestoreCodeToMessage");
     } }, t("Fork + restore code"))) : null);
   }
+  function MessageFeedbackActions({
+    messageId,
+    feedback
+  }) {
+    const [dialog, setDialog] = (0, import_react8.useState)();
+    const [submitting, setSubmitting] = (0, import_react8.useState)(false);
+    const [pendingObserved, setPendingObserved] = (0, import_react8.useState)(false);
+    const [toast, setToast] = (0, import_react8.useState)(false);
+    const toastTimerRef = (0, import_react8.useRef)();
+    const dialogTitleId = (0, import_react8.useId)();
+    const hasRating = feedback.rating !== void 0;
+    const pending = Boolean(feedback.pending);
+    const disabled = pending || feedback.status === "loading" || submitting;
+    (0, import_react8.useEffect)(() => {
+      return () => {
+        if (toastTimerRef.current !== void 0) window.clearTimeout(toastTimerRef.current);
+      };
+    }, []);
+    (0, import_react8.useEffect)(() => {
+      if (!dialog || !submitting) return;
+      if (pending) {
+        setPendingObserved(true);
+        return;
+      }
+      if (!pendingObserved) return;
+      if (feedback.error) {
+        setSubmitting(false);
+        setPendingObserved(false);
+        return;
+      }
+      if (feedback.rating !== dialog.rating) return;
+      setDialog(void 0);
+      setSubmitting(false);
+      setPendingObserved(false);
+      setToast(true);
+      if (toastTimerRef.current !== void 0) window.clearTimeout(toastTimerRef.current);
+      toastTimerRef.current = window.setTimeout(() => setToast(false), 2500);
+    }, [dialog, feedback.error, feedback.rating, pending, pendingObserved, submitting]);
+    (0, import_react8.useEffect)(() => {
+      if (!dialog) return;
+      const onKeyDown = (event) => {
+        if (event.key === "Escape" && !submitting) setDialog(void 0);
+      };
+      document.addEventListener("keydown", onKeyDown);
+      return () => {
+        document.removeEventListener("keydown", onKeyDown);
+      };
+    }, [dialog, submitting]);
+    const toggle = (rating) => {
+      if (disabled) return;
+      if (feedback.rating === rating) {
+        postAction({ type: "toggleMessageFeedback", messageId, rating });
+        return;
+      }
+      setDialog({ rating, note: "" });
+      setSubmitting(false);
+      setPendingObserved(false);
+    };
+    const submit = () => {
+      if (!dialog || submitting) return;
+      setSubmitting(true);
+      setPendingObserved(false);
+      const note = dialog.note.trim();
+      postAction({
+        type: "submitMessageFeedback",
+        messageId,
+        rating: dialog.rating,
+        ...note.length === 0 ? {} : { note },
+        ...dialog.category === void 0 ? {} : { category: dialog.category }
+      });
+    };
+    const selected = feedback.rating;
+    const hasVisibleFeedback = hasRating || Boolean(feedback.error) || dialog !== void 0 || toast;
+    return /* @__PURE__ */ import_react8.default.createElement(import_react8.default.Fragment, null, /* @__PURE__ */ import_react8.default.createElement("div", { className: `dsh-message-feedback${hasVisibleFeedback ? " has-feedback" : ""}${dialog ? " open" : ""}` }, /* @__PURE__ */ import_react8.default.createElement(
+      "button",
+      {
+        type: "button",
+        className: `dsh-message-feedback-button${selected === "positive" ? " active" : ""}`,
+        "aria-label": t(selected === "positive" ? "Like (selected)" : "Like"),
+        "aria-pressed": selected === "positive",
+        "aria-haspopup": "dialog",
+        title: t(selected === "positive" ? "Like (selected)" : "Like"),
+        disabled,
+        onClick: (event) => {
+          event.stopPropagation();
+          toggle("positive");
+        }
+      },
+      /* @__PURE__ */ import_react8.default.createElement(LikeIcon, null)
+    ), /* @__PURE__ */ import_react8.default.createElement(
+      "button",
+      {
+        type: "button",
+        className: `dsh-message-feedback-button${selected === "negative" ? " active" : ""}`,
+        "aria-label": t(selected === "negative" ? "Dislike (selected)" : "Dislike"),
+        "aria-pressed": selected === "negative",
+        "aria-haspopup": "dialog",
+        title: t(selected === "negative" ? "Dislike (selected)" : "Dislike"),
+        disabled,
+        onClick: (event) => {
+          event.stopPropagation();
+          toggle("negative");
+        }
+      },
+      /* @__PURE__ */ import_react8.default.createElement(DislikeIcon, null)
+    ), !dialog && feedback.error ? /* @__PURE__ */ import_react8.default.createElement("span", { className: "dsh-feedback-error", role: "status" }, feedback.error) : null), dialog ? /* @__PURE__ */ import_react8.default.createElement(
+      "div",
+      {
+        className: "dsh-session-feedback-backdrop",
+        role: "presentation",
+        onMouseDown: (event) => {
+          if (event.target === event.currentTarget && !submitting) setDialog(void 0);
+        }
+      },
+      /* @__PURE__ */ import_react8.default.createElement(
+        "section",
+        {
+          className: "dsh-session-feedback-dialog",
+          role: "dialog",
+          "aria-modal": "true",
+          "aria-labelledby": dialogTitleId,
+          onMouseDown: (event) => event.stopPropagation()
+        },
+        /* @__PURE__ */ import_react8.default.createElement("div", { className: "dsh-session-feedback-head" }, /* @__PURE__ */ import_react8.default.createElement("div", null, /* @__PURE__ */ import_react8.default.createElement("h2", { id: dialogTitleId }, t("Submit feedback")), /* @__PURE__ */ import_react8.default.createElement("p", null, t("Your feedback helps us improve this response."))), /* @__PURE__ */ import_react8.default.createElement(
+          "button",
+          {
+            type: "button",
+            className: "dsh-icon-button",
+            "aria-label": t("Close"),
+            title: t("Close"),
+            disabled: submitting,
+            onClick: () => setDialog(void 0)
+          },
+          /* @__PURE__ */ import_react8.default.createElement(CloseIcon, null)
+        )),
+        /* @__PURE__ */ import_react8.default.createElement("fieldset", { className: "dsh-session-feedback-categories", disabled: submitting }, /* @__PURE__ */ import_react8.default.createElement("legend", null, t("Feedback category")), MESSAGE_FEEDBACK_CATEGORIES.map((category) => /* @__PURE__ */ import_react8.default.createElement(
+          "button",
+          {
+            key: category,
+            type: "button",
+            className: `dsh-session-feedback-category${dialog.category === category ? " active" : ""}`,
+            "aria-pressed": dialog.category === category,
+            onClick: () => setDialog((current) => current && {
+              ...current,
+              ...current.category === category ? { category: void 0 } : { category }
+            })
+          },
+          t(MESSAGE_FEEDBACK_CATEGORY_LABELS[category])
+        ))),
+        /* @__PURE__ */ import_react8.default.createElement("label", { className: "dsh-session-feedback-label", htmlFor: dialogTitleId + "-detail" }, t("Feedback details")),
+        /* @__PURE__ */ import_react8.default.createElement(
+          "textarea",
+          {
+            id: dialogTitleId + "-detail",
+            className: "dsh-session-feedback-textarea",
+            value: dialog.note,
+            maxLength: 32768,
+            disabled: submitting,
+            placeholder: t("Add details about this response."),
+            onChange: (event) => setDialog((current) => current && {
+              ...current,
+              note: event.target.value
+            })
+          }
+        ),
+        feedback.error ? /* @__PURE__ */ import_react8.default.createElement("div", { className: "dsh-session-feedback-error", role: "alert" }, feedback.error) : null,
+        /* @__PURE__ */ import_react8.default.createElement("div", { className: "dsh-session-feedback-actions" }, /* @__PURE__ */ import_react8.default.createElement(
+          "button",
+          {
+            type: "button",
+            className: "dsh-button dsh-button-secondary",
+            disabled: submitting,
+            onClick: () => setDialog(void 0)
+          },
+          t("Cancel")
+        ), /* @__PURE__ */ import_react8.default.createElement("button", { type: "button", className: "dsh-button", disabled: submitting, onClick: submit }, submitting ? t("Submitting...") : t("Submit feedback")))
+      )
+    ) : null, toast ? /* @__PURE__ */ import_react8.default.createElement("div", { className: "dsh-session-feedback-toast", role: "status", "aria-live": "polite" }, t("Thanks for your feedback")) : null);
+  }
   function MessageFooterActions({
     message,
     traceSeq
@@ -25018,6 +25238,7 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
     const stateLabel = message.state === "pending" ? t(" \xB7 waiting for response") : message.state === "streaming" && message.role === "assistant" ? ` \xB7 ${agentStatusLabel ?? t("Thinking...")}` : message.state === "streaming" ? t(" \xB7 streaming") : "";
     const hasTrace = Number.isSafeInteger(message.seq) && (message.seq ?? -1) >= 0;
     const checkpointSeq = (message.role === "user" || message.role === "assistant") && message.state !== "streaming" && message.state !== "pending" && typeof message.seq === "number" && Number.isSafeInteger(message.seq) && message.seq >= 0 ? message.seq : void 0;
+    const feedbackTarget = message.role === "assistant" && message.state === "committed" && message.messageId && message.feedback ? message.messageId : void 0;
     return /* @__PURE__ */ import_react8.default.createElement(
       "div",
       {
@@ -25034,6 +25255,7 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
           autoOpenReasoning
         }
       ),
+      feedbackTarget && message.feedback ? /* @__PURE__ */ import_react8.default.createElement("div", { className: "dsh-message-feedback-row" }, /* @__PURE__ */ import_react8.default.createElement(MessageFeedbackActions, { messageId: feedbackTarget, feedback: message.feedback })) : null,
       /* @__PURE__ */ import_react8.default.createElement(MessageFooterActions, { message, traceSeq: hasTrace ? message.seq : void 0 }),
       message.state === "failed" ? /* @__PURE__ */ import_react8.default.createElement(
         "button",
@@ -25080,7 +25302,8 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
     messages,
     submitting,
     agentStatusLabel,
-    autoOpenReasoning
+    autoOpenReasoning,
+    messageFeedback
   }) {
     const listRef = (0, import_react9.useRef)(null);
     const stickToBottomRef = (0, import_react9.useRef)(true);
@@ -25132,6 +25355,7 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
         onClick,
         onKeyDown: handleMarkdownKeydown
       },
+      messageFeedback?.status === "error" && messageFeedback.error ? /* @__PURE__ */ import_react9.default.createElement("div", { className: "dsh-feedback-status", role: "status" }, messageFeedback.error) : null,
       stableMessages.length === 0 ? /* @__PURE__ */ import_react9.default.createElement("div", { className: "dsh-empty" }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "dsh-empty-title" }, t("Describe a task.")), /* @__PURE__ */ import_react9.default.createElement("div", { className: "dsh-empty-detail" }, t("The current selection is attached automatically. You can also use @ to reference files."), /* @__PURE__ */ import_react9.default.createElement("br", null), t("Ctrl/Cmd + Enter to send."))) : stableMessages.map((message) => /* @__PURE__ */ import_react9.default.createElement(
         MessageItem,
         {
@@ -26617,7 +26841,7 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
   function SessionStats({ stats }) {
     const groups = sessionStatsGroups(stats);
     if (groups.length === 0) return null;
-    return /* @__PURE__ */ import_react28.default.createElement("div", { className: "dsh-stats", "aria-label": t("Session statistics") }, /* @__PURE__ */ import_react28.default.createElement("div", { className: "dsh-stats-top" }, groups.slice(0, 2).map((group, index) => /* @__PURE__ */ import_react28.default.createElement(import_react28.default.Fragment, { key: group }, index > 0 ? /* @__PURE__ */ import_react28.default.createElement("span", { className: "dsh-stats-separator", "aria-hidden": "true" }, "|") : null, /* @__PURE__ */ import_react28.default.createElement("span", null, group)))), groups[2] ? /* @__PURE__ */ import_react28.default.createElement("div", { className: "dsh-stats-bottom" }, groups[2]) : null);
+    return /* @__PURE__ */ import_react28.default.createElement("div", { className: "dsh-stats", "aria-label": t("Session statistics") }, /* @__PURE__ */ import_react28.default.createElement("div", { className: "dsh-stats-top" }, groups.map((group, index) => /* @__PURE__ */ import_react28.default.createElement(import_react28.default.Fragment, { key: group }, index > 0 ? /* @__PURE__ */ import_react28.default.createElement("span", { className: "dsh-stats-separator", "aria-hidden": "true" }, "|") : null, /* @__PURE__ */ import_react28.default.createElement("span", null, group)))));
   }
 
   // webview/src/components/TokenUsageBar.tsx
@@ -26854,6 +27078,7 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
   // webview/src/components/slashCommands.ts
   var IDE_SLASH_COMMANDS = [
     { name: "/ide", description: t("Add one-shot IDE context"), action: { type: "openIdeContextPicker" }, origin: "ide" },
+    { name: "/template", description: t("Pre-fill the composer from a .dsh/prompts template"), action: { type: "openPromptTemplatePicker" }, origin: "ide" },
     { name: "/new", description: t("New session"), action: { type: "newSession" }, origin: "ide" },
     { name: "/search", description: t("Search sessions"), action: { type: "searchSession" }, origin: "ide" },
     { name: "/model", description: t("Select the current session model"), action: { type: "selectModel" }, origin: "ide" },
@@ -27881,10 +28106,134 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
     );
   }
 
+  // webview/src/components/SessionFeedbackDialog.tsx
+  var import_react36 = __toESM(require_react());
+  var CATEGORIES = [
+    "task-result",
+    "instruction-following",
+    "product-interaction",
+    "service-stability",
+    "resource-cost",
+    "security-privacy-permission",
+    "other"
+  ];
+  var CATEGORY_LABELS = {
+    "task-result": "Task result",
+    "instruction-following": "Instruction following",
+    "product-interaction": "Product interaction",
+    "service-stability": "Service stability",
+    "resource-cost": "Resource cost",
+    "security-privacy-permission": "Security, privacy, or permissions",
+    other: "Other"
+  };
+  function SessionFeedbackDialog({
+    feedback
+  }) {
+    const [category, setCategory] = (0, import_react36.useState)();
+    const [text, setText] = (0, import_react36.useState)("");
+    const [draftSequence, setDraftSequence] = (0, import_react36.useState)();
+    const open = feedback?.open === true;
+    const submitting = feedback?.status === "submitting";
+    (0, import_react36.useEffect)(() => {
+      if (feedback?.sequence === void 0 || feedback.sequence === draftSequence) return;
+      setCategory(void 0);
+      setText("");
+      setDraftSequence(feedback.sequence);
+    }, [draftSequence, feedback?.sequence]);
+    (0, import_react36.useEffect)(() => {
+      if (!open) return;
+      const onKeyDown = (event) => {
+        if (event.key === "Escape" && !submitting) postAction({ type: "dismissSessionFeedback" });
+      };
+      document.addEventListener("keydown", onKeyDown);
+      return () => document.removeEventListener("keydown", onKeyDown);
+    }, [open, submitting]);
+    if (!feedback) return null;
+    if (!open) {
+      return feedback.status === "success" || feedback.status === "unavailable" ? /* @__PURE__ */ import_react36.default.createElement("div", { className: "dsh-session-feedback-toast", role: "status", "aria-live": "polite" }, feedback.status === "success" ? t("Thanks for your feedback") : feedback.error || t("Session feedback is unavailable in this Runtime.")) : null;
+    }
+    const submit = () => {
+      if (submitting) return;
+      postAction({
+        type: "recordSessionFeedback",
+        text,
+        ...category === void 0 ? {} : { category }
+      });
+    };
+    return /* @__PURE__ */ import_react36.default.createElement(
+      "div",
+      {
+        className: "dsh-session-feedback-backdrop",
+        role: "presentation",
+        onMouseDown: (event) => {
+          if (event.target === event.currentTarget && !submitting) {
+            postAction({ type: "dismissSessionFeedback" });
+          }
+        }
+      },
+      /* @__PURE__ */ import_react36.default.createElement(
+        "section",
+        {
+          className: "dsh-session-feedback-dialog",
+          role: "dialog",
+          "aria-modal": "true",
+          "aria-labelledby": "dsh-session-feedback-title"
+        },
+        /* @__PURE__ */ import_react36.default.createElement("div", { className: "dsh-session-feedback-head" }, /* @__PURE__ */ import_react36.default.createElement("div", null, /* @__PURE__ */ import_react36.default.createElement("h2", { id: "dsh-session-feedback-title" }, t("Submit feedback")), /* @__PURE__ */ import_react36.default.createElement("p", null, t("Your feedback helps us improve this Session."))), /* @__PURE__ */ import_react36.default.createElement(
+          "button",
+          {
+            type: "button",
+            className: "dsh-icon-button",
+            "aria-label": t("Close"),
+            title: t("Close"),
+            disabled: submitting,
+            onClick: () => postAction({ type: "dismissSessionFeedback" })
+          },
+          /* @__PURE__ */ import_react36.default.createElement(CloseIcon, null)
+        )),
+        /* @__PURE__ */ import_react36.default.createElement("fieldset", { className: "dsh-session-feedback-categories", disabled: submitting }, /* @__PURE__ */ import_react36.default.createElement("legend", null, t("Feedback category")), CATEGORIES.map((item) => /* @__PURE__ */ import_react36.default.createElement(
+          "button",
+          {
+            key: item,
+            type: "button",
+            className: `dsh-session-feedback-category${category === item ? " active" : ""}`,
+            "aria-pressed": category === item,
+            onClick: () => setCategory((current) => current === item ? void 0 : item)
+          },
+          t(CATEGORY_LABELS[item])
+        ))),
+        /* @__PURE__ */ import_react36.default.createElement("label", { className: "dsh-session-feedback-label", htmlFor: "dsh-session-feedback-text" }, t("Feedback details")),
+        /* @__PURE__ */ import_react36.default.createElement(
+          "textarea",
+          {
+            id: "dsh-session-feedback-text",
+            className: "dsh-session-feedback-textarea",
+            value: text,
+            maxLength: 32768,
+            disabled: submitting,
+            placeholder: t("Add details to help us improve. Your submission will include the current conversation log."),
+            onChange: (event) => setText(event.target.value)
+          }
+        ),
+        feedback.status === "error" && feedback.error ? /* @__PURE__ */ import_react36.default.createElement("div", { className: "dsh-session-feedback-error", role: "alert" }, feedback.error) : null,
+        /* @__PURE__ */ import_react36.default.createElement("div", { className: "dsh-session-feedback-actions" }, /* @__PURE__ */ import_react36.default.createElement(
+          "button",
+          {
+            type: "button",
+            className: "dsh-button dsh-button-secondary",
+            disabled: submitting,
+            onClick: () => postAction({ type: "dismissSessionFeedback" })
+          },
+          t("Cancel")
+        ), /* @__PURE__ */ import_react36.default.createElement("button", { type: "button", className: "dsh-button", disabled: submitting, onClick: submit }, submitting ? t("Submitting...") : t("Submit feedback")))
+      )
+    );
+  }
+
   // webview/src/App.tsx
   function App() {
     const state = useHostState();
-    return /* @__PURE__ */ import_react36.default.createElement("div", { className: `dsh-shell${state.focusMode ? " dsh-focus-mode" : ""}` }, /* @__PURE__ */ import_react36.default.createElement(
+    return /* @__PURE__ */ import_react37.default.createElement("div", { className: `dsh-shell${state.focusMode ? " dsh-focus-mode" : ""}` }, /* @__PURE__ */ import_react37.default.createElement(
       Header,
       {
         status: state.status,
@@ -27897,15 +28246,16 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
         focusMode: state.focusMode,
         pendingRequestCount: state.interactions.filter((interaction) => interaction.status === "pending").length
       }
-    ), /* @__PURE__ */ import_react36.default.createElement(StatusBanner, { status: state.status, sessionStatus: state.sessionStatus }), !state.focusMode && state.settings ? /* @__PURE__ */ import_react36.default.createElement(SettingsPanel, { settings: state.settings }) : null, /* @__PURE__ */ import_react36.default.createElement(
+    ), /* @__PURE__ */ import_react37.default.createElement(StatusBanner, { status: state.status, sessionStatus: state.sessionStatus }), /* @__PURE__ */ import_react37.default.createElement(SessionFeedbackDialog, { feedback: state.sessionFeedback }), !state.focusMode && state.settings ? /* @__PURE__ */ import_react37.default.createElement(SettingsPanel, { settings: state.settings }) : null, /* @__PURE__ */ import_react37.default.createElement(
       MessageList,
       {
         messages: state.messages,
         submitting: state.submitting,
         agentStatusLabel: state.agentStatusLabel,
-        autoOpenReasoning: state.autoOpenReasoning
+        autoOpenReasoning: state.autoOpenReasoning,
+        messageFeedback: state.messageFeedback
       }
-    ), !state.focusMode ? /* @__PURE__ */ import_react36.default.createElement(Interactions, { interactions: state.interactions }) : null, !state.focusMode ? /* @__PURE__ */ import_react36.default.createElement(
+    ), !state.focusMode ? /* @__PURE__ */ import_react37.default.createElement(Interactions, { interactions: state.interactions }) : null, !state.focusMode ? /* @__PURE__ */ import_react37.default.createElement(
       ActivityDock,
       {
         goal: state.goal,
@@ -27924,7 +28274,7 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
         agentPresetLabel: state.agentPresetLabel,
         autoOpenReasoning: state.autoOpenReasoning
       }
-    ) : null, /* @__PURE__ */ import_react36.default.createElement(
+    ) : null, /* @__PURE__ */ import_react37.default.createElement(
       Composer,
       {
         context: state.context,
@@ -27951,7 +28301,7 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
   // webview/src/main.tsx
   var mount = document.getElementById("root");
   if (mount) {
-    (0, import_client.createRoot)(mount).render(/* @__PURE__ */ import_react37.default.createElement(App, null));
+    (0, import_client.createRoot)(mount).render(/* @__PURE__ */ import_react38.default.createElement(App, null));
   }
 })();
 /*! Bundled license information:

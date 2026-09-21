@@ -134,6 +134,75 @@ final class DshWebviewActionSanitizer {
                     ? input
                     : null;
         }
+        if ("toggleMessageFeedback".equals(type)) {
+            String messageId = strictString(input, "messageId");
+            String rating = strictString(input, "rating");
+            return hasOnly(input, "type", "messageId", "rating")
+                            && messageId != null
+                            && !messageId.isBlank()
+                            && messageId.length() <= 512
+                            && ("positive".equals(rating) || "negative".equals(rating))
+                    ? input
+                    : null;
+        }
+        if ("submitMessageFeedback".equals(type)) {
+            String messageId = strictString(input, "messageId");
+            String rating = strictString(input, "rating");
+            String note = input.has("note") ? strictString(input, "note") : null;
+            String category = input.has("category") ? strictString(input, "category") : null;
+            return hasOnly(input, "type", "messageId", "rating", "note", "category")
+                            && messageId != null
+                            && !messageId.isBlank()
+                            && messageId.length() <= 512
+                            && ("positive".equals(rating) || "negative".equals(rating))
+                            && (!input.has("note") || (note != null && note.length() <= 32_768))
+                            && (!input.has("category") || validFeedbackCategory(category))
+                    ? input
+                    : null;
+        }
+        if ("saveMessageFeedbackNote".equals(type)) {
+            String messageId = strictString(input, "messageId");
+            String note = strictString(input, "note");
+            return hasOnly(input, "type", "messageId", "note")
+                            && messageId != null
+                            && !messageId.isBlank()
+                            && messageId.length() <= 512
+                            && note != null
+                            && note.length() <= 32_768
+                    ? input
+                    : null;
+        }
+        if ("recordSessionFeedback".equals(type)) {
+            String text = strictString(input, "text");
+            String category = input.has("category") ? strictString(input, "category") : null;
+            return hasOnly(input, "type", "text", "category")
+                            && text != null
+                            && text.length() <= 32_768
+                            && (!input.has("category") || validFeedbackCategory(category))
+                    ? input
+                    : null;
+        }
+        if ("stopDynamicPlugin".equals(type) || "removeDynamicPlugin".equals(type)) {
+            String sessionId = strictString(input, "sessionId");
+            String pluginId = strictString(input, "pluginId");
+            return hasOnly(input, "type", "sessionId", "pluginId")
+                            && boundedId(sessionId)
+                            && boundedId(pluginId)
+                    ? input
+                    : null;
+        }
+        if ("declineDynamicPlugin".equals(type)) {
+            String requestId = strictString(input, "requestId");
+            String pluginId = strictString(input, "pluginId");
+            return hasOnly(input, "type", "requestId", "pluginId")
+                            && boundedId(requestId)
+                            && boundedId(pluginId)
+                    ? input
+                    : null;
+        }
+        if ("openSessionFeedback".equals(type) || "dismissSessionFeedback".equals(type)) {
+            return hasOnly(input, "type") ? input : null;
+        }
         if ("openFileLocation".equals(type)) {
             if (!hasOnly(input, "type", "path", "line", "column")) {
                 return null;
@@ -495,10 +564,27 @@ final class DshWebviewActionSanitizer {
         return true;
     }
 
+    private static boolean validFeedbackCategory(String category) {
+        return category != null
+                && Set.of(
+                                "task-result",
+                                "instruction-following",
+                                "product-interaction",
+                                "service-stability",
+                                "resource-cost",
+                                "security-privacy-permission",
+                                "other")
+                        .contains(category);
+    }
+
     private static String strictString(JsonObject input, String key) {
         JsonElement value = input == null ? null : input.get(key);
         return value != null && value.isJsonPrimitive() && value.getAsJsonPrimitive().isString()
                 ? value.getAsString()
                 : null;
+    }
+
+    private static boolean boundedId(String value) {
+        return value != null && !value.isBlank() && value.length() <= 512;
     }
 }

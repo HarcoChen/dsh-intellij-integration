@@ -15,13 +15,18 @@ import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.ide.CopyPasteManager;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.ui.Messages;
 import com.intellij.ui.components.JBLabel;
 import java.awt.BorderLayout;
 import java.awt.FlowLayout;
 import java.awt.datatransfer.StringSelection;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
@@ -64,9 +69,10 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
     /** Coalesces bursts of snapshot updates into one EDT state publish. */
     private final AtomicBoolean statePostPending = new AtomicBoolean();
 
+    private final DshDynamicPluginController dynamicPlugins;
     private final Consumer<DshRemoteState.Snapshot> snapshotListener = this::onSnapshot;
     private final Consumer<DshRuntimeService.RuntimeStatus> runtimeStatusListener =
-            ignored -> postStateLater();
+            this::onRuntimeStatus;
     private final DshMarkdownRenderCache markdownRenderCache = new DshMarkdownRenderCache();
     private final DshIdeContextController ideContext;
     private final DshDebugContextController debugContext;
@@ -81,6 +87,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
     private final DshSessionActionsController sessionActions;
     private final DshPromptController prompts;
     private final DshChangeReviewStore changeReviews;
+    private final DshFeedbackController feedback;
 
     private DshBridge bridge;
     private JPanel fallbackPanel;
@@ -230,6 +237,22 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
                         this::postStateLater,
                         this::notify,
                         error -> lastError = error);
+        this.feedback =
+                new DshFeedbackController(
+                        remote,
+                        operations,
+                        () -> sessionId,
+                        this::postStateLater,
+                        this::notify,
+                        error -> lastError = error);
+        this.dynamicPlugins =
+                new DshDynamicPluginController(
+                        runtime,
+                        remote,
+                        operations,
+                        this::postStateLater,
+                        this::notify,
+                        error -> lastError = error);
         runtime.addStatusListener(runtimeStatusListener);
         remote.addListener(snapshotListener);
         setBorder(BorderFactory.createEmptyBorder());
@@ -258,6 +281,11 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
                         }
                     });
         }
+    }
+
+    private void onRuntimeStatus(DshRuntimeService.RuntimeStatus status) {
+        dynamicPlugins.refreshOnRuntimeStart(status);
+        postStateLater();
     }
 
     /** Derive presentation caches from the latest snapshot. Runs off the EDT. */
@@ -293,6 +321,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
         if (selected != null) live.add(selected);
         sessionState.prune(live);
         changeReviews.retain(live);
+        feedback.prune(live);
 
         if (selected != null) {
             String followKey = "session:" + selected;
@@ -317,6 +346,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
                         sessionState.projectHistory(selected, history, statusLabel);
                 projection = cached.projection();
                 messages = cached.messages();
+                feedback.refresh(selected, false);
                 rememberCopyableMessages(selected, messages);
                 changeReviews.observe(selected, project.getBasePath(), history);
                 prompts.refreshCatalogs(selected);
@@ -488,6 +518,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
             postStateLater();
             flushPendingComposerUpdate();
             subagents.refresh(sessionId);
+            dynamicPlugins.refreshIfRunning();
             return;
         }
         switch (type) {
@@ -522,8 +553,27 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
             case "forkAndRestoreCodeToMessage" ->
                     checkpointForkAndRestore(integer(action, "seq", -1));
             case "copyMessage" -> copyMessage(string(action, "messageId"));
+            case "toggleMessageFeedback" ->
+                    feedback.toggle(string(action, "messageId"), string(action, "rating"));
+            case "submitMessageFeedback" ->
+                    feedback.submit(
+                            string(action, "messageId"),
+                            string(action, "rating"),
+                            string(action, "note"),
+                            string(action, "category"));
+            case "saveMessageFeedbackNote" ->
+                    feedback.saveNote(string(action, "messageId"), stringOr(action, "note", ""));
+            case "openSessionFeedback" -> feedback.openSessionFeedback();
+            case "dismissSessionFeedback" -> feedback.dismissSessionFeedback();
+            case "recordSessionFeedback" ->
+                    feedback.recordSessionFeedback(
+                            stringOr(action, "text", ""), string(action, "category"));
             case "archiveSession" -> sessionActions.archive();
             case "openTrace" -> openTrace(action);
+            case "openConversationOutline" -> openConversationOutline();
+            case "openPromptTemplatePicker" -> openPromptTemplatePicker();
+            case "openTerminalCommandPicker" ->
+                    notify(DshBundle.message("dsh.terminal.context.unavailable"));
             case "openBrowser" -> openBrowser();
             case "openExternalLink" -> openExternalLink(action);
             case "openLogs" -> showLogs();
@@ -561,6 +611,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
                                         postStateLater();
                                     });
             case "manageSettings" -> runtimeSettings.togglePanel();
+            case "refreshPluginInventory" -> runtimeSettings.refreshPluginInventory();
             case "mutateSettings" -> runtimeSettings.mutate(action);
             case "configureApiKey" -> runtimeSettings.configureApiKey();
             case "manageProviders" -> runtimeSettings.manageProviders();
@@ -601,6 +652,13 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
             case "followUpSubagent" ->
                     subagents.followUp(string(action, "childSessionId"), string(action, "text"));
             case "interruptSubagent" -> subagents.interrupt(string(action, "childSessionId"));
+            case "refreshDynamicPlugins" -> dynamicPlugins.refresh();
+            case "stopDynamicPlugin" ->
+                    dynamicPlugins.stop(string(action, "sessionId"), string(action, "pluginId"));
+            case "removeDynamicPlugin" ->
+                    dynamicPlugins.remove(string(action, "sessionId"), string(action, "pluginId"));
+            case "declineDynamicPlugin" ->
+                    dynamicPlugins.decline(string(action, "pluginId"), string(action, "requestId"));
             case "answerApproval", "answerQuestion" -> answerInteraction(action);
             case "copyCode", "insertCode", "openCode", "applyCode" -> codeActions.handle(action);
             case "openToolDiff" ->
@@ -1071,7 +1129,10 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
         DshRuntimeService.RuntimeStatus runtimeStatus = runtime.getStatus();
         DshRemoteState.Snapshot current = snapshot;
         JsonObject state = new JsonObject();
-        state.add("messages", messages == null ? new JsonArray() : messages.deepCopy());
+        JsonArray visibleMessages =
+                feedback.decorate(
+                        sessionId, messages == null ? new JsonArray() : messages.deepCopy());
+        state.add("messages", visibleMessages);
         state.add("context", ideContext.contextMetadata());
         JsonObject selection = ideContext.currentSelection(false);
         if (selection != null) state.add("selection", selection);
@@ -1162,6 +1223,8 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
         state.add("commands", sessionState.commandCatalog(sessionId));
         JsonArray todos = DshSessionStateStore.todos(cellValue(sessionId, "todos"));
         if (todos != null) state.add("todos", todos);
+        JsonArray schedule = DshSessionStateStore.schedule(cellValue(sessionId, "schedule"));
+        if (schedule != null) state.add("schedule", schedule);
         JsonObject imageLimits =
                 DshSessionStateStore.imageLimits(cellValue(sessionId, "imageLimits"));
         if (imageLimits != null) state.add("imageLimits", imageLimits);
@@ -1170,6 +1233,10 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
         if (sessionStats != null) state.add("sessionStats", sessionStats);
         JsonObject plan = DshSessionStateStore.plan(cellValue(sessionId, "plan"));
         if (plan != null) state.add("plan", plan);
+        JsonObject messageFeedback = feedback.view(sessionId);
+        if (messageFeedback != null) state.add("messageFeedback", messageFeedback);
+        JsonObject sessionFeedback = feedback.sessionView(sessionId);
+        if (sessionFeedback != null) state.add("sessionFeedback", sessionFeedback);
         JsonObject tokenUsage = tokenUsageView(view);
         if (tokenUsage != null) state.add("tokenUsage", tokenUsage);
         JsonObject goal = goals.view(sessionId);
@@ -1177,6 +1244,8 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
         state.add("subagents", subagents.treeView(sessionId));
         JsonObject subagentPreviewState = subagents.previewView(sessionId);
         if (subagentPreviewState != null) state.add("subagentPreview", subagentPreviewState);
+        JsonObject dynamicPluginView = dynamicPlugins.view();
+        if (dynamicPluginView != null) state.add("dynamicPlugins", dynamicPluginView);
         String statusLabel = agentStatusLabelFor(sessionId, running);
         if (statusLabel != null) {
             state.addProperty("agentStatusLabel", statusLabel);
@@ -1204,8 +1273,8 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
         }
         StringBuilder key = new StringBuilder();
         for (String candidate : candidates) key.append(candidate).append('\0');
-        int seed = Math.abs((session + "\0" + key).hashCode());
-        return candidates.get(seed % candidates.size());
+        int seed = (session + "\0" + key).hashCode();
+        return candidates.get(Math.floorMod(seed, candidates.size()));
     }
 
     private static String statusMessage(
@@ -1323,6 +1392,172 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
                         () -> new DshTraceDialog(project, current, traceTitle, selectedSeq).show());
     }
 
+    /** Show a native navigator for the current session's turns and reveal the chosen message. */
+    private void openConversationOutline() {
+        String current = sessionId;
+        if (current == null || current.isBlank()) {
+            notify(DshBundle.message("dsh.outline.no.active.session"));
+            return;
+        }
+        List<String> labels = new java.util.ArrayList<>();
+        List<Integer> sequences = new java.util.ArrayList<>();
+        JsonElement outline = cellValue(current, "turnOutline");
+        if (outline != null && outline.isJsonArray()) {
+            for (JsonElement candidate : outline.getAsJsonArray()) {
+                if (!candidate.isJsonObject()) continue;
+                JsonObject row = candidate.getAsJsonObject();
+                long seq = DshJson.longValue(row.get("seq"), -1);
+                if (seq < 0 || seq > Integer.MAX_VALUE) continue;
+                String prompt = stringOr(row, "prompt", "").replaceAll("\\s+", " ").trim();
+                String response = stringOr(row, "response", "").replaceAll("\\s+", " ").trim();
+                String label = prompt.isBlank() ? response : prompt;
+                if (label.isBlank()) label = DshBundle.message("dsh.outline.turn", row.get("turn"));
+                if (label.length() > 120) label = label.substring(0, 119) + "…";
+                labels.add(label + "  (#" + seq + ")");
+                sequences.add((int) seq);
+            }
+        }
+        if (labels.isEmpty()) {
+            for (JsonElement candidate : messages) {
+                if (!candidate.isJsonObject()) continue;
+                JsonObject row = candidate.getAsJsonObject();
+                if (!"user".equals(string(row, "role"))) continue;
+                long seq = DshJson.longValue(row.get("seq"), -1);
+                String text = stringOr(row, "text", "").replaceAll("\\s+", " ").trim();
+                if (seq < 0 || seq > Integer.MAX_VALUE || text.isBlank()) continue;
+                if (text.length() > 120) text = text.substring(0, 119) + "…";
+                labels.add(text + "  (#" + seq + ")");
+                sequences.add((int) seq);
+            }
+        }
+        if (labels.isEmpty()) {
+            notify(DshBundle.message("dsh.outline.empty"));
+            return;
+        }
+        int selected =
+                Messages.showChooseDialog(
+                        project,
+                        DshBundle.message("dsh.outline.dialog.message"),
+                        DshBundle.message("dsh.outline.dialog.title"),
+                        Messages.getInformationIcon(),
+                        labels.toArray(new String[0]),
+                        labels.get(0));
+        if (selected >= 0 && selected < sequences.size()) {
+            JsonObject reveal = new JsonObject();
+            reveal.addProperty("type", "revealMessage");
+            reveal.addProperty("seq", sequences.get(selected));
+            postToWebview(reveal);
+        }
+    }
+
+    /** Discover visible Markdown drafts under .dsh/prompts without injecting them implicitly. */
+    private void openPromptTemplatePicker() {
+        String base = project.getBasePath();
+        if (base == null || base.isBlank()) {
+            notify(DshBundle.message("dsh.prompt.template.no.workspace"));
+            return;
+        }
+        Path promptsRoot = Path.of(base).resolve(".dsh").resolve("prompts").normalize();
+        operations.execute(
+                () -> {
+                    List<PromptTemplate> templates = discoverPromptTemplates(promptsRoot);
+                    ApplicationManager.getApplication()
+                            .invokeLater(
+                                    () -> {
+                                        if (disposed) return;
+                                        if (templates.isEmpty()) {
+                                            notify(DshBundle.message("dsh.prompt.template.empty"));
+                                            return;
+                                        }
+                                        String[] labels =
+                                                templates.stream()
+                                                        .map(
+                                                                template ->
+                                                                        template.label
+                                                                                + "  —  "
+                                                                                + template.relative)
+                                                        .toArray(String[]::new);
+                                        int selected =
+                                                Messages.showChooseDialog(
+                                                        project,
+                                                        DshBundle.message(
+                                                                "dsh.prompt.template.choose.message"),
+                                                        DshBundle.message(
+                                                                "dsh.prompt.template.choose.title"),
+                                                        Messages.getInformationIcon(),
+                                                        labels,
+                                                        labels[0]);
+                                        if (selected >= 0 && selected < templates.size())
+                                            setComposerText(templates.get(selected).content);
+                                    });
+                });
+    }
+
+    private static List<PromptTemplate> discoverPromptTemplates(Path root) {
+        List<PromptTemplate> result = new ArrayList<>();
+        if (!Files.isDirectory(root)) return result;
+        try (var paths = Files.walk(root, 4)) {
+            paths.filter(
+                            path ->
+                                    !Files.isSymbolicLink(path)
+                                            && Files.isRegularFile(path)
+                                            && path.getFileName()
+                                                    .toString()
+                                                    .toLowerCase(Locale.ROOT)
+                                                    .endsWith(".md"))
+                    .sorted()
+                    .limit(100)
+                    .forEach(
+                            path -> {
+                                try {
+                                    if (Files.size(path) > 32 * 1024) return;
+                                    String content = Files.readString(path, StandardCharsets.UTF_8);
+                                    if (!content.isEmpty() && content.charAt(0) == '\ufeff')
+                                        content = content.substring(1);
+                                    String relative =
+                                            root.relativize(path).toString().replace('\\', '/');
+                                    String stem = relative.replaceFirst("(?i)\\.md$", "");
+                                    result.add(
+                                            new PromptTemplate(
+                                                    relative,
+                                                    promptTemplateTitle(content, stem),
+                                                    content));
+                                } catch (Exception ignored) {
+                                    // A broken or concurrently deleted draft is simply not listed.
+                                }
+                            });
+        } catch (Exception ignored) {
+            // Missing/unreadable .dsh/prompts behaves like an empty template directory.
+        }
+        return result;
+    }
+
+    private static String promptTemplateTitle(String content, String fallback) {
+        String[] lines = content.substring(0, Math.min(content.length(), 8_192)).split("\\R");
+        if (lines.length > 0 && lines[0].trim().equals("---")) {
+            for (int index = 1; index < lines.length && index <= 20; index++) {
+                String line = lines[index].trim();
+                if (line.equals("---")) break;
+                if (line.startsWith("title:")) {
+                    String title = line.substring("title:".length()).trim();
+                    if (!title.isBlank()) return trimTemplateTitle(title);
+                }
+            }
+        }
+        for (String line : lines) {
+            String text = line.trim();
+            if (text.startsWith("# ")) return trimTemplateTitle(text.substring(2).trim());
+        }
+        return trimTemplateTitle(fallback);
+    }
+
+    private static String trimTemplateTitle(String value) {
+        String trimmed = value.replaceAll("^[\\\"']|[\\\"']$", "").trim();
+        return trimmed.length() <= 120 ? trimmed : trimmed.substring(0, 119) + "…";
+    }
+
+    private record PromptTemplate(String relative, String label, String content) {}
+
     private void openExternalLink(JsonObject action) {
         String url = string(action, "url");
         if (url == null) url = string(action, "href");
@@ -1379,6 +1614,8 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
         remote.removeListener(snapshotListener);
         releaseFollowedSession();
         changeReviews.dispose();
+        feedback.dispose();
+        dynamicPlugins.dispose();
         operations.shutdownNow();
         if (bridge != null) bridge.dispose();
     }
