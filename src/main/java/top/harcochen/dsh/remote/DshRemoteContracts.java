@@ -9,7 +9,7 @@ import java.util.UUID;
 
 /**
  * Wire contracts for the RC Remote API, fixed against {@code deepseek-harness} tag {@code
- * dsh-v0.1.2-rc.1}, commit {@code a66e4702047846cdaa10c66c9d3df3951f5ea70d}.
+ * dsh-v0.1.5-rc.2}, commit {@code fb2c4b9e698e30edb738bca4cf0618587db7d203}.
  *
  * <p>Every endpoint's {@code args} field names were taken from the Host method parameters (the
  * descriptor {@code wire} names), not from flattened DTOs. Zero-argument endpoints send an {@code
@@ -19,10 +19,10 @@ import java.util.UUID;
  */
 public final class DshRemoteContracts {
     /** Harness tag this contract was audited against. */
-    public static final String TARGET_TAG = "dsh-v0.1.2-rc.1";
+    public static final String TARGET_TAG = "dsh-v0.1.5-rc.2";
 
     /** Harness commit this contract was audited against. */
-    public static final String TARGET_COMMIT = "a66e4702047846cdaa10c66c9d3df3951f5ea70d";
+    public static final String TARGET_COMMIT = "fb2c4b9e698e30edb738bca4cf0618587db7d203";
 
     public static final String MUX_PATH = "/api/remote.mux";
     public static final String EVENT_STREAM_ENDPOINT = "$events";
@@ -72,13 +72,26 @@ public final class DshRemoteContracts {
     public static final String COMMANDS_LIST = "commands/list";
     public static final String COMMANDS_EXECUTE = "commands/execute";
     public static final String LLM_PROVIDERS = "llm/listConfigurableProviders";
+    public static final String LLM_LIST_PROVIDERS = "llm/listProviders";
     public static final String LLM_DISCOVER_MODELS = "llm/discoverModels";
     public static final String CREDENTIALS_DESCRIBE = "credentials/describe";
     public static final String CREDENTIALS_SET = "credentials/set";
     public static final String CREDENTIALS_UNSET = "credentials/unset";
+    public static final String PLUGIN_INVENTORY_LIST = "pluginInventory/list";
+    public static final String DYNAMIC_PLUGIN_INVENTORY = "dynamicCordisRunner/inventory";
+    public static final String DYNAMIC_PLUGIN_STOP = "dynamicCordisRunner/stopFromPanel";
+    public static final String DYNAMIC_PLUGIN_REMOVE = "dynamicCordisRunner/undefineFromPanel";
+    public static final String DYNAMIC_PLUGIN_RESOLVE = "dynamicCordisRunner/resolveRequestRun";
 
-    /** Recorded for capability documentation; no IntelliJ UI exposes it yet. */
+    /** Binary HTTP route used by {@code session/prompt} file content parts. */
+    public static final String SESSION_UPLOAD_FILE_BINARY = "session/uploadFileBinary";
+
+    /** Optional per-message feedback sidecar endpoints. */
     public static final String MESSAGE_FEEDBACK_LIST = "messageFeedback/list";
+
+    public static final String MESSAGE_FEEDBACK_PUT = "messageFeedback/put";
+    public static final String MESSAGE_FEEDBACK_DELETE = "messageFeedback/delete";
+    public static final String SESSION_FEEDBACK_RECORD = "sessionFeedback/record";
 
     // Stream endpoints opened through /api/remote.mux.
     public static final String STREAM_WORKSPACE_FOLLOW = "workspace/follow";
@@ -269,7 +282,7 @@ public final class DshRemoteContracts {
     /**
      * `session/list(_request)`; the baseline request is an empty object. The Host's descriptor
      * names this parameter {@code _request} — the one wire name that differs from the method
-     * signature — verified against the live `dsh-v0.1.2-rc.1` Runtime.
+     * signature — verified against the live `dsh-v0.1.5-rc.2` Runtime.
      */
     public static JsonObject argsSessionList() {
         JsonObject args = new JsonObject();
@@ -394,6 +407,7 @@ public final class DshRemoteContracts {
         JsonObject request = new JsonObject();
         request.add("address", address.deepCopy());
         if (maxMessages > 0) request.addProperty("maxMessages", maxMessages);
+        request.addProperty("assistantStream", true);
         return withRequest(request);
     }
 
@@ -564,7 +578,8 @@ public final class DshRemoteContracts {
         if (clientTimeZone != null && !clientTimeZone.isBlank()) {
             args.addProperty("clientTimeZone", clientTimeZone);
         }
-        return args;
+        args.addProperty("delivery", "queue");
+        return withRequest(args);
     }
 
     /** `subagents/interruptByParent(parentSessionId, childSessionId, mode)`. */
@@ -591,12 +606,16 @@ public final class DshRemoteContracts {
         return args;
     }
 
-    /** `commands/execute(agentId, line, images)`. */
+    /** `commands/execute(agentId, line, submittedAttachments)`. */
     public static JsonObject argsCommandsExecute(String agentId, String line, JsonArray images) {
         JsonObject args = new JsonObject();
         args.addProperty("agentId", agentId);
         args.addProperty("line", line == null ? "" : line);
-        args.add("images", images == null ? new JsonArray() : images.deepCopy());
+        JsonArray attachments = images == null ? new JsonArray() : images.deepCopy();
+        for (JsonElement image : attachments) {
+            if (image.isJsonObject()) image.getAsJsonObject().addProperty("type", "image");
+        }
+        args.add("submittedAttachments", attachments);
         return args;
     }
 
@@ -630,6 +649,81 @@ public final class DshRemoteContracts {
         JsonObject args = new JsonObject();
         args.addProperty("ref", ref);
         return args;
+    }
+
+    /** `dynamicCordisRunner/stopFromPanel(agentId, pluginId)`. */
+    public static JsonObject argsDynamicPluginPanel(String agentId, String pluginId) {
+        JsonObject args = new JsonObject();
+        args.addProperty("agentId", agentId);
+        args.addProperty("pluginId", pluginId);
+        return args;
+    }
+
+    /** `dynamicCordisRunner/resolveRequestRun(requestId, resolution)`. */
+    public static JsonObject argsDynamicPluginResolve(
+            String requestId, String pluginRunId, boolean accepted) {
+        JsonObject args = new JsonObject();
+        args.addProperty("requestId", requestId);
+        JsonObject resolution = new JsonObject();
+        resolution.addProperty("ok", accepted);
+        if (accepted) {
+            if (pluginRunId != null && !pluginRunId.isBlank()) {
+                resolution.addProperty("pluginRunId", pluginRunId);
+            }
+        } else {
+            resolution.addProperty("reason", "rejected");
+            if (pluginRunId != null && !pluginRunId.isBlank()) {
+                resolution.addProperty("pluginRunId", pluginRunId);
+            }
+        }
+        args.add("resolution", resolution);
+        return args;
+    }
+
+    /** `messageFeedback/list(request)` with `{request:{sessionId}}`. */
+    public static JsonObject argsMessageFeedbackList(String sessionId) {
+        JsonObject request = new JsonObject();
+        request.addProperty("sessionId", sessionId);
+        return withRequest(request);
+    }
+
+    /** `messageFeedback/put(request)` with a versioned feedback item. */
+    public static JsonObject argsMessageFeedbackPut(
+            String sessionId,
+            String messageId,
+            String rating,
+            String note,
+            String category,
+            String ifVersion) {
+        JsonObject request = new JsonObject();
+        request.addProperty("sessionId", sessionId);
+        request.addProperty("messageId", messageId);
+        request.addProperty("rating", rating);
+        if (note != null && !note.isBlank()) request.addProperty("note", note);
+        if (category != null && !category.isBlank()) request.addProperty("category", category);
+        if (ifVersion == null) request.add("ifVersion", com.google.gson.JsonNull.INSTANCE);
+        else request.addProperty("ifVersion", ifVersion);
+        return withRequest(request);
+    }
+
+    /** `messageFeedback/delete(request)` with a versioned feedback item. */
+    public static JsonObject argsMessageFeedbackDelete(
+            String sessionId, String messageId, String ifVersion) {
+        JsonObject request = new JsonObject();
+        request.addProperty("sessionId", sessionId);
+        request.addProperty("messageId", messageId);
+        request.addProperty("ifVersion", ifVersion);
+        return withRequest(request);
+    }
+
+    /** `sessionFeedback/record(request)` with an optional category and note. */
+    public static JsonObject argsSessionFeedbackRecord(
+            String sessionId, String text, String category) {
+        JsonObject request = new JsonObject();
+        request.addProperty("sessionId", sessionId);
+        if (text != null && !text.isBlank()) request.addProperty("text", text);
+        if (category != null && !category.isBlank()) request.addProperty("category", category);
+        return withRequest(request);
     }
 
     /** `session/openWorkspacePath(request)` with `{request:{path}}`. */

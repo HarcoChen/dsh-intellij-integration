@@ -23,6 +23,12 @@ Status: `[x]` implemented, `[-]` usable but not yet at VS Code parity, `[ ]` not
 - [x] Attach an unstaged Git diff as one-shot context and clear it only after a successful send.
 - [x] Keep multiple one-shot items in `state.context`, including diagnostics and folder attachments.
 - [x] Implement AppShot capture, reporting the gap plainly on hosts without the native selector.
+- [x] Attach arbitrary files from paste, drag-and-drop, or the file picker; upload them through the
+      Runtime binary route and submit only session-scoped receipts.
+- [x] Copy finalized user and assistant messages through the native system clipboard, including a
+      bounded host-side cache for stream-to-history races.
+- [x] Discover bounded `.dsh/prompts/**/*.md` templates as visible composer drafts; templates are
+      never injected or sent without an explicit user action.
 
 ## P1 — runtime projections and controls
 
@@ -69,21 +75,24 @@ action validation, and the user-visible failure path are wired together.
   click the model name to open the native model chooser. Keyboard focus opens the statistics,
   Escape dismisses them, and the panel stays inside narrow WebView viewports.
 
-- [ ] Message checkpoints: fork from a finalized message, restore code to that message, or fork and restore together.
+- [x] Message checkpoints: fork from a finalized message, restore code to that message, or fork and restore together.
 - [x] Plan Mode: consume the public `plan` projection and expose `/plan` plus a composer toggle.
   - [x] Serialize composer toggles and use bare `/plan` so enabling the mode does not submit `on` as a task.
   - [x] Render declared plan reviews with approve / continue-planning feedback, preserving the question protocol.
   - [x] Validate nested answer fields and refuse replies to unavailable or mismatched session interactions.
-- [ ] IDE Provider management: configure endpoints, credentials, and models; discover models through `llm.models` and `llm.discoverModels`.
-- [ ] Debug Context: attach a bounded, one-shot snapshot of the current XDebugger frame, stack, locals, source excerpt, and diagnostics.
+- [x] IDE Provider management: configure endpoints, credentials, and models; discover models through `llm.listConfigurableProviders` and `llm.discoverModels`.
+- [x] Debug Context: attach a bounded, one-shot snapshot of the current XDebugger frame, stack, locals, source excerpt, and diagnostics.
 - [x] Subagent timing: consume `subagentTiming` and show settled/active duration in the tree and preview.
   - [x] Use live control projections, including children outside the session catalog, and compare timing watermarks.
   - [x] Refresh duration and activity in both views; reject malformed, fractional, or unsafe integer durations.
-- [ ] Managed Runtime distribution: cache and integrity-check the platform Runtime instead of relying only on pnpm/npx.
-- [ ] Conversation outline: provide a native session message navigator.
-- [ ] Agent status candidates: support a validated list of status labels instead of one fixed label.
+- [x] Managed Runtime distribution: cache and integrity-check the platform Runtime instead of relying only on pnpm/npx.
+- [x] Conversation outline: provide a native session message navigator.
+- [x] Agent status candidates: support a validated list of status labels instead of one fixed label.
 - [-] Terminal context: deferred until IntelliJ exposes a stable shell-execution event API; do not depend on terminal plugin internals.
-- [-] Message feedback: deferred until the evaluation/statistics loop has a product surface; the upstream sidecar remains optional.
+- [x] Message feedback: optional `messageFeedback` CAS mutations and `sessionFeedback/record`, with graceful fallback on older Runtimes.
+- [x] Read-only plugin inventory: consume `pluginInventory/list`, validate bounded Loader and Agent preset rows, and expose refresh/error state in the native settings bridge.
+- [x] Dynamic Cordis plugin panel: consume optional inventory, expose stop/remove/decline actions with stale-state checks, and never execute untrusted Client-half code in the IDE.
+- [x] Schedule projection: validate active reminders and render the read-only schedule tab in the Activity Dock.
 
 ## Quality gates for each batch
 
@@ -96,8 +105,58 @@ Latest parity batch verified on 2026-09-14 against the pinned `0.1.2-rc.1` Runti
 - Plan review rendering preserved the original question payload and escaped embedded HTML;
   the WebView boundary accepted valid answers and rejected surplus fields and non-string feedback.
 - No unit tests were added. Installed-IDE interaction remains the manual gate below.
-- The separate 0.1.5 protocol / Runtime lifecycle migration is still pending; this batch keeps the
-  existing audited Runtime version.
+
+Runtime 0.1.5 migration batch (2026-09-15):
+
+- [x] RC.2 assistant streams, reconnect settlement, V3 history, attachments, subagent request envelopes, Goal activation.
+- [x] Authoritative model catalog, mode-selection policy and skill source-path hints.
+- [x] Compatible local Runtime preference, pinned package fallback, shared-lock reuse, confirmed local upgrades and orphan migration.
+- [x] Bundled crash recovery engine, isolated validation, cancellation, reversible bundle isolation and diagnostic export.
+- [x] Agent Team experimental typed client (optional service; no Team UI).
+- Real RC.2 integration passed with a temporary Harness home and loopback model: streaming reconnect,
+  durable settlement, history decoding, native Java startup/stop/cancel, crash restart and offline diagnostics.
+- The vendored recovery engine passed its 12 existing process integration scenarios, including budget,
+  cancellation, sandbox validation and restoration conflicts. Java/Node shared-lock interop passed.
+- Final formatting/lint/build and IC/PC 2024.3.6 Plugin Verifier passed; both IDEs report compatible
+  with the existing deprecated-API warnings. The ZIP contains the helper and its MIT license.
+- Browser smoke verified the recovering banner, Chinese status and cancel action. Remaining banner
+  clicks were not completed because UI approval timed out twice; they remain a manual check.
+- No unit tests were added. Windows/Linux execution and installed-IDE interaction remain manual gates.
+
+Chat parity batch (2026-09-21):
+
+- [x] Migrated dsh-ide file drafts and message-copy WebView behavior without exposing the deferred
+      feedback surface; the host validates drafts, uploads raw bytes, and verifies opaque receipts.
+- [x] Added English and Simplified Chinese failure messages for invalid, oversized, and unavailable
+      attachments/messages.
+- `compileJava`, `spotlessCheck`, and `checkstyleMain` passed with the repository's JDK 21 toolchain.
+- No unit tests were added. Real Runtime file-upload and installed-IDE clipboard smoke checks remain
+  manual gates.
+
+Provider/runtime parity batch (2026-09-21):
+
+- [x] Provider management now exposes active/configurable providers, endpoint/protocol/API-key
+      configuration, model discovery and model catalog details, with native dialogs and a Web UI
+      fallback for settings that cannot be represented safely in the IDE.
+- [x] Message and session feedback use the Runtime's versioned sidecar endpoints and fail closed
+      when an older Runtime does not advertise them.
+- [x] Managed Runtime installation is platform-gated, manifest-pinned, SHA-256/size verified,
+      lock-serialized, path-safe, and atomically cached as the final local fallback.
+- [x] Conversation outline and checkpoint actions are available from native IDE commands and the
+      WebView, with host-side sequence validation and reveal routing.
+- [x] Prompt-template selection is host-owned and bounded; the latest WebView's `/template` action
+      now pre-fills the composer without silently submitting or injecting a draft.
+- [x] XDebugger context capture remains one-shot and bounded; agent status labels accept a
+      validated candidate list with a fixed-label override.
+- [x] Tool-write dirty-file guard: before approving a structured file diff, compare its target
+      paths with IntelliJ's unsaved editor documents; keep the approval pending and explain how
+      to save/revert when they overlap.
+- [x] Latest Activity Dock surfaces are now host-backed: schedule, plugin inventory, and optional
+      dynamic Cordis plugin state/actions are projected through the same sanitized WebView boundary.
+- `compileJava`, `spotlessCheck`, `checkstyleMain`, and `buildPlugin` are the automated gates for
+  this batch. No unit tests were added. Installed-IDE interaction and Windows/Linux Runtime
+  installation remain manual gates; Terminal context remains intentionally deferred because the
+  IntelliJ platform does not expose a stable scrollback/event API for it.
 
 - [x] Reject malformed or surplus WebView action fields at the host boundary for the completed batch.
 - [x] Keep IntelliJ model reads inside read actions and mutations inside write commands for the completed batch.

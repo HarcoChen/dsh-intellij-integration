@@ -75,6 +75,8 @@ final class DshGoalController {
             JsonObject source = value.getAsJsonObject();
             result.addProperty("state", "present");
             result.add("goal", source.getAsJsonObject("goal").deepCopy());
+            String activation = activation(session, source.getAsJsonObject("goal"));
+            if (activation != null) result.addProperty("activation", activation);
             result.add("roundsStarted", source.get("roundsStarted").deepCopy());
             result.add("createdAt", source.get("createdAt").deepCopy());
             result.add("updatedAt", source.get("updatedAt").deepCopy());
@@ -163,8 +165,14 @@ final class DshGoalController {
         JsonObject goal = projected.getAsJsonObject("goal");
         long roundsStarted = DshJson.longValue(projected.get("roundsStarted"), 0);
         long maxGoalRounds = DshJson.longValue(goal.get("maxGoalRounds"), 0);
-        if (!actionAllowed(
-                DshJson.string(goal, "phase"), operation, roundsStarted, maxGoalRounds)) {
+        boolean disarmedResume =
+                "resume".equals(operation)
+                        && "active".equals(DshJson.string(goal, "phase"))
+                        && "disarmed".equals(activation(session, goal))
+                        && roundsStarted < maxGoalRounds;
+        if (!disarmedResume
+                && !actionAllowed(
+                        DshJson.string(goal, "phase"), operation, roundsStarted, maxGoalRounds)) {
             throw new IllegalStateException(
                     "resume".equals(operation) && roundsStarted >= maxGoalRounds
                             ? "Goal has reached its maximum rounds and cannot be resumed."
@@ -257,6 +265,17 @@ final class DshGoalController {
             return "Harness goal phase is inconsistent with blockedReason.";
         }
         return null;
+    }
+
+    private String activation(String session, JsonObject goal) {
+        DshRemoteState.ProjectionCell cell = projections.apply(session, "goalActivation");
+        if (cell == null || cell.value() == null || !cell.value().isJsonObject()) return null;
+        JsonObject value = cell.value().getAsJsonObject();
+        if (!java.util.Objects.equals(goal.get("id"), value.get("id"))
+                || !java.util.Objects.equals(goal.get("revision"), value.get("revision")))
+            return null;
+        String activation = DshJson.string(value, "activation");
+        return "armed".equals(activation) || "disarmed".equals(activation) ? activation : null;
     }
 
     private static boolean actionAllowed(

@@ -69,6 +69,7 @@ public final class DshRemoteState {
         this.generation = generation;
         this.phase = phase;
         this.message = null;
+        for (Follow follow : follows.values()) follow.assistant = new DshAssistantStream();
         catalogBySession.clear();
         sessionListBaselineReceived = false;
         controlBySession.clear();
@@ -346,6 +347,14 @@ public final class DshRemoteState {
         control.seed(asOfSeq, values);
     }
 
+    void setGoalActivation(String sessionId, JsonElement value) {
+        controlFor(sessionId).applyProjection("goalActivation", value, Long.MAX_VALUE);
+    }
+
+    void clearAssistantStreams() {
+        for (Follow follow : follows.values()) follow.assistant = new DshAssistantStream();
+    }
+
     private SessionControl controlFor(String sessionId) {
         return controlBySession.computeIfAbsent(sessionId, ignored -> new SessionControl());
     }
@@ -375,7 +384,9 @@ public final class DshRemoteState {
     }
 
     void openFollow(JsonObject address, int maxMessages) {
-        Follow follow = new Follow(address.deepCopy(), maxMessages);
+        Follow follow = follows.get(addressKey(address));
+        if (follow == null) follow = new Follow(address.deepCopy(), maxMessages);
+        follow.assistant = new DshAssistantStream();
         follows.put(addressKey(address), follow);
     }
 
@@ -405,8 +416,21 @@ public final class DshRemoteState {
             }
             long cursor = longValue(frame.get("cursor"), Long.MIN_VALUE);
             if (cursor < -1) return false;
-            follow.replaceEvents(
-                    asArray(frame.get("records")), cursor, bool(frame, "hasMore", false));
+            try {
+                follow.assistant.replace(frame.get("assistantStream"), cursor);
+            } catch (IllegalArgumentException error) {
+                return false;
+            }
+            try {
+                follow.replaceEvents(
+                        DshRemoteHistory.records(asArray(frame.get("records"))),
+                        cursor,
+                        bool(frame, "hasMore", false));
+                for (JsonElement candidate : follow.events)
+                    follow.assistant.acceptEvent(candidate.getAsJsonObject());
+            } catch (RuntimeException error) {
+                return false;
+            }
             JsonObject projections =
                     frame.has("projections") && frame.get("projections").isJsonObject()
                             ? frame.getAsJsonObject("projections")
@@ -416,6 +440,14 @@ public final class DshRemoteState {
                 if (sessionId != null) seedProjection(sessionId, projections);
             }
             return true;
+        }
+        if ("assistant-stream".equals(type)) {
+            try {
+                follow.assistant.acceptFrame(frame.get("frame"), follow.cursor);
+                return true;
+            } catch (IllegalArgumentException error) {
+                return false;
+            }
         }
         if ("event".equals(type)) {
             JsonObject event =
@@ -427,6 +459,12 @@ public final class DshRemoteState {
             if (seq < 0) return true;
             if (seq <= follow.cursor) return true; // idempotent duplicate
             if (seq != follow.cursor + 1) return false; // gap: reopen
+            try {
+                event = DshRemoteHistory.event(event);
+                follow.assistant.acceptEvent(event);
+            } catch (IllegalArgumentException error) {
+                return false;
+            }
             follow.appendEvent(event.deepCopy());
             String sessionId = sessionIdOf(follow.address);
             if (sessionId != null) {
@@ -546,12 +584,19 @@ public final class DshRemoteState {
     /** One followed address's history view. */
     public static final class FollowView {
         public final JsonObject address;
+        public final JsonObject assistantStream;
         public final JsonArray events;
         public final long cursor;
         public final boolean hasMore;
 
-        FollowView(JsonObject address, JsonArray events, long cursor, boolean hasMore) {
+        FollowView(
+                JsonObject address,
+                JsonArray events,
+                long cursor,
+                boolean hasMore,
+                JsonObject assistantStream) {
             this.address = address;
+            this.assistantStream = assistantStream;
             this.events = events;
             this.cursor = cursor;
             this.hasMore = hasMore;
@@ -692,7 +737,12 @@ public final class DshRemoteState {
             Follow follow = entry.getValue();
             followViews.put(
                     entry.getKey(),
-                    new FollowView(follow.address, follow.events, follow.cursor, follow.hasMore));
+                    new FollowView(
+                            follow.address,
+                            follow.events,
+                            follow.cursor,
+                            follow.hasMore,
+                            follow.assistant.snapshot()));
         }
 
         return new Snapshot(
@@ -876,6 +926,7 @@ public final class DshRemoteState {
         final JsonObject address;
         final int maxMessages;
         JsonArray events = new JsonArray();
+        DshAssistantStream assistant = new DshAssistantStream();
         long cursor = -1;
         boolean hasMore;
 
@@ -885,7 +936,14 @@ public final class DshRemoteState {
         }
 
         void replaceEvents(JsonArray records, long cursor, boolean hasMore) {
-            this.events = trimHead(records.deepCopy());
+            java.util.TreeMap<Long, JsonElement> merged = new java.util.TreeMap<>();
+            for (JsonElement event : events)
+                merged.put(longValue(event.getAsJsonObject().get("seq"), -1), event);
+            for (JsonElement event : records)
+                merged.put(longValue(event.getAsJsonObject().get("seq"), -1), event);
+            JsonArray combined = new JsonArray();
+            for (JsonElement event : merged.values()) combined.add(event);
+            this.events = trimHead(combined);
             this.cursor = cursor;
             this.hasMore = hasMore;
         }

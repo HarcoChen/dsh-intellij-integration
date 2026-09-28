@@ -7,12 +7,23 @@ import com.intellij.openapi.Disposable;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
 import com.intellij.util.concurrency.AppExecutorUtil;
+import java.io.ByteArrayOutputStream;
+import java.net.URI;
+import java.net.URLEncoder;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Flow;
 import java.util.function.Consumer;
 import org.jetbrains.annotations.NotNull;
 import top.harcochen.dsh.DshBundle;
@@ -30,23 +41,27 @@ import top.harcochen.dsh.DshSettingsState;
  */
 public final class DshRemoteService implements Disposable {
     private static final Logger LOG = Logger.getInstance(DshRemoteService.class);
-
-    /** Temporary DeepSeek model exposed by the official endpoint before catalog refresh. */
-    private static final String FORCED_DEEPSEEK_PROVIDER = "deepseek-official";
-
-    private static final String FORCED_DEEPSEEK_MODEL_ID = "deepseek-v4.1-flash-expires-on-0910";
-
-    /** Keep the temporary route visible through 2026-09-10, then stop advertising it. */
-    private static final long FORCED_DEEPSEEK_MODEL_LAST_VISIBLE_AT =
-            java.time.Instant.parse("2026-09-11T00:00:00Z").toEpochMilli();
-
-    private static final String FORCED_DEEPSEEK_MODEL_DESCRIPTION =
-            "Temporary text-only route; available through 2026-09-10.";
+    private static final HttpClient UPLOAD_HTTP_CLIENT =
+            HttpClient.newBuilder()
+                    .version(HttpClient.Version.HTTP_1_1)
+                    .connectTimeout(Duration.ofSeconds(5))
+                    .followRedirects(HttpClient.Redirect.NEVER)
+                    .build();
+    private static final String FILE_UPLOAD_ENDPOINT =
+            DshRemoteContracts.SESSION_UPLOAD_FILE_BINARY;
+    private static final long MAX_UPLOAD_RESPONSE_BYTES = 1_000_000L;
+    private static final HttpResponse.BodyHandler<String> LIMITED_UPLOAD_BODY_HANDLER =
+            ignored -> new SizeLimitedBodySubscriber(MAX_UPLOAD_RESPONSE_BYTES);
 
     public static final String PHASE_STOPPED = "stopped";
+
     public static final String PHASE_CONNECTING = "connecting";
     public static final String PHASE_CONNECTED = "connected";
     public static final String PHASE_RECONNECTING = "reconnecting";
+
+    public long settingsEpoch() {
+        return connection.settingsEpoch();
+    }
 
     private final Project project;
     private final DshRuntimeService runtime;
@@ -225,6 +240,10 @@ public final class DshRemoteService implements Disposable {
     // unary domain API (blocking; only call from background executors)
     // ---------------------------------------------------------------------------
 
+    public DshAgentTeamClient agentTeams() {
+        return new DshAgentTeamClient(unary);
+    }
+
     public JsonObject createSession(String cwd, String workspaceId, String agentPreset)
             throws DshRemoteException {
         return objectValue(
@@ -282,6 +301,140 @@ public final class DshRemoteService implements Disposable {
                                 requestId, sessionId, mode, content, clientTimeZone)));
     }
 
+    /**
+     * Upload one raw file draft and return the Runtime-owned receipt used in a prompt content part.
+     * The upload route is intentionally kept outside the Remote unary envelope: it accepts binary
+     * bytes, but it still uses the same authority-bound cookie and request timeout.
+     */
+    public String uploadFile(String sessionId, String name, byte[] bytes)
+            throws DshRemoteException {
+        if (sessionId == null || sessionId.isBlank() || name == null || name.isBlank()) {
+            throw new IllegalArgumentException("A file upload needs a session and name");
+        }
+        if (bytes == null || bytes.length == 0) {
+            throw new IllegalArgumentException("A file upload cannot be empty");
+        }
+        String base = runtime.getUrl();
+        if (base == null || base.isBlank()) {
+            throw DshRemoteException.carrier(
+                    FILE_UPLOAD_ENDPOINT, "DSH Runtime is not connected", null);
+        }
+        try {
+            auth.cookie();
+        } catch (DshRemoteException error) {
+            LOG.warn("DSH Runtime authentication failed during file upload: " + error.display());
+            throw error;
+        }
+
+        URI uri;
+        try {
+            uri =
+                    URI.create(
+                            base.strip().replaceAll("/+$", "")
+                                    + "/api/"
+                                    + FILE_UPLOAD_ENDPOINT
+                                    + "?sessionId="
+                                    + URLEncoder.encode(sessionId, StandardCharsets.UTF_8)
+                                    + "&name="
+                                    + URLEncoder.encode(name, StandardCharsets.UTF_8));
+        } catch (RuntimeException error) {
+            throw DshRemoteException.protocol(
+                    FILE_UPLOAD_ENDPOINT, "File upload URL is invalid", error);
+        }
+
+        HttpRequest.Builder requestBuilder =
+                HttpRequest.newBuilder()
+                        .uri(uri)
+                        .timeout(Duration.ofMillis(uploadTimeoutMs()))
+                        .header("content-type", "application/octet-stream")
+                        .POST(HttpRequest.BodyPublishers.ofByteArray(bytes));
+        for (Map.Entry<String, String> entry : auth.headers().entrySet()) {
+            requestBuilder.header(entry.getKey(), entry.getValue());
+        }
+
+        HttpResponse<String> response;
+        try {
+            response = UPLOAD_HTTP_CLIENT.send(requestBuilder.build(), LIMITED_UPLOAD_BODY_HANDLER);
+        } catch (InterruptedException error) {
+            Thread.currentThread().interrupt();
+            throw DshRemoteException.carrier(
+                    FILE_UPLOAD_ENDPOINT, "File upload was interrupted", error);
+        } catch (Exception error) {
+            if (isUploadResponseTooLarge(error)) {
+                throw DshRemoteException.protocol(
+                        FILE_UPLOAD_ENDPOINT, "File upload response is too large", error);
+            }
+            throw DshRemoteException.carrier(
+                    FILE_UPLOAD_ENDPOINT,
+                    error.getMessage() == null ? "File upload failed" : error.getMessage(),
+                    error);
+        }
+
+        int status = response.statusCode();
+        if (status == 401 || status == 403) {
+            auth.invalidate();
+            throw DshRemoteException.auth(FILE_UPLOAD_ENDPOINT, status);
+        }
+        if (status == 404) throw DshRemoteException.capability(FILE_UPLOAD_ENDPOINT);
+        if (status < 200 || status >= 300) {
+            throw DshRemoteException.http(FILE_UPLOAD_ENDPOINT, status);
+        }
+        String body = response.body();
+        if (body == null || body.length() > MAX_UPLOAD_RESPONSE_BYTES) {
+            throw DshRemoteException.protocol(
+                    FILE_UPLOAD_ENDPOINT, "File upload response is too large", null);
+        }
+        JsonObject envelope;
+        try {
+            JsonElement parsed = com.google.gson.JsonParser.parseString(body);
+            if (!parsed.isJsonObject()) throw new IllegalArgumentException("not an object");
+            envelope = parsed.getAsJsonObject();
+        } catch (RuntimeException error) {
+            throw DshRemoteException.protocol(
+                    FILE_UPLOAD_ENDPOINT, "File upload returned invalid JSON", error);
+        }
+        Boolean ok = booleanValue(envelope, "ok");
+        if (Boolean.FALSE.equals(ok)) {
+            JsonObject error = objectValue(envelope, "error");
+            String code = stringOf(error, "code");
+            String message = stringOf(error, "message");
+            throw DshRemoteException.remote(
+                    FILE_UPLOAD_ENDPOINT,
+                    code.isBlank() ? "upload/rejected" : code,
+                    message.isBlank() ? "The Runtime rejected the file upload" : message,
+                    error);
+        }
+        if (!Boolean.TRUE.equals(ok)) {
+            throw DshRemoteException.protocol(
+                    FILE_UPLOAD_ENDPOINT, "File upload response has no ok flag", null);
+        }
+        JsonObject value = objectValue(envelope, "value");
+        JsonObject file = objectValue(value, "file");
+        String receiptId = stringOf(value, "receiptId");
+        String attachmentId = stringOf(file, "attachmentId");
+        String returnedName = stringOf(file, "name");
+        long returnedBytes = longOf(file, "bytes", -1);
+        if (receiptId.isBlank()
+                || receiptId.length() > 512
+                || attachmentId.isBlank()
+                || attachmentId.length() > 512
+                || returnedName.isBlank()
+                || returnedName.length() > 512
+                || returnedName.contains("/")
+                || returnedName.contains("\\")
+                || returnedBytes < 0
+                || returnedBytes != bytes.length) {
+            throw DshRemoteException.protocol(
+                    FILE_UPLOAD_ENDPOINT, "File upload returned an unusable receipt", null);
+        }
+        return receiptId;
+    }
+
+    private int uploadTimeoutMs() {
+        int configured = DshSettingsState.getInstance(project).requestTimeoutMs;
+        return Math.max(1_000, Math.min(configured, 3_600_000));
+    }
+
     public void cancel(String sessionId) throws DshRemoteException {
         unary.call(
                 DshRemoteContracts.SESSION_CANCEL, DshRemoteContracts.argsSessionCancel(sessionId));
@@ -302,11 +455,9 @@ public final class DshRemoteService implements Disposable {
     }
 
     public JsonObject modelCatalog() throws DshRemoteException {
-        return appendTemporaryDeepSeekModel(
-                objectValue(
-                        unary.call(
-                                DshRemoteContracts.SESSION_MODEL_CATALOG,
-                                DshRemoteContracts.argsEmpty())));
+        return objectValue(
+                unary.call(
+                        DshRemoteContracts.SESSION_MODEL_CATALOG, DshRemoteContracts.argsEmpty()));
     }
 
     public void selectModel(String sessionId, String provider, String model, String reasoningEffort)
@@ -502,14 +653,41 @@ public final class DshRemoteService implements Disposable {
     }
 
     public JsonArray providers() throws DshRemoteException {
-        JsonElement value =
-                unary.call(DshRemoteContracts.LLM_PROVIDERS, DshRemoteContracts.argsEmpty());
-        return value != null && value.isJsonArray() ? value.getAsJsonArray() : new JsonArray();
+        JsonArray configurable =
+                arrayValue(
+                        unary.call(
+                                DshRemoteContracts.LLM_PROVIDERS, DshRemoteContracts.argsEmpty()));
+        java.util.Set<String> active = new java.util.HashSet<>();
+        try {
+            JsonArray activeRows =
+                    arrayValue(
+                            unary.call(
+                                    DshRemoteContracts.LLM_LIST_PROVIDERS,
+                                    DshRemoteContracts.argsEmpty()));
+            for (JsonElement candidate : activeRows) {
+                if (!candidate.isJsonObject()) continue;
+                String id = stringOf(candidate.getAsJsonObject(), "id");
+                if (!id.isBlank()) active.add(id);
+            }
+        } catch (DshRemoteException error) {
+            // Older Runtimes may expose only the configurable directory. Keep
+            // that useful surface available and treat activity as unknown.
+            if (!error.isCapabilityMissing()) throw error;
+        }
+        JsonArray result = new JsonArray();
+        for (JsonElement candidate : configurable) {
+            if (!candidate.isJsonObject()) continue;
+            JsonObject provider = candidate.getAsJsonObject().deepCopy();
+            String id = stringOf(provider, "provider");
+            if (!id.isBlank()) provider.addProperty("active", active.contains(id));
+            result.add(provider);
+        }
+        return result;
     }
 
-    public JsonObject discoverLlmModels(String settingsNs, JsonObject draft)
+    public JsonArray discoverLlmModels(String settingsNs, JsonObject draft)
             throws DshRemoteException {
-        return objectValue(
+        return arrayValue(
                 unary.call(
                         DshRemoteContracts.LLM_DISCOVER_MODELS,
                         DshRemoteContracts.argsLlmDiscoverModels(settingsNs, draft)));
@@ -533,15 +711,145 @@ public final class DshRemoteService implements Disposable {
                 DshRemoteContracts.CREDENTIALS_UNSET, DshRemoteContracts.argsCredentialsUnset(ref));
     }
 
+    /** Read the optional point-in-time Runtime plugin inventory. */
+    public JsonObject pluginInventory() throws DshRemoteException {
+        JsonObject value =
+                DshPluginInventory.normalize(
+                        unary.call(
+                                DshRemoteContracts.PLUGIN_INVENTORY_LIST,
+                                DshRemoteContracts.argsEmpty()));
+        if (value == null) {
+            throw DshRemoteException.protocol(
+                    DshRemoteContracts.PLUGIN_INVENTORY_LIST,
+                    "Remote plugin inventory has an invalid shape",
+                    null);
+        }
+        return value;
+    }
+
+    /** Read the optional frame-wide dynamic Cordis plugin registry. */
+    public JsonArray dynamicPluginInventory() throws DshRemoteException {
+        JsonArray value =
+                DshDynamicPlugin.normalizeInventory(
+                        unary.call(
+                                DshRemoteContracts.DYNAMIC_PLUGIN_INVENTORY,
+                                DshRemoteContracts.argsEmpty()));
+        if (value == null) {
+            throw DshRemoteException.protocol(
+                    DshRemoteContracts.DYNAMIC_PLUGIN_INVENTORY,
+                    "Remote dynamic plugin inventory has an invalid shape",
+                    null);
+        }
+        return value;
+    }
+
+    public JsonObject stopDynamicPlugin(String agentId, String pluginId) throws DshRemoteException {
+        JsonObject value =
+                DshDynamicPlugin.normalizeReceipt(
+                        unary.call(
+                                DshRemoteContracts.DYNAMIC_PLUGIN_STOP,
+                                DshRemoteContracts.argsDynamicPluginPanel(agentId, pluginId)),
+                        "stop");
+        if (value == null) {
+            throw DshRemoteException.protocol(
+                    DshRemoteContracts.DYNAMIC_PLUGIN_STOP,
+                    "Remote dynamic plugin stop returned an invalid shape",
+                    null);
+        }
+        return value;
+    }
+
+    public JsonObject removeDynamicPlugin(String agentId, String pluginId)
+            throws DshRemoteException {
+        JsonObject value =
+                DshDynamicPlugin.normalizeReceipt(
+                        unary.call(
+                                DshRemoteContracts.DYNAMIC_PLUGIN_REMOVE,
+                                DshRemoteContracts.argsDynamicPluginPanel(agentId, pluginId)),
+                        "remove");
+        if (value == null) {
+            throw DshRemoteException.protocol(
+                    DshRemoteContracts.DYNAMIC_PLUGIN_REMOVE,
+                    "Remote dynamic plugin removal returned an invalid shape",
+                    null);
+        }
+        return value;
+    }
+
+    public JsonObject declineDynamicPlugin(String requestId, String pluginRunId)
+            throws DshRemoteException {
+        JsonObject value =
+                DshDynamicPlugin.normalizeResolve(
+                        unary.call(
+                                DshRemoteContracts.DYNAMIC_PLUGIN_RESOLVE,
+                                DshRemoteContracts.argsDynamicPluginResolve(
+                                        requestId, pluginRunId, false)));
+        if (value == null) {
+            throw DshRemoteException.protocol(
+                    DshRemoteContracts.DYNAMIC_PLUGIN_RESOLVE,
+                    "Remote dynamic plugin decision returned an invalid shape",
+                    null);
+        }
+        return value;
+    }
+
+    public JsonObject listMessageFeedback(String sessionId) throws DshRemoteException {
+        return objectValue(
+                unary.call(
+                        DshRemoteContracts.MESSAGE_FEEDBACK_LIST,
+                        DshRemoteContracts.argsMessageFeedbackList(sessionId)));
+    }
+
+    public JsonObject putMessageFeedback(
+            String sessionId,
+            String messageId,
+            String rating,
+            String note,
+            String category,
+            String ifVersion)
+            throws DshRemoteException {
+        return objectValue(
+                unary.call(
+                        DshRemoteContracts.MESSAGE_FEEDBACK_PUT,
+                        DshRemoteContracts.argsMessageFeedbackPut(
+                                sessionId, messageId, rating, note, category, ifVersion)));
+    }
+
+    public JsonObject deleteMessageFeedback(String sessionId, String messageId, String ifVersion)
+            throws DshRemoteException {
+        return objectValue(
+                unary.call(
+                        DshRemoteContracts.MESSAGE_FEEDBACK_DELETE,
+                        DshRemoteContracts.argsMessageFeedbackDelete(
+                                sessionId, messageId, ifVersion)));
+    }
+
+    public JsonObject recordSessionFeedback(String sessionId, String text, String category)
+            throws DshRemoteException {
+        return objectValue(
+                unary.call(
+                        DshRemoteContracts.SESSION_FEEDBACK_RECORD,
+                        DshRemoteContracts.argsSessionFeedbackRecord(sessionId, text, category)));
+    }
+
     /** One message-aligned backwards history page for any session address. */
     public JsonObject pageHistory(
             JsonObject address, long throughSeq, Long beforeSeq, int maxMessages)
             throws DshRemoteException {
-        return objectValue(
-                unary.call(
-                        DshRemoteContracts.SESSION_PAGE,
-                        DshRemoteContracts.argsSessionPage(
-                                address, throughSeq, beforeSeq, maxMessages)));
+        long generation = snapshot.generation;
+        JsonObject page =
+                objectValue(
+                        unary.call(
+                                DshRemoteContracts.SESSION_PAGE,
+                                DshRemoteContracts.argsSessionPage(
+                                        address, throughSeq, beforeSeq, maxMessages)));
+        if (snapshot.generation != generation)
+            throw DshRemoteException.carrier(
+                    DshRemoteContracts.SESSION_PAGE,
+                    "Connection changed while reading history",
+                    null);
+        page.add("records", DshRemoteHistory.records(arrayOrEmpty(page, "records")));
+        return page;
     }
 
     /**
@@ -600,7 +908,17 @@ public final class DshRemoteService implements Disposable {
                                                 if (item != null
                                                         && "snapshot".equals(stringOf(item, "type"))
                                                         && !opened.isDone()) {
-                                                    opened.complete(item.deepCopy());
+                                                    try {
+                                                        JsonObject decoded = item.deepCopy();
+                                                        decoded.add(
+                                                                "records",
+                                                                DshRemoteHistory.records(
+                                                                        arrayOrEmpty(
+                                                                                item, "records")));
+                                                        opened.complete(decoded);
+                                                    } catch (RuntimeException failure) {
+                                                        opened.completeExceptionally(failure);
+                                                    }
                                                 }
                                             },
                                             error -> {
@@ -715,68 +1033,14 @@ public final class DshRemoteService implements Disposable {
         return value != null && value.isJsonObject() ? value.getAsJsonObject() : new JsonObject();
     }
 
-    /**
-     * Advertise the temporary official DeepSeek route until the Runtime catalog catches up.
-     *
-     * <p>The route is intentionally added only to an existing provider group. The Runtime remains
-     * authoritative for provider availability, while this compatibility shim makes the model
-     * selectable by older editor integrations during the short catalog propagation window.
-     */
-    private static JsonObject appendTemporaryDeepSeekModel(JsonObject catalog) {
-        if (System.currentTimeMillis() >= FORCED_DEEPSEEK_MODEL_LAST_VISIBLE_AT
-                || catalog == null
-                || !catalog.has("groups")
-                || !catalog.get("groups").isJsonArray()) {
-            return catalog;
-        }
-
-        for (JsonElement groupElement : catalog.getAsJsonArray("groups")) {
-            if (!groupElement.isJsonObject()) continue;
-            JsonObject group = groupElement.getAsJsonObject();
-            if (!FORCED_DEEPSEEK_PROVIDER.equals(stringOf(group, "id"))) continue;
-            if (!group.has("models") || !group.get("models").isJsonArray()) continue;
-
-            JsonArray models = group.getAsJsonArray("models");
-            for (JsonElement modelElement : models) {
-                if (modelElement.isJsonObject()
-                        && FORCED_DEEPSEEK_MODEL_ID.equals(
-                                stringOf(modelElement.getAsJsonObject(), "id"))) {
-                    return catalog;
-                }
-            }
-
-            JsonObject temporaryModel = new JsonObject();
-            temporaryModel.addProperty("id", FORCED_DEEPSEEK_MODEL_ID);
-            temporaryModel.addProperty("name", FORCED_DEEPSEEK_MODEL_ID);
-            temporaryModel.addProperty("description", FORCED_DEEPSEEK_MODEL_DESCRIPTION);
-            JsonObject reasoning = copyReasoningMetadata(models);
-            if (reasoning != null) temporaryModel.add("reasoning", reasoning);
-            models.add(temporaryModel);
-            return catalog;
-        }
-        return catalog;
+    private static JsonArray arrayValue(JsonElement value) {
+        return value != null && value.isJsonArray() ? value.getAsJsonArray() : new JsonArray();
     }
 
-    /** Reuse the provider's configured reasoning choices for the temporary route. */
-    private static JsonObject copyReasoningMetadata(JsonArray models) {
-        for (JsonElement modelElement : models) {
-            if (!modelElement.isJsonObject()) continue;
-            JsonObject model = modelElement.getAsJsonObject();
-            if (!model.has("reasoning") || !model.get("reasoning").isJsonObject()) continue;
-            JsonObject source = model.getAsJsonObject("reasoning");
-            if (!source.has("efforts")
-                    || !source.get("efforts").isJsonArray()
-                    || source.getAsJsonArray("efforts").isEmpty()) {
-                continue;
-            }
-            JsonObject copy = new JsonObject();
-            copy.add("efforts", source.getAsJsonArray("efforts").deepCopy());
-            if (source.has("defaultEffort")) {
-                copy.add("defaultEffort", source.get("defaultEffort").deepCopy());
-            }
-            return copy;
-        }
-        return null;
+    private static JsonObject objectValue(JsonObject object, String key) {
+        return object != null && object.has(key) && object.get(key).isJsonObject()
+                ? object.getAsJsonObject(key)
+                : new JsonObject();
     }
 
     private static JsonArray arrayOrEmpty(JsonObject value, String key) {
@@ -801,6 +1065,90 @@ public final class DshRemoteService implements Disposable {
                 && object.get(key).getAsBoolean();
     }
 
+    private static boolean isUploadResponseTooLarge(Throwable error) {
+        Throwable current = error;
+        while (current != null) {
+            if (current instanceof UploadResponseTooLargeException) return true;
+            Throwable cause = current.getCause();
+            if (cause == current) break;
+            current = cause;
+        }
+        return false;
+    }
+
+    private static final class UploadResponseTooLargeException extends RuntimeException {
+        UploadResponseTooLargeException() {
+            super("File upload response is too large");
+        }
+    }
+
+    private static final class SizeLimitedBodySubscriber
+            implements HttpResponse.BodySubscriber<String> {
+        private final long limit;
+        private final CompletableFuture<String> body = new CompletableFuture<>();
+        private final ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        private Flow.Subscription subscription;
+        private long received;
+
+        SizeLimitedBodySubscriber(long limit) {
+            this.limit = limit;
+        }
+
+        @Override
+        public CompletionStage<String> getBody() {
+            return body;
+        }
+
+        @Override
+        public void onSubscribe(Flow.Subscription next) {
+            if (subscription != null) {
+                next.cancel();
+                return;
+            }
+            subscription = next;
+            next.request(1);
+        }
+
+        @Override
+        public void onNext(List<ByteBuffer> items) {
+            if (body.isDone()) return;
+            long chunk = 0;
+            for (ByteBuffer item : items) chunk += item.remaining();
+            if (chunk > limit - received) {
+                subscription.cancel();
+                body.completeExceptionally(new UploadResponseTooLargeException());
+                return;
+            }
+            for (ByteBuffer item : items) {
+                ByteBuffer copy = item.asReadOnlyBuffer();
+                byte[] value = new byte[copy.remaining()];
+                copy.get(value);
+                bytes.writeBytes(value);
+            }
+            received += chunk;
+            subscription.request(1);
+        }
+
+        @Override
+        public void onError(Throwable error) {
+            body.completeExceptionally(error);
+        }
+
+        @Override
+        public void onComplete() {
+            body.complete(new String(bytes.toByteArray(), StandardCharsets.UTF_8));
+        }
+    }
+
+    private static Boolean booleanValue(JsonObject object, String key) {
+        if (object == null || !object.has(key) || !object.get(key).isJsonPrimitive()) return null;
+        try {
+            return object.get(key).getAsBoolean();
+        } catch (RuntimeException ignored) {
+            return null;
+        }
+    }
+
     private static long longOf(JsonObject object, String key, long fallback) {
         return object != null
                         && object.has(key)
@@ -818,8 +1166,8 @@ public final class DshRemoteService implements Disposable {
             JsonObject event =
                     wrapper.has("event") && wrapper.get("event").isJsonObject()
                             ? wrapper.getAsJsonObject("event")
-                            : null;
-            if (event == null || !event.has("seq")) continue;
+                            : wrapper;
+            if (!event.has("seq")) continue;
             try {
                 long seq = event.get("seq").getAsLong();
                 if (seq >= 0) target.putIfAbsent(seq, wrapper.deepCopy());

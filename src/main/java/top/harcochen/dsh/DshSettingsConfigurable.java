@@ -36,7 +36,10 @@ public final class DshSettingsConfigurable implements Configurable {
     private JBCheckBox autoStart;
     private JBCheckBox persistSession;
     private JBCheckBox installWhenMissing;
+    private JBCheckBox useManagedRuntime;
     private JBCheckBox enableCompaction;
+    private JBCheckBox recoveryEnabled;
+    private JBCheckBox recoveryIsolation;
 
     public DshSettingsConfigurable(Project project) {
         this.project = project;
@@ -74,6 +77,7 @@ public final class DshSettingsConfigurable implements Configurable {
         persistSession = new JBCheckBox(DshBundle.message("dsh.settings.persist.session.label"));
         installWhenMissing =
                 new JBCheckBox(DshBundle.message("dsh.settings.install.when.missing.label"));
+        useManagedRuntime = new JBCheckBox(DshBundle.message("dsh.settings.managed.runtime.label"));
         enableCompaction =
                 new JBCheckBox(DshBundle.message("dsh.settings.enable.compaction.label"));
 
@@ -137,7 +141,12 @@ public final class DshSettingsConfigurable implements Configurable {
         addCheckbox(autoStart);
         addCheckbox(persistSession);
         addCheckbox(installWhenMissing);
+        addCheckbox(useManagedRuntime);
         addCheckbox(enableCompaction);
+        recoveryEnabled = new JBCheckBox(DshBundle.message("dsh.settings.recovery.enabled"));
+        recoveryIsolation = new JBCheckBox(DshBundle.message("dsh.settings.recovery.isolation"));
+        addCheckbox(recoveryEnabled);
+        addCheckbox(recoveryIsolation);
 
         JPanel note = new JPanel();
         note.setLayout(new BoxLayout(note, BoxLayout.Y_AXIS));
@@ -204,7 +213,10 @@ public final class DshSettingsConfigurable implements Configurable {
                 || autoStart.isSelected() != state.autoStart
                 || persistSession.isSelected() != state.persistSession
                 || installWhenMissing.isSelected() != state.installWhenMissing
-                || enableCompaction.isSelected() != state.enableCompaction;
+                || useManagedRuntime.isSelected() != state.useManagedRuntime
+                || enableCompaction.isSelected() != state.enableCompaction
+                || recoveryEnabled.isSelected() != state.recoveryEnabled
+                || recoveryIsolation.isSelected() != state.recoveryAutoPersistBundleIsolation;
     }
 
     @Override
@@ -261,7 +273,10 @@ public final class DshSettingsConfigurable implements Configurable {
         state.autoStart = autoStart.isSelected();
         state.persistSession = persistSession.isSelected();
         state.installWhenMissing = installWhenMissing.isSelected();
+        state.useManagedRuntime = useManagedRuntime.isSelected();
         state.enableCompaction = enableCompaction.isSelected();
+        state.recoveryEnabled = recoveryEnabled.isSelected();
+        state.recoveryAutoPersistBundleIsolation = recoveryIsolation.isSelected();
         DshRuntimeService.getInstance(project).settingsChanged();
     }
 
@@ -283,7 +298,10 @@ public final class DshSettingsConfigurable implements Configurable {
         autoStart.setSelected(state.autoStart);
         persistSession.setSelected(state.persistSession);
         installWhenMissing.setSelected(state.installWhenMissing);
+        useManagedRuntime.setSelected(state.useManagedRuntime);
         enableCompaction.setSelected(state.enableCompaction);
+        recoveryEnabled.setSelected(state.recoveryEnabled);
+        recoveryIsolation.setSelected(state.recoveryAutoPersistBundleIsolation);
     }
 
     private String joinedLabels() {

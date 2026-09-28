@@ -78,15 +78,15 @@ final class DshTraceProjector {
                     if (id != null) compactionEnds.putIfAbsent(id, entry);
                 }
                 case "assistant/chunk" -> addChunk(chunks, entry);
-                case "tool/code-dispatch-start" -> {
+                case "tool/ptc-dispatch-start" -> {
                     String callId = string(data, "subCallId");
                     if (callId != null) subStarts.putIfAbsent(callId, entry);
                 }
-                case "tool/code-dispatch" -> {
+                case "tool/ptc-dispatch" -> {
                     String callId = string(data, "subCallId");
                     if (callId != null) subSettles.putIfAbsent(callId, entry);
                 }
-                case "assistant/message" -> {
+                case "assistant/message", "assistant/attempt" -> {
                     if (location != null) assistantSteps.add(location);
                 }
                 default -> {}
@@ -98,7 +98,7 @@ final class DshTraceProjector {
         Set<String> emittedTools = new HashSet<>();
         for (Entry entry : entries) {
             if ("assistant/chunk".equals(entry.type())) continue;
-            if ("tool/code-dispatch".equals(entry.type())) {
+            if ("tool/ptc-dispatch".equals(entry.type())) {
                 String callId = string(data(entry), "subCallId");
                 if (callId != null && subStarts.containsKey(callId)) continue;
                 if (callId != null) {
@@ -112,7 +112,7 @@ final class DshTraceProjector {
                     continue;
                 }
             }
-            if ("tool/code-dispatch-start".equals(entry.type())) {
+            if ("tool/ptc-dispatch-start".equals(entry.type())) {
                 String callId = string(data(entry), "subCallId");
                 if (callId != null) {
                     Entry settle = subSettles.get(callId);
@@ -155,9 +155,27 @@ final class DshTraceProjector {
                     continue;
                 }
             }
-            if ("assistant/message".equals(entry.type())) {
+            if ("assistant/message".equals(entry.type())
+                    || "assistant/attempt".equals(entry.type())) {
                 String key = stepKey(data(entry));
                 ChunkGroup group = key == null ? null : chunks.get(key);
+                if (data(entry).has("stream")) {
+                    Map<String, ChunkGroup> compact = new LinkedHashMap<>();
+                    for (JsonElement value :
+                            top.harcochen.dsh.remote.DshAssistantStream.expand(
+                                    data(entry).get("stream"))) {
+                        JsonObject timed = value.getAsJsonObject();
+                        JsonObject event = entry.event.deepCopy();
+                        event.addProperty("type", "assistant/chunk");
+                        event.add("time", timed.get("time"));
+                        JsonObject chunkData = data(entry).deepCopy();
+                        chunkData.remove("stream");
+                        chunkData.add("chunk", timed.get("chunk"));
+                        event.add("data", chunkData);
+                        addChunk(compact, new Entry(event, event));
+                    }
+                    group = compact.get(key);
+                }
                 addRow(
                         rows,
                         seqToRowId,
@@ -331,7 +349,7 @@ final class DshTraceProjector {
                                         ? "Compaction completed"
                                         : "Compaction failed · " + error;
                     }
-                } else if (type.startsWith("tool/code-dispatch")) {
+                } else if (type.startsWith("tool/ptc-dispatch")) {
                     category = "subtool";
                     summary = subtoolSummary(data, type);
                 }
@@ -378,7 +396,7 @@ final class DshTraceProjector {
                                 + ":"
                                 + entry.seq(),
                         entry.seq(),
-                        "assistant/message",
+                        entry.type(),
                         "assistant",
                         summary,
                         entry.time(),
@@ -545,8 +563,8 @@ final class DshTraceProjector {
                         "subtool:" + callId,
                         anchor.seq(),
                         settle == null
-                                ? "tool/code-dispatch-start"
-                                : "tool/code-dispatch-start → tool/code-dispatch",
+                                ? "tool/ptc-dispatch-start"
+                                : "tool/ptc-dispatch-start → tool/ptc-dispatch",
                         "subtool",
                         summary,
                         anchor.time(),

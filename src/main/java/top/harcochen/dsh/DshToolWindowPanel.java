@@ -13,13 +13,25 @@ import com.intellij.ide.BrowserUtil;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.diagnostic.Logger;
+import com.intellij.openapi.editor.Document;
+import com.intellij.openapi.fileEditor.FileDocumentManager;
+import com.intellij.openapi.ide.CopyPasteManager;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.ui.Messages;
+import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.ui.components.JBLabel;
 import java.awt.BorderLayout;
 import java.awt.FlowLayout;
+import java.awt.datatransfer.StringSelection;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
@@ -60,9 +72,10 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
     /** Coalesces bursts of snapshot updates into one EDT state publish. */
     private final AtomicBoolean statePostPending = new AtomicBoolean();
 
+    private final DshDynamicPluginController dynamicPlugins;
     private final Consumer<DshRemoteState.Snapshot> snapshotListener = this::onSnapshot;
     private final Consumer<DshRuntimeService.RuntimeStatus> runtimeStatusListener =
-            ignored -> postStateLater();
+            this::onRuntimeStatus;
     private final DshMarkdownRenderCache markdownRenderCache = new DshMarkdownRenderCache();
     private final DshIdeContextController ideContext;
     private final DshDebugContextController debugContext;
@@ -77,6 +90,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
     private final DshSessionActionsController sessionActions;
     private final DshPromptController prompts;
     private final DshChangeReviewStore changeReviews;
+    private final DshFeedbackController feedback;
 
     private DshBridge bridge;
     private JPanel fallbackPanel;
@@ -90,11 +104,16 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
     private volatile String followedSession;
     private volatile long projectedCursor = Long.MIN_VALUE;
     private volatile JsonArray projectedEvents;
+    private volatile JsonObject projectedAssistantStream;
     private volatile JsonObject currentWorkspaceRegistration;
     private volatile String canonicalBasePath;
     private volatile DshRemoteState.Snapshot snapshot = DshRemoteService.emptySnapshot();
     private volatile JsonArray messages = new JsonArray();
     private volatile DshMessageProjector.Projection projection;
+
+    /** Keeps visible text briefly so copy actions survive a stream-to-history projection race. */
+    private final Map<String, String> copyableMessageTexts = new LinkedHashMap<>();
+
     private volatile String lastError;
     private volatile JsonObject pendingComposerUpdate;
 
@@ -221,6 +240,22 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
                         this::postStateLater,
                         this::notify,
                         error -> lastError = error);
+        this.feedback =
+                new DshFeedbackController(
+                        remote,
+                        operations,
+                        () -> sessionId,
+                        this::postStateLater,
+                        this::notify,
+                        error -> lastError = error);
+        this.dynamicPlugins =
+                new DshDynamicPluginController(
+                        runtime,
+                        remote,
+                        operations,
+                        this::postStateLater,
+                        this::notify,
+                        error -> lastError = error);
         runtime.addStatusListener(runtimeStatusListener);
         remote.addListener(snapshotListener);
         setBorder(BorderFactory.createEmptyBorder());
@@ -249,6 +284,11 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
                         }
                     });
         }
+    }
+
+    private void onRuntimeStatus(DshRuntimeService.RuntimeStatus status) {
+        dynamicPlugins.refreshOnRuntimeStart(status);
+        postStateLater();
     }
 
     /** Derive presentation caches from the latest snapshot. Runs off the EDT. */
@@ -284,15 +324,22 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
         if (selected != null) live.add(selected);
         sessionState.prune(live);
         changeReviews.retain(live);
+        feedback.prune(live);
 
         if (selected != null) {
             String followKey = "session:" + selected;
             DshRemoteState.FollowView view = current.follows.get(followKey);
             long cursor = view == null ? Long.MIN_VALUE : view.cursor;
-            boolean replaced = view != null && view.events != projectedEvents;
+            boolean replaced =
+                    view != null
+                            && (view.events != projectedEvents
+                                    || !java.util.Objects.equals(
+                                            view.assistantStream, projectedAssistantStream));
             if (view != null && (cursor != projectedCursor || replaced)) {
                 JsonObject history = new JsonObject();
                 history.add("events", view.events);
+                if (view.assistantStream != null)
+                    history.add("assistantStream", view.assistantStream);
                 DshSettingsState settings = DshSettingsState.getInstance(project);
                 String statusLabel =
                         settings.agentStatusLabel == null || settings.agentStatusLabel.isBlank()
@@ -302,11 +349,14 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
                         sessionState.projectHistory(selected, history, statusLabel);
                 projection = cached.projection();
                 messages = cached.messages();
+                feedback.refresh(selected, false);
+                rememberCopyableMessages(selected, messages);
                 changeReviews.observe(selected, project.getBasePath(), history);
                 prompts.refreshCatalogs(selected);
                 sessionActions.refreshModelCatalog(selected);
                 projectedCursor = cursor;
                 projectedEvents = view.events;
+                projectedAssistantStream = view.assistantStream;
             }
             agentPresets.refreshCatalogIfNecessary();
         } else {
@@ -471,6 +521,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
             postStateLater();
             flushPendingComposerUpdate();
             subagents.refresh(sessionId);
+            dynamicPlugins.refreshIfRunning();
             return;
         }
         switch (type) {
@@ -504,12 +555,79 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
             case "restoreCodeToMessage" -> checkpointRestore(integer(action, "seq", -1));
             case "forkAndRestoreCodeToMessage" ->
                     checkpointForkAndRestore(integer(action, "seq", -1));
+            case "copyMessage" -> copyMessage(string(action, "messageId"));
+            case "toggleMessageFeedback" ->
+                    feedback.toggle(string(action, "messageId"), string(action, "rating"));
+            case "submitMessageFeedback" ->
+                    feedback.submit(
+                            string(action, "messageId"),
+                            string(action, "rating"),
+                            string(action, "note"),
+                            string(action, "category"));
+            case "saveMessageFeedbackNote" ->
+                    feedback.saveNote(string(action, "messageId"), stringOr(action, "note", ""));
+            case "openSessionFeedback" -> feedback.openSessionFeedback();
+            case "dismissSessionFeedback" -> feedback.dismissSessionFeedback();
+            case "recordSessionFeedback" ->
+                    feedback.recordSessionFeedback(
+                            stringOr(action, "text", ""), string(action, "category"));
             case "archiveSession" -> sessionActions.archive();
             case "openTrace" -> openTrace(action);
+            case "openConversationOutline" -> openConversationOutline();
+            case "openPromptTemplatePicker" -> openPromptTemplatePicker();
+            case "openTerminalCommandPicker" ->
+                    notify(DshBundle.message("dsh.terminal.context.unavailable"));
             case "openBrowser" -> openBrowser();
             case "openExternalLink" -> openExternalLink(action);
             case "openLogs" -> showLogs();
+            case "cancelRecovery" -> runtime.cancelRecovery();
+            case "restoreRecovery", "exportRecoveryDiagnostics" ->
+                    runtime.recoveryAction("restoreRecovery".equals(type) ? "restore" : "export")
+                            .whenComplete(
+                                    (result, error) -> {
+                                        if (error != null) notify(DshJson.message(error));
+                                        else {
+                                            String display =
+                                                    DshBundle.message("dsh.recovery.restored");
+                                            try {
+                                                if (result != null) {
+                                                    for (String line : result.split("\\R")) {
+                                                        if (line.startsWith(
+                                                                "DSH_INTELLIJ_HELPER ")) {
+                                                            JsonObject message =
+                                                                    com.google.gson.JsonParser
+                                                                            .parseString(
+                                                                                    line.substring(
+                                                                                            "DSH_INTELLIJ_HELPER "
+                                                                                                    .length()))
+                                                                            .getAsJsonObject();
+                                                            if ("diagnostics"
+                                                                    .equals(
+                                                                            string(
+                                                                                    message,
+                                                                                    "event")))
+                                                                display =
+                                                                        DshBundle.message(
+                                                                                "dsh.recovery.exported",
+                                                                                string(
+                                                                                        message
+                                                                                                .getAsJsonObject(
+                                                                                                        "value"),
+                                                                                        "path"));
+                                                        }
+                                                    }
+                                                }
+                                            } catch (RuntimeException malformed) {
+                                                LOG.debug(
+                                                        "Malformed DSH recovery helper output",
+                                                        malformed);
+                                            }
+                                            notify(display);
+                                        }
+                                        postStateLater();
+                                    });
             case "manageSettings" -> runtimeSettings.togglePanel();
+            case "refreshPluginInventory" -> runtimeSettings.refreshPluginInventory();
             case "mutateSettings" -> runtimeSettings.mutate(action);
             case "configureApiKey" -> runtimeSettings.configureApiKey();
             case "manageProviders" -> runtimeSettings.manageProviders();
@@ -550,6 +668,13 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
             case "followUpSubagent" ->
                     subagents.followUp(string(action, "childSessionId"), string(action, "text"));
             case "interruptSubagent" -> subagents.interrupt(string(action, "childSessionId"));
+            case "refreshDynamicPlugins" -> dynamicPlugins.refresh();
+            case "stopDynamicPlugin" ->
+                    dynamicPlugins.stop(string(action, "sessionId"), string(action, "pluginId"));
+            case "removeDynamicPlugin" ->
+                    dynamicPlugins.remove(string(action, "sessionId"), string(action, "pluginId"));
+            case "declineDynamicPlugin" ->
+                    dynamicPlugins.decline(string(action, "pluginId"), string(action, "requestId"));
             case "answerApproval", "answerQuestion" -> answerInteraction(action);
             case "copyCode", "insertCode", "openCode", "applyCode" -> codeActions.handle(action);
             case "openToolDiff" ->
@@ -589,6 +714,72 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
             notify("This message is no longer available for a checkpoint action.");
         }
         return turn;
+    }
+
+    /** Copy the host-projected message text rather than trusting text supplied by the WebView. */
+    private void copyMessage(String messageId) {
+        if (messageId == null || messageId.isBlank()) return;
+        String scope = sessionId == null ? "none" : sessionId;
+        String cacheKey = scope + ":" + messageId;
+        String text = null;
+        synchronized (copyableMessageTexts) {
+            text = copyableMessageTexts.get(cacheKey);
+        }
+        JsonArray current = messages;
+        if (text == null) {
+            for (JsonElement candidate : current) {
+                if (!candidate.isJsonObject()) continue;
+                JsonObject row = candidate.getAsJsonObject();
+                if (!messageId.equals(string(row, "id"))) continue;
+                String role = string(row, "role");
+                if (!"user".equals(role) && !"assistant".equals(role)) break;
+                text = stringOr(row, "text", "");
+                String skill = string(row, "skillInvocation");
+                if ("user".equals(role) && skill != null && !skill.isBlank()) {
+                    text = "/" + skill + (text.isBlank() ? "" : " " + text);
+                }
+                if (!text.isBlank()) rememberCopyableMessage(cacheKey, text);
+                break;
+            }
+        }
+        if (text == null || text.isBlank()) {
+            notify(DshBundle.message("dsh.message.copy.unavailable"));
+            return;
+        }
+        String copied = text;
+        ApplicationManager.getApplication()
+                .invokeLater(
+                        () ->
+                                CopyPasteManager.getInstance()
+                                        .setContents(new StringSelection(copied)));
+    }
+
+    private void rememberCopyableMessages(String session, JsonArray rows) {
+        if (session == null || session.isBlank() || rows == null) return;
+        for (JsonElement candidate : rows) {
+            if (!candidate.isJsonObject()) continue;
+            JsonObject row = candidate.getAsJsonObject();
+            String role = string(row, "role");
+            if (!"user".equals(role) && !"assistant".equals(role)) continue;
+            String text = stringOr(row, "text", "");
+            String skill = string(row, "skillInvocation");
+            if ("user".equals(role) && skill != null && !skill.isBlank()) {
+                text = "/" + skill + (text.isBlank() ? "" : " " + text);
+            }
+            if (!text.isBlank()) {
+                rememberCopyableMessage(session + ":" + string(row, "id"), text);
+            }
+        }
+    }
+
+    private void rememberCopyableMessage(String key, String text) {
+        if (key == null || key.endsWith(":null") || text == null || text.isBlank()) return;
+        synchronized (copyableMessageTexts) {
+            copyableMessageTexts.put(key, text);
+            while (copyableMessageTexts.size() > 2_000) {
+                copyableMessageTexts.remove(copyableMessageTexts.keySet().iterator().next());
+            }
+        }
     }
 
     /** Dispatch a structured action from IDE menus, as if it came from the webview. */
@@ -798,6 +989,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
     // ---------------------------------------------------------------------------
 
     private String ensureSession() throws DshRemoteException {
+        agentPresets.prepareForSend(sessionId);
         if (sessionId != null && !sessionId.isBlank()) return sessionId;
         String cwd = project.getBasePath();
         String workspaceId = resolveWorkspaceId(cwd);
@@ -953,7 +1145,10 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
         DshRuntimeService.RuntimeStatus runtimeStatus = runtime.getStatus();
         DshRemoteState.Snapshot current = snapshot;
         JsonObject state = new JsonObject();
-        state.add("messages", messages == null ? new JsonArray() : messages.deepCopy());
+        JsonArray visibleMessages =
+                feedback.decorate(
+                        sessionId, messages == null ? new JsonArray() : messages.deepCopy());
+        state.add("messages", visibleMessages);
         state.add("context", ideContext.contextMetadata());
         JsonObject selection = ideContext.currentSelection(false);
         if (selection != null) state.add("selection", selection);
@@ -961,12 +1156,20 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
         JsonObject panel = runtimeSettings.panel();
         if (panel != null) state.add("settings", panel.deepCopy());
         state.addProperty("selectionEnabled", ideContext.isSelectionEnabled());
+        state.addProperty("modeSelectionEnabled", agentPresets.modeSelectionEnabled());
         JsonObject status = new JsonObject();
-        status.addProperty("state", runtimeState(runtimeStatus.state));
+        status.addProperty(
+                "state",
+                runtimeStatus.state == DshRuntimeService.RuntimeState.RUNNING
+                                && "error".equals(current.phase)
+                        ? "error"
+                        : runtimeState(runtimeStatus.state));
         if (runtimeStatus.url != null) status.addProperty("url", runtimeStatus.url);
         String statusMessage = statusMessage(runtimeStatus, current);
         if (statusMessage != null && !statusMessage.isBlank())
             status.addProperty("message", statusMessage);
+        JsonObject recovery = runtime.recoveryStatus();
+        if (recovery != null) status.add("recovery", recovery);
         state.add("status", status);
         boolean running = projection != null && projection.running;
         JsonObject currentRow = sessionRow(sessionId);
@@ -1036,6 +1239,8 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
         state.add("commands", sessionState.commandCatalog(sessionId));
         JsonArray todos = DshSessionStateStore.todos(cellValue(sessionId, "todos"));
         if (todos != null) state.add("todos", todos);
+        JsonArray schedule = DshSessionStateStore.schedule(cellValue(sessionId, "schedule"));
+        if (schedule != null) state.add("schedule", schedule);
         JsonObject imageLimits =
                 DshSessionStateStore.imageLimits(cellValue(sessionId, "imageLimits"));
         if (imageLimits != null) state.add("imageLimits", imageLimits);
@@ -1044,6 +1249,10 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
         if (sessionStats != null) state.add("sessionStats", sessionStats);
         JsonObject plan = DshSessionStateStore.plan(cellValue(sessionId, "plan"));
         if (plan != null) state.add("plan", plan);
+        JsonObject messageFeedback = feedback.view(sessionId);
+        if (messageFeedback != null) state.add("messageFeedback", messageFeedback);
+        JsonObject sessionFeedback = feedback.sessionView(sessionId);
+        if (sessionFeedback != null) state.add("sessionFeedback", sessionFeedback);
         JsonObject tokenUsage = tokenUsageView(view);
         if (tokenUsage != null) state.add("tokenUsage", tokenUsage);
         JsonObject goal = goals.view(sessionId);
@@ -1051,6 +1260,8 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
         state.add("subagents", subagents.treeView(sessionId));
         JsonObject subagentPreviewState = subagents.previewView(sessionId);
         if (subagentPreviewState != null) state.add("subagentPreview", subagentPreviewState);
+        JsonObject dynamicPluginView = dynamicPlugins.view();
+        if (dynamicPluginView != null) state.add("dynamicPlugins", dynamicPluginView);
         String statusLabel = agentStatusLabelFor(sessionId, running);
         if (statusLabel != null) {
             state.addProperty("agentStatusLabel", statusLabel);
@@ -1078,8 +1289,8 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
         }
         StringBuilder key = new StringBuilder();
         for (String candidate : candidates) key.append(candidate).append('\0');
-        int seed = Math.abs((session + "\0" + key).hashCode());
-        return candidates.get(seed % candidates.size());
+        int seed = (session + "\0" + key).hashCode();
+        return candidates.get(Math.floorMod(seed, candidates.size()));
     }
 
     private static String statusMessage(
@@ -1087,7 +1298,9 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
         if (runtimeStatus.state != DshRuntimeService.RuntimeState.RUNNING) {
             return runtimeStatus.message;
         }
-        if (DshRemoteService.PHASE_RECONNECTING.equals(current.phase) && current.message != null) {
+        if ((DshRemoteService.PHASE_RECONNECTING.equals(current.phase)
+                        || "error".equals(current.phase))
+                && current.message != null) {
             return current.message;
         }
         return null;
@@ -1145,6 +1358,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
                 () -> {
                     DshRemoteState.SessionView view = sessionView(current);
                     boolean pending = false;
+                    JsonObject pendingItem = null;
                     if (view != null) {
                         for (JsonElement candidate : view.interactions) {
                             if (!candidate.isJsonObject()) continue;
@@ -1154,6 +1368,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
                                     && expectedKind.equals(string(item, "kind"))
                                     && "pending".equals(string(item, "status"))) {
                                 pending = true;
+                                pendingItem = item;
                                 break;
                             }
                         }
@@ -1163,12 +1378,92 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
                         postStateLater();
                         return;
                     }
+                    if ("allowed-once".equals(string(action, "outcome"))) {
+                        List<String> dirty =
+                                dirtyApprovalPaths(
+                                        current,
+                                        pendingItem == null ? null : string(pendingItem, "callId"));
+                        if (!dirty.isEmpty()) {
+                            String files = String.join(", ", dirty);
+                            String message = DshBundle.message("dsh.approval.dirty", files);
+                            lastError = message;
+                            notify(message);
+                            postStateLater();
+                            return;
+                        }
+                    }
                     String failure = remote.answerInteraction(current, key, outcomeValue);
                     if (failure != null) {
                         lastError = failure;
                         postStateLater();
                     }
                 });
+    }
+
+    /**
+     * Find unsaved editor buffers that a pending structured tool diff would overwrite.
+     *
+     * <p>The check is deliberately limited to paths present in the Runtime's diff card. We do not
+     * infer write targets from a tool name or command text, so an approval whose presentation has
+     * no structured file diff keeps the ordinary approval flow. When a match is found the caller
+     * leaves the interaction pending; saving or reverting the document then makes the same action
+     * available again.
+     */
+    private List<String> dirtyApprovalPaths(String session, String callId) {
+        if (session == null || session.isBlank() || callId == null || callId.isBlank()) {
+            return List.of();
+        }
+        try {
+            JsonObject history = remote.traceHistory(session, 160);
+            DshToolDiff.CallDiffState state = DshToolDiff.callDiffState(history, callId);
+            if (state == null) return List.of();
+            List<String> diffPaths = DshToolDiff.diffViewPaths(state.view);
+            if (diffPaths.isEmpty()) return List.of();
+
+            Set<String> dirtyFiles =
+                    ReadAction.compute(
+                            () -> {
+                                Set<String> result = new HashSet<>();
+                                FileDocumentManager manager = FileDocumentManager.getInstance();
+                                for (Document document : manager.getUnsavedDocuments()) {
+                                    VirtualFile file = manager.getFile(document);
+                                    if (file != null && file.isValid()) {
+                                        String path = canonicalPath(file.getPath());
+                                        if (path != null) result.add(path);
+                                    }
+                                }
+                                return result;
+                            });
+            if (dirtyFiles.isEmpty()) return List.of();
+
+            String root = project.getBasePath();
+            List<String> matches = new ArrayList<>();
+            for (String path : diffPaths) {
+                String absolute = resolveDiffPath(root, path);
+                if (absolute == null) continue;
+                String canonical = canonicalPath(absolute);
+                if (canonical != null && dirtyFiles.contains(canonical)) matches.add(path);
+            }
+            return matches;
+        } catch (Exception error) {
+            // A trace read can fail during reconnect. The structured diff is optional; preserve
+            // the normal approval path rather than blocking a tool on a best-effort guard.
+            LOG.debug("Unable to inspect approval diff for dirty editor buffers", error);
+            return List.of();
+        }
+    }
+
+    private static String resolveDiffPath(String root, String path) {
+        if (path == null || path.isBlank()) return null;
+        try {
+            Path candidate = Path.of(path);
+            if (!candidate.isAbsolute() && root != null && !root.isBlank()) {
+                candidate = Path.of(root).resolve(candidate);
+            }
+            return candidate.normalize().toString();
+        } catch (RuntimeException error) {
+            return null;
+        }
     }
 
     private void openBrowser() {
@@ -1194,6 +1489,172 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
                 .invokeLater(
                         () -> new DshTraceDialog(project, current, traceTitle, selectedSeq).show());
     }
+
+    /** Show a native navigator for the current session's turns and reveal the chosen message. */
+    private void openConversationOutline() {
+        String current = sessionId;
+        if (current == null || current.isBlank()) {
+            notify(DshBundle.message("dsh.outline.no.active.session"));
+            return;
+        }
+        List<String> labels = new java.util.ArrayList<>();
+        List<Integer> sequences = new java.util.ArrayList<>();
+        JsonElement outline = cellValue(current, "turnOutline");
+        if (outline != null && outline.isJsonArray()) {
+            for (JsonElement candidate : outline.getAsJsonArray()) {
+                if (!candidate.isJsonObject()) continue;
+                JsonObject row = candidate.getAsJsonObject();
+                long seq = DshJson.longValue(row.get("seq"), -1);
+                if (seq < 0 || seq > Integer.MAX_VALUE) continue;
+                String prompt = stringOr(row, "prompt", "").replaceAll("\\s+", " ").trim();
+                String response = stringOr(row, "response", "").replaceAll("\\s+", " ").trim();
+                String label = prompt.isBlank() ? response : prompt;
+                if (label.isBlank()) label = DshBundle.message("dsh.outline.turn", row.get("turn"));
+                if (label.length() > 120) label = label.substring(0, 119) + "…";
+                labels.add(label + "  (#" + seq + ")");
+                sequences.add((int) seq);
+            }
+        }
+        if (labels.isEmpty()) {
+            for (JsonElement candidate : messages) {
+                if (!candidate.isJsonObject()) continue;
+                JsonObject row = candidate.getAsJsonObject();
+                if (!"user".equals(string(row, "role"))) continue;
+                long seq = DshJson.longValue(row.get("seq"), -1);
+                String text = stringOr(row, "text", "").replaceAll("\\s+", " ").trim();
+                if (seq < 0 || seq > Integer.MAX_VALUE || text.isBlank()) continue;
+                if (text.length() > 120) text = text.substring(0, 119) + "…";
+                labels.add(text + "  (#" + seq + ")");
+                sequences.add((int) seq);
+            }
+        }
+        if (labels.isEmpty()) {
+            notify(DshBundle.message("dsh.outline.empty"));
+            return;
+        }
+        int selected =
+                Messages.showChooseDialog(
+                        project,
+                        DshBundle.message("dsh.outline.dialog.message"),
+                        DshBundle.message("dsh.outline.dialog.title"),
+                        Messages.getInformationIcon(),
+                        labels.toArray(new String[0]),
+                        labels.get(0));
+        if (selected >= 0 && selected < sequences.size()) {
+            JsonObject reveal = new JsonObject();
+            reveal.addProperty("type", "revealMessage");
+            reveal.addProperty("seq", sequences.get(selected));
+            postToWebview(reveal);
+        }
+    }
+
+    /** Discover visible Markdown drafts under .dsh/prompts without injecting them implicitly. */
+    private void openPromptTemplatePicker() {
+        String base = project.getBasePath();
+        if (base == null || base.isBlank()) {
+            notify(DshBundle.message("dsh.prompt.template.no.workspace"));
+            return;
+        }
+        Path promptsRoot = Path.of(base).resolve(".dsh").resolve("prompts").normalize();
+        operations.execute(
+                () -> {
+                    List<PromptTemplate> templates = discoverPromptTemplates(promptsRoot);
+                    ApplicationManager.getApplication()
+                            .invokeLater(
+                                    () -> {
+                                        if (disposed) return;
+                                        if (templates.isEmpty()) {
+                                            notify(DshBundle.message("dsh.prompt.template.empty"));
+                                            return;
+                                        }
+                                        String[] labels =
+                                                templates.stream()
+                                                        .map(
+                                                                template ->
+                                                                        template.label
+                                                                                + "  —  "
+                                                                                + template.relative)
+                                                        .toArray(String[]::new);
+                                        int selected =
+                                                Messages.showChooseDialog(
+                                                        project,
+                                                        DshBundle.message(
+                                                                "dsh.prompt.template.choose.message"),
+                                                        DshBundle.message(
+                                                                "dsh.prompt.template.choose.title"),
+                                                        Messages.getInformationIcon(),
+                                                        labels,
+                                                        labels[0]);
+                                        if (selected >= 0 && selected < templates.size())
+                                            setComposerText(templates.get(selected).content);
+                                    });
+                });
+    }
+
+    private static List<PromptTemplate> discoverPromptTemplates(Path root) {
+        List<PromptTemplate> result = new ArrayList<>();
+        if (!Files.isDirectory(root)) return result;
+        try (var paths = Files.walk(root, 4)) {
+            paths.filter(
+                            path ->
+                                    !Files.isSymbolicLink(path)
+                                            && Files.isRegularFile(path)
+                                            && path.getFileName()
+                                                    .toString()
+                                                    .toLowerCase(Locale.ROOT)
+                                                    .endsWith(".md"))
+                    .sorted()
+                    .limit(100)
+                    .forEach(
+                            path -> {
+                                try {
+                                    if (Files.size(path) > 32 * 1024) return;
+                                    String content = Files.readString(path, StandardCharsets.UTF_8);
+                                    if (!content.isEmpty() && content.charAt(0) == '\ufeff')
+                                        content = content.substring(1);
+                                    String relative =
+                                            root.relativize(path).toString().replace('\\', '/');
+                                    String stem = relative.replaceFirst("(?i)\\.md$", "");
+                                    result.add(
+                                            new PromptTemplate(
+                                                    relative,
+                                                    promptTemplateTitle(content, stem),
+                                                    content));
+                                } catch (Exception ignored) {
+                                    // A broken or concurrently deleted draft is simply not listed.
+                                }
+                            });
+        } catch (Exception ignored) {
+            // Missing/unreadable .dsh/prompts behaves like an empty template directory.
+        }
+        return result;
+    }
+
+    private static String promptTemplateTitle(String content, String fallback) {
+        String[] lines = content.substring(0, Math.min(content.length(), 8_192)).split("\\R");
+        if (lines.length > 0 && lines[0].trim().equals("---")) {
+            for (int index = 1; index < lines.length && index <= 20; index++) {
+                String line = lines[index].trim();
+                if (line.equals("---")) break;
+                if (line.startsWith("title:")) {
+                    String title = line.substring("title:".length()).trim();
+                    if (!title.isBlank()) return trimTemplateTitle(title);
+                }
+            }
+        }
+        for (String line : lines) {
+            String text = line.trim();
+            if (text.startsWith("# ")) return trimTemplateTitle(text.substring(2).trim());
+        }
+        return trimTemplateTitle(fallback);
+    }
+
+    private static String trimTemplateTitle(String value) {
+        String trimmed = value.replaceAll("^[\\\"']|[\\\"']$", "").trim();
+        return trimmed.length() <= 120 ? trimmed : trimmed.substring(0, 119) + "…";
+    }
+
+    private record PromptTemplate(String relative, String label, String content) {}
 
     private void openExternalLink(JsonObject action) {
         String url = string(action, "url");
@@ -1251,6 +1712,8 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
         remote.removeListener(snapshotListener);
         releaseFollowedSession();
         changeReviews.dispose();
+        feedback.dispose();
+        dynamicPlugins.dispose();
         operations.shutdownNow();
         if (bridge != null) bridge.dispose();
     }

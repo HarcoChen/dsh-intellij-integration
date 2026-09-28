@@ -9,6 +9,16 @@ import java.util.Set;
 
 /** Validates messages crossing the untrusted JCEF-to-host boundary. */
 final class DshWebviewActionSanitizer {
+    private static final int MAX_FILES_PER_MESSAGE = 20;
+    private static final int MAX_FILE_NAME_CHARACTERS = 512;
+
+    /** Bounds the untrusted JCEF payload before the host decodes file bytes. */
+    private static final long MAX_FILE_BYTES = 32L * 1024 * 1024;
+
+    private static final long MAX_FILE_BASE64_CHARACTERS = ((MAX_FILE_BYTES + 2) / 3) * 4;
+    private static final long MAX_TOTAL_ATTACHMENT_BASE64_CHARACTERS =
+            ((64L * 1024 * 1024 + 2) / 3) * 4;
+
     private DshWebviewActionSanitizer() {}
 
     private static boolean validAnswers(JsonArray answers) {
@@ -54,16 +64,16 @@ final class DshWebviewActionSanitizer {
             return null;
         }
         if ("sendPrompt".equals(type)) {
-            if (!hasOnly(input, "type", "text", "mode", "images")) {
+            if (!hasOnly(input, "type", "text", "mode", "images", "files")) {
                 return null;
             }
             String text = DshJson.string(input, "text");
             String mode = DshJson.string(input, "mode");
-            if (text == null
-                    || text.length() > 1_000_000
+            if ((text != null && text.length() > 1_000_000)
                     || !("queue".equals(mode) || "steer".equals(mode))) {
                 return null;
             }
+            long totalAttachmentCharacters = 0;
             if (input.has("images")) {
                 if (!input.get("images").isJsonArray()
                         || input.getAsJsonArray("images").size() > 20) {
@@ -89,9 +99,120 @@ final class DshWebviewActionSanitizer {
                                     || mediaType.equals("image/gif"))) {
                         return null;
                     }
+                    totalAttachmentCharacters += data.length();
+                    if (totalAttachmentCharacters > MAX_TOTAL_ATTACHMENT_BASE64_CHARACTERS) {
+                        return null;
+                    }
                 }
             }
+            if (input.has("files")) {
+                if (!input.get("files").isJsonArray()
+                        || input.getAsJsonArray("files").size() > MAX_FILES_PER_MESSAGE) {
+                    return null;
+                }
+                for (JsonElement file : input.getAsJsonArray("files")) {
+                    if (!file.isJsonObject()) return null;
+                    JsonObject fileObject = file.getAsJsonObject();
+                    if (!hasOnly(fileObject, "name", "data")) return null;
+                    String name = strictString(fileObject, "name");
+                    String data = strictString(fileObject, "data");
+                    if (name == null
+                            || name.isBlank()
+                            || name.length() > MAX_FILE_NAME_CHARACTERS
+                            || data == null
+                            || data.isBlank()
+                            || data.length() > MAX_FILE_BASE64_CHARACTERS) {
+                        return null;
+                    }
+                    totalAttachmentCharacters += data.length();
+                    if (totalAttachmentCharacters > MAX_TOTAL_ATTACHMENT_BASE64_CHARACTERS) {
+                        return null;
+                    }
+                }
+            }
+            boolean noText = text == null || text.isBlank();
+            boolean noImages = !input.has("images") || input.getAsJsonArray("images").isEmpty();
+            boolean noFiles = !input.has("files") || input.getAsJsonArray("files").isEmpty();
+            if (noText && noImages && noFiles) return null;
             return input;
+        }
+        if ("copyMessage".equals(type)) {
+            String messageId = strictString(input, "messageId");
+            return hasOnly(input, "type", "messageId")
+                            && messageId != null
+                            && !messageId.isBlank()
+                            && messageId.length() <= 512
+                    ? input
+                    : null;
+        }
+        if ("toggleMessageFeedback".equals(type)) {
+            String messageId = strictString(input, "messageId");
+            String rating = strictString(input, "rating");
+            return hasOnly(input, "type", "messageId", "rating")
+                            && messageId != null
+                            && !messageId.isBlank()
+                            && messageId.length() <= 512
+                            && ("positive".equals(rating) || "negative".equals(rating))
+                    ? input
+                    : null;
+        }
+        if ("submitMessageFeedback".equals(type)) {
+            String messageId = strictString(input, "messageId");
+            String rating = strictString(input, "rating");
+            String note = input.has("note") ? strictString(input, "note") : null;
+            String category = input.has("category") ? strictString(input, "category") : null;
+            return hasOnly(input, "type", "messageId", "rating", "note", "category")
+                            && messageId != null
+                            && !messageId.isBlank()
+                            && messageId.length() <= 512
+                            && ("positive".equals(rating) || "negative".equals(rating))
+                            && (!input.has("note") || (note != null && note.length() <= 32_768))
+                            && (!input.has("category") || validFeedbackCategory(category))
+                    ? input
+                    : null;
+        }
+        if ("saveMessageFeedbackNote".equals(type)) {
+            String messageId = strictString(input, "messageId");
+            String note = strictString(input, "note");
+            return hasOnly(input, "type", "messageId", "note")
+                            && messageId != null
+                            && !messageId.isBlank()
+                            && messageId.length() <= 512
+                            && note != null
+                            && note.length() <= 32_768
+                    ? input
+                    : null;
+        }
+        if ("recordSessionFeedback".equals(type)) {
+            String text = strictString(input, "text");
+            String category = input.has("category") ? strictString(input, "category") : null;
+            return hasOnly(input, "type", "text", "category")
+                            && text != null
+                            && text.length() <= 32_768
+                            && (!input.has("category") || validFeedbackCategory(category))
+                    ? input
+                    : null;
+        }
+        if ("stopDynamicPlugin".equals(type) || "removeDynamicPlugin".equals(type)) {
+            String sessionId = strictString(input, "sessionId");
+            String pluginId = strictString(input, "pluginId");
+            return hasOnly(input, "type", "sessionId", "pluginId")
+                            && boundedId(sessionId)
+                            && boundedId(pluginId)
+                    ? input
+                    : null;
+        }
+        if ("declineDynamicPlugin".equals(type)) {
+            String requestId = strictString(input, "requestId");
+            String pluginId = strictString(input, "pluginId");
+            return hasOnly(input, "type", "requestId", "pluginId")
+                            && boundedId(requestId)
+                            && boundedId(pluginId)
+                    ? input
+                    : null;
+        }
+        if ("openSessionFeedback".equals(type) || "dismissSessionFeedback".equals(type)) {
+            return hasOnly(input, "type") ? input : null;
         }
         if ("openFileLocation".equals(type)) {
             if (!hasOnly(input, "type", "path", "line", "column")) {
@@ -341,6 +462,8 @@ final class DshWebviewActionSanitizer {
                     ? input
                     : null;
         }
+        if (java.util.Set.of("cancelRecovery", "restoreRecovery", "exportRecoveryDiagnostics")
+                .contains(type)) return hasOnly(input, "type") ? input : null;
         if (type.startsWith("switch")
                 || type.startsWith("open")
                 || type.startsWith("remove")
@@ -450,5 +573,29 @@ final class DshWebviewActionSanitizer {
             }
         }
         return true;
+    }
+
+    private static boolean validFeedbackCategory(String category) {
+        return category != null
+                && Set.of(
+                                "task-result",
+                                "instruction-following",
+                                "product-interaction",
+                                "service-stability",
+                                "resource-cost",
+                                "security-privacy-permission",
+                                "other")
+                        .contains(category);
+    }
+
+    private static String strictString(JsonObject input, String key) {
+        JsonElement value = input == null ? null : input.get(key);
+        return value != null && value.isJsonPrimitive() && value.getAsJsonPrimitive().isString()
+                ? value.getAsString()
+                : null;
+    }
+
+    private static boolean boundedId(String value) {
+        return value != null && !value.isBlank() && value.length() <= 512;
     }
 }
