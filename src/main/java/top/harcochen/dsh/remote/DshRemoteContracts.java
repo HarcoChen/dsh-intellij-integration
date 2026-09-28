@@ -9,7 +9,7 @@ import java.util.UUID;
 
 /**
  * Wire contracts for the RC Remote API, fixed against {@code deepseek-harness} tag {@code
- * dsh-v0.1.5-rc.2}, commit {@code fb2c4b9e698e30edb738bca4cf0618587db7d203}.
+ * dsh-v0.1.7-rc.2}, commit {@code 477b4f420553e8a52c2fbccc464d7561b239c443}.
  *
  * <p>Every endpoint's {@code args} field names were taken from the Host method parameters (the
  * descriptor {@code wire} names), not from flattened DTOs. Zero-argument endpoints send an {@code
@@ -19,10 +19,10 @@ import java.util.UUID;
  */
 public final class DshRemoteContracts {
     /** Harness tag this contract was audited against. */
-    public static final String TARGET_TAG = "dsh-v0.1.5-rc.2";
+    public static final String TARGET_TAG = "dsh-v0.1.7-rc.2";
 
     /** Harness commit this contract was audited against. */
-    public static final String TARGET_COMMIT = "fb2c4b9e698e30edb738bca4cf0618587db7d203";
+    public static final String TARGET_COMMIT = "477b4f420553e8a52c2fbccc464d7561b239c443";
 
     public static final String MUX_PATH = "/api/remote.mux";
     public static final String EVENT_STREAM_ENDPOINT = "$events";
@@ -40,6 +40,7 @@ public final class DshRemoteContracts {
     public static final String SESSION_ATTACHMENT = "session/attachment";
     public static final String SESSION_MODEL_CATALOG = "session/modelCatalog";
     public static final String SESSION_SELECT_MODEL = "session/selectModel";
+    public static final String SESSION_INITIALIZE_DEFAULT_MODEL = "session/initializeDefaultModel";
     public static final String SESSION_PAGE = "session/page";
     public static final String SESSION_CAN_OPEN_WORKSPACE_PATH = "session/canOpenWorkspacePath";
     public static final String SESSION_OPEN_WORKSPACE_PATH = "session/openWorkspacePath";
@@ -49,6 +50,24 @@ public final class DshRemoteContracts {
     public static final String WORKSPACE_INSERT_BEFORE = "workspace/insertBefore";
     public static final String WORKSPACE_INSERT_SESSION_BEFORE = "workspace/insertSessionBefore";
     public static final String WORKSPACE_ARCHIVE_SESSION = "workspace/archiveSession";
+    public static final String WORKSPACE_UNARCHIVE_SESSION = "workspace/unarchiveSession";
+    public static final String WORKSPACE_PIN_SESSION = "workspace/pinSession";
+    public static final String WORKSPACE_UNPIN_SESSION = "workspace/unpinSession";
+    public static final String WORKSPACE_INITIALIZE_DEFAULT = "workspace/initializeDefault";
+    public static final String SCHEDULE_LIST = "schedule/list";
+    public static final String SCHEDULE_CATALOG = "schedule/catalog";
+    public static final String SCHEDULE_HISTORY = "schedule/history";
+    public static final String SCHEDULE_UPDATE = "schedule/update";
+    public static final String SCHEDULE_DELETE = "schedule/delete";
+    public static final String ACCOUNT_GET_STATE = "account/getState";
+    public static final String ACCOUNT_GET_PROFILE = "account/getProfile";
+    public static final String ACCOUNT_GET_BALANCE = "account/getBalance";
+    public static final String ACCOUNT_GET_BONUSES = "account/getUnnotifiedBonuses";
+    public static final String ACCOUNT_ACK_BONUS = "account/ackBonusNotified";
+    public static final String ACCOUNT_START_SIGN_IN = "account/startSignIn";
+    public static final String ACCOUNT_CANCEL_SIGN_IN = "account/cancelSignIn";
+    public static final String ACCOUNT_RUNNING_TASKS = "account/hasRunningAccountTasks";
+    public static final String ACCOUNT_SIGN_OUT = "account/signOut";
     public static final String AGENT_PRESETS_LIST = "agentPresets/list";
     public static final String AGENT_PRESETS_SELECT = "agentPresets/select";
     public static final String AGENT_PRESETS_READ = "agentPresets/read";
@@ -282,7 +301,7 @@ public final class DshRemoteContracts {
     /**
      * `session/list(_request)`; the baseline request is an empty object. The Host's descriptor
      * names this parameter {@code _request} — the one wire name that differs from the method
-     * signature — verified against the live `dsh-v0.1.5-rc.2` Runtime.
+     * signature — verified against the earlier live Runtime and retained by the RC.2 descriptor.
      */
     public static JsonObject argsSessionList() {
         JsonObject args = new JsonObject();
@@ -458,9 +477,56 @@ public final class DshRemoteContracts {
 
     /** `workspace/archiveSession(request)` with `{request:{sessionId}}`. */
     public static JsonObject argsWorkspaceArchiveSession(String sessionId) {
+        return argsWorkspaceArchiveSession(sessionId, false);
+    }
+
+    public static JsonObject argsWorkspaceArchiveSession(String sessionId, boolean stopActivity) {
+        JsonObject request = new JsonObject();
+        request.addProperty("sessionId", sessionId);
+        if (stopActivity) request.addProperty("stopActivity", true);
+        return withRequest(request);
+    }
+
+    /** RC.2 Workspace session actions share the same request envelope. */
+    public static JsonObject argsWorkspaceSession(String sessionId) {
+        return argsWorkspaceArchiveSession(sessionId);
+    }
+
+    public static JsonObject argsScheduleSession(String sessionId) {
         JsonObject request = new JsonObject();
         request.addProperty("sessionId", sessionId);
         return withRequest(request);
+    }
+
+    public static JsonObject argsScheduleHistory(
+            String sessionId, String scheduleId, int limit, String before) {
+        JsonObject request = new JsonObject();
+        request.addProperty("sessionId", sessionId);
+        request.addProperty("id", scheduleId);
+        request.addProperty("limit", limit);
+        if (before != null) request.addProperty("before", before);
+        return withRequest(request);
+    }
+
+    public static JsonObject argsAccountClient(JsonObject client) {
+        JsonObject args = new JsonObject();
+        args.add("client", client.deepCopy());
+        return args;
+    }
+
+    public static JsonObject argsAccountStartSignIn(JsonObject client, String callbackOrigin) {
+        JsonObject args = argsAccountClient(client);
+        args.addProperty("callbackOrigin", callbackOrigin);
+        args.addProperty("loginSource", "desktop");
+        return args;
+    }
+
+    public static JsonObject argsAccountAckBonus(
+            String accountId, String orderId, JsonObject client) {
+        JsonObject args = argsAccountClient(client);
+        args.addProperty("accountId", accountId);
+        args.addProperty("orderId", orderId);
+        return args;
     }
 
     /** `agentPresets/select(agentId, agentPreset)`. */

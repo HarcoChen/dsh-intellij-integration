@@ -85,6 +85,8 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
     private final DshGoalController goals;
     private final DshSettingsController runtimeSettings;
     private final DshWorkspaceController workspaces;
+    private final DshAccountController account;
+    private final DshScheduleController schedules;
     private final DshAgentPresetController agentPresets;
     private final DshDiffController diffs;
     private final DshSessionActionsController sessionActions;
@@ -102,6 +104,8 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
     private volatile boolean newSessionDraft;
     private volatile String pendingAgentPreset;
     private volatile String followedSession;
+    private volatile String lastScheduleSession;
+    private volatile long lastScheduleEpoch = Long.MIN_VALUE;
     private volatile long projectedCursor = Long.MIN_VALUE;
     private volatile JsonArray projectedEvents;
     private volatile JsonObject projectedAssistantStream;
@@ -183,6 +187,24 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
                         this::postStateLater,
                         this::notify,
                         error -> lastError = error);
+        this.account =
+                new DshAccountController(
+                        project,
+                        runtime,
+                        remote,
+                        operations,
+                        this::notify,
+                        error -> lastError = error);
+        this.schedules =
+                new DshScheduleController(
+                        project,
+                        runtime,
+                        remote,
+                        operations,
+                        () -> sessionId,
+                        this::notify,
+                        error -> lastError = error,
+                        this::postStateLater);
         this.agentPresets =
                 new DshAgentPresetController(
                         project,
@@ -327,6 +349,18 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
         feedback.prune(live);
 
         if (selected != null) {
+            long scheduleEpoch = remote.settingsEpoch();
+            if (!selected.equals(lastScheduleSession) || scheduleEpoch != lastScheduleEpoch) {
+                lastScheduleSession = selected;
+                lastScheduleEpoch = scheduleEpoch;
+                sessionActions.invalidateModelCatalog();
+                schedules.refreshCurrent(selected);
+                operations.execute(
+                        () -> {
+                            sessionActions.refreshModelCatalog(selected);
+                            postStateLater();
+                        });
+            }
             String followKey = "session:" + selected;
             DshRemoteState.FollowView view = current.follows.get(followKey);
             long cursor = view == null ? Long.MIN_VALUE : view.cursor;
@@ -549,6 +583,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
                 subagents.refresh(sessionId);
             }
             case "searchSession" -> sessionActions.search();
+            case "manageSessions" -> sessionActions.manageSessions();
             case "renameSession" -> sessionActions.rename();
             case "forkSession" -> sessionActions.fork();
             case "forkFromMessage" -> checkpointFork(integer(action, "seq", -1));
@@ -630,10 +665,13 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
             case "refreshPluginInventory" -> runtimeSettings.refreshPluginInventory();
             case "mutateSettings" -> runtimeSettings.mutate(action);
             case "configureApiKey" -> runtimeSettings.configureApiKey();
+            case "configureJevApiKey" -> runtimeSettings.configureJevApiKey();
             case "manageProviders" -> runtimeSettings.manageProviders();
             case "manageAgentPresets" -> agentPresets.manage();
             case "selectAgentPreset" -> agentPresets.select(string(action, "agentPreset"));
             case "manageWorkspaces" -> workspaces.manage();
+            case "manageAccount" -> account.manage();
+            case "manageSchedules" -> schedules.manage();
             case "openSettingsDocument" -> runtimeSettings.openDocument();
             case "openIdeContextPicker" -> ideContext.openPicker();
             case "toggleSelection" -> ideContext.toggleSelection();
@@ -993,6 +1031,19 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
         if (sessionId != null && !sessionId.isBlank()) return sessionId;
         String cwd = project.getBasePath();
         String workspaceId = resolveWorkspaceId(cwd);
+        if (workspaceId == null && (cwd == null || cwd.isBlank())) {
+            DshRemoteState.Snapshot current = remote.snapshot();
+            if (!current.workspaces.isEmpty()) {
+                workspaceId = string(current.workspaces.get(0), "workspaceId");
+            } else if (current.catalog.isEmpty() && current.archivedSessionIds.isEmpty()) {
+                JsonObject initialized = remote.initializeDefaultWorkspace();
+                JsonObject workspace =
+                        initialized.has("workspace") && initialized.get("workspace").isJsonObject()
+                                ? initialized.getAsJsonObject("workspace")
+                                : null;
+                workspaceId = workspace == null ? null : string(workspace, "workspaceId");
+            }
+        }
         JsonObject created =
                 remote.createSession(
                         workspaceId != null ? null : cwd, workspaceId, pendingAgentPreset);
@@ -1240,6 +1291,8 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
         JsonArray todos = DshSessionStateStore.todos(cellValue(sessionId, "todos"));
         if (todos != null) state.add("todos", todos);
         JsonArray schedule = DshSessionStateStore.schedule(cellValue(sessionId, "schedule"));
+        JsonArray liveSchedule = schedules.current(sessionId);
+        if (liveSchedule != null) schedule = liveSchedule;
         if (schedule != null) state.add("schedule", schedule);
         JsonObject imageLimits =
                 DshSessionStateStore.imageLimits(cellValue(sessionId, "imageLimits"));

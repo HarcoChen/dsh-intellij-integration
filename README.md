@@ -77,6 +77,10 @@ The plugin manages local Runtime startup, shutdown, and restart. The verified ma
 
 Runtime 0.1.5 support includes transient assistant streaming across reconnects, V3 history and compaction records, submitted attachments, queued subagent prompts, and explicit Goal resume after reconnect. Mode selection follows Runtime policy, and skill menus show source paths on hover. The context ring still shows statistics on hover; click the model name to switch models.
 
+The default Runtime is now `0.1.7-rc.2`. The chat menu opens native **Manage sessions**, **Manage DeepSeek account**, and **Manage schedules** dialogs. Session management supports pinning and restoring archived sessions. Account management uses the Runtime's browser sign-in flow and shows profile, wallet balances, and bonus notices. Schedule management shows reminders across sessions; reminders owned by the current session can be edited or deleted, and delivery history can be inspected. In projects without a folder, the first explicit session can initialize the Runtime's default Workspace.
+
+The IDE also bundles the shared Laya/Jev Runtime integration and mounts it into local Runtimes it starts. It is disabled by default. Enable it and selected decision features under **Settings → Tools → DeepSeek Harness**, configure a System One API key from the chat menu, then restart the Runtime. The key is stored in IntelliJ Password Safe. The endpoint must use HTTPS; externally managed Runtimes are not modified.
+
 Owned local Runtimes retry after crashes and can recover through isolated validation, bounded repair attempts, and reversible bundle isolation. The status banner offers cancellation, restoration, and redacted diagnostics export. Both automatic recovery and persistent bundle isolation can be disabled in settings. The bundled Node helper runs locally; it needs Node.js 24+ even with an installed standalone `dsh`.
 
 Only a compatible Runtime advertised by the shared editor lock is reused automatically. Updating a verified local npm installation or stopping an identified abandoned Runtime requires a native confirmation dialog. Manually configured external Runtimes remain externally managed. Upgrade old Runtimes before connecting; 0.1.5 history migrations are not a downgrade path.
@@ -95,7 +99,8 @@ Open **Settings | Tools | DeepSeek Harness**.
 | Command / Args | `auto` / empty | Prefer a compatible local `dsh`, then pinned pnpm/npx, then the verified managed distribution when automatic installation is enabled. Use `managed` to require the managed distribution; explicit launch commands remain supported. |
 | Server URL / Port | `""` / `0` | Prefer an already running DSH Runtime; port `0` selects an available port for local startup. |
 | Auto start | `true` | Start or connect to the Runtime when the project opens. |
-| Runtime version | `0.1.5-rc.2` | Package-manager fallback version; the minimum supported local Runtime is `0.1.5-rc.1`. |
+| Runtime version | `0.1.7-rc.2` | Package-manager fallback version; the minimum supported local Runtime is `0.1.5-rc.1`. |
+| Laya/Jev integration | Disabled | Bundled System One integration for locally started Runtimes; the endpoint, model, and optional policies are configurable. |
 | Managed Runtime | `true` | Enable the platform archive verified from the pinned manifest as the final automatic fallback. |
 | npm registry | `https://registry.npmmirror.com` | Registry mirror used as a download fallback. |
 | Timeouts | `30s` startup, `600s` request | How long to wait for startup and individual RPC calls. |

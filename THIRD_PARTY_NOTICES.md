@@ -36,3 +36,12 @@ The IntelliJ adapter replaces editor UI and localization dependencies with a pri
 stdin/stdout bridge. `runtime-helper/main.ts` supplies lifecycle orchestration;
 `src/main/resources/runtime/helper.cjs` is the bundled artifact. Build instructions
 and local adaptations are documented in `runtime-helper/README.md`.
+
+## dsh-jev-integration Runtime package
+
+`src/main/resources/jev/` contains the built IDE-neutral
+[dsh-jev-integration](https://github.com/HarcoChen/dsh-jev-integration) package,
+version 0.1.0 (`795907cbdf3347f97b27c473f4f6194f5877a74d`) from the companion
+dsh-ide checkout. Its MIT license and own
+third-party notices are retained alongside the distribution. The integration
+calls a separately operated System One endpoint only when enabled.

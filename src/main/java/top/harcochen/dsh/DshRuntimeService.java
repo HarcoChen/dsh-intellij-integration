@@ -346,11 +346,23 @@ public final class DshRuntimeService implements Disposable {
 
     private Process launch(DshSettingsState settings) {
         List<List<String>> candidates = launcherCandidates(settings);
-        String overlay = null;
+        List<String> overlays = new ArrayList<>();
+        try {
+            String jevPatch = DshJevIntegration.prepare(settings);
+            for (List<String> candidate : candidates) {
+                if (webProfileIndex(candidate) >= 0) {
+                    insertWebLauncherPatch(candidate, jevPatch);
+                    if (!overlays.contains(jevPatch)) overlays.add(jevPatch);
+                }
+            }
+            if (!overlays.isEmpty()) appendLog("[dsh:jev] built-in integration mounted");
+        } catch (IOException unavailable) {
+            appendLog("[dsh:jev] built-in integration unavailable: " + unavailable.getMessage());
+        }
         if (settings.enableCompaction) {
             String patch = writeCompactionPatch();
-            overlay = patch;
             if (patch != null) {
+                overlays.add(patch);
                 for (List<String> candidate : candidates) {
                     insertWebLauncherPatch(candidate, patch);
                 }
@@ -413,6 +425,10 @@ public final class DshRuntimeService implements Disposable {
                 if (apiKey != null && !apiKey.isBlank()) {
                     builder.environment().put(apiKeyName, apiKey);
                 }
+                String jevApiKey = DshCredentials.readJev(project);
+                if (jevApiKey != null && !jevApiKey.isBlank()) {
+                    builder.environment().put("TYPESAFE_API_KEY", jevApiKey);
+                }
                 List<String> original = List.copyOf(resolvedCommand);
                 builder.command(
                         prepareCommand(
@@ -429,7 +445,7 @@ public final class DshRuntimeService implements Disposable {
                                 basePath == null ? System.getProperty("user.dir") : basePath,
                                 launchedVersion,
                                 settings,
-                                overlay));
+                                overlays));
                 runtimeLock.publishProcess(
                         child, launchedVersion, isNodePackageManager(candidateCommand.get(0)));
                 appendLog(DshBundle.message("dsh.runtime.log.started.pid", child.pid()));

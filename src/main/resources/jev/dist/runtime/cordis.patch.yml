@@ -1,0 +1,115 @@
+# DSH bundle layer for the shared Jev Runtime integration.
+# The package entry point is loaded by the DSH runtime; this row only supplies
+# deployment defaults. User/workspace/session overrides are managed by the
+# integration endpoints and are never written to the host's global config.
+- insert:
+    - id: dsh-jev-integration
+      name: dsh-jev-integration
+      config:
+        # Jev sends protected tool arguments to TypeSafe. Hosts must explicitly
+        # enable this optional advisory layer after showing their privacy notice.
+        enabled: false
+        baseUrl: https://api.typesafe.ai/v1/systemone
+        model: jev-latest
+        timeoutMs: 2000
+        advisoryTimeoutMs: 3500
+        askThreshold: 0.5
+        blockThreshold: 0.85
+        guardedTools:
+          - bash
+          - pwsh
+          - terminal
+          - run_command
+          - execute_command
+          - run_code
+          - write_to_file
+          - replace_file_content
+        loopGuard:
+          enabled: false
+          triggerThreshold: 2
+          noProgressThreshold: 0.3
+          pLoopThreshold: 0.6
+          minConfidence: 0.5
+          cooldownSteps: 3
+          maxHistory: 8
+          deferExactRepeats: true
+          requestTimeoutMs: 3500
+          include: []
+          exclude: []
+        resultShaper:
+          enabled: false
+          shapeTools:
+            - bash
+            - pwsh
+            - terminal
+            - run_command
+            - execute_command
+          thresholdChars: 8000
+          maxPerTurn: 2
+          keepKinds:
+            - warning
+            - failure
+          minKindConfidence: 0.6
+          maxClusters: 24
+          sampleChars: 400
+          requestTimeoutMs: 4000
+        doneGate:
+          enabled: false
+          blockThreshold: 0.75
+          minEvidenceItems: 1
+          requestTimeoutMs: 3500
+          maxClaimChars: 4000
+          cooldownTurns: 1
+        toolPruner:
+          enabled: false
+          maxTools: 8
+          minScoreThreshold: 2
+          minConfidence: 0.5
+          minIntentChars: 8
+          minKeep: 3
+          maxCandidates: 50
+          requestTimeoutMs: 4000
+          alwaysRetain:
+            - run_code
+            - skill
+            - jev_ask
+            - jev_rank
+            - jev_check
+            - read_file
+            - write_to_file
+            - write_file
+            - edit_file
+            - str_replace_editor
+            - replace_file_content
+            - bash
+            - terminal
+            - pwsh
+            - run_command
+            - execute_command
+            - grep
+            - glob
+            - find_by_name
+            - view_file
+        skillRouter:
+          enabled: false
+          minCandidates: 8
+          minIntentChars: 12
+          maxSkills: 2
+          maxCandidates: 32
+          minScore: 1.5
+          minConfidence: 0.5
+          nameMatchBoost: 0.6
+          maxAdviceChars: 1200
+          requestTimeoutMs: 4000
+        decisionTools:
+          enabled: false
+          requestTimeoutMs: 3500
+          maxStateChars: 12000
+          maxQuestionChars: 1500
+          maxQuestions: 16
+          maxCandidates: 50
+          maxCandidateChars: 600
+          maxResultChars: 4000
+        deterministicSafetyGuard:
+          enabled: true
+          maxArgumentChars: 32000

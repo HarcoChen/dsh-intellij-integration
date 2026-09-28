@@ -39,6 +39,8 @@ public final class DshRemoteConnection implements AutoCloseable {
         void onDropped(String message);
 
         void onAuthFailure(DshRemoteException error);
+
+        void onAccountEvent(String event);
     }
 
     static final int FOLLOW_MAX_MESSAGES = 250;
@@ -530,6 +532,16 @@ public final class DshRemoteConnection implements AutoCloseable {
                         if (gen != generation) return;
                         if ("settings/document-updated".equals(event)
                                 || "agent-preset/selected".equals(event)) {
+                            settingsEpoch++;
+                            publish();
+                            return;
+                        }
+                        if ("schedule/changed".equals(event)
+                                || "credentials/record-updated".equals(event)
+                                || "deepseek-account/session-expired".equals(event)
+                                || "deepseek-account/model-sign-in-required".equals(event)) {
+                            if (event.startsWith("deepseek-account/"))
+                                callbacks.onAccountEvent(event);
                             settingsEpoch++;
                             publish();
                             return;
