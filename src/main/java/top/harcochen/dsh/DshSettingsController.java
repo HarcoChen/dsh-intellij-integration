@@ -76,6 +76,20 @@ final class DshSettingsController {
                         });
     }
 
+    void configureJevApiKey() {
+        ApplicationManager.getApplication()
+                .invokeLater(
+                        () -> {
+                            String value =
+                                    Messages.showPasswordDialog(
+                                            DshBundle.message("dsh.jev.api.key.dialog.message"),
+                                            DshBundle.message("dsh.jev.api.key.dialog.title"));
+                            if (value == null || value.isBlank()) return;
+                            DshCredentials.storeJev(project, value);
+                            notifyUser(DshBundle.message("dsh.jev.api.key.saved"));
+                        });
+    }
+
     synchronized void togglePanel() {
         if (panel != null) {
             generation.incrementAndGet();

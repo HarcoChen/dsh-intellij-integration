@@ -12,6 +12,7 @@ import java.awt.BorderLayout;
 import java.awt.Dimension;
 import java.awt.FontMetrics;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.ExecutorService;
@@ -25,6 +26,7 @@ import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.KeyStroke;
 import javax.swing.ListSelectionModel;
+import top.harcochen.dsh.remote.DshRemoteException;
 import top.harcochen.dsh.remote.DshRemoteService;
 import top.harcochen.dsh.remote.DshRemoteState;
 
@@ -94,6 +96,11 @@ final class DshSessionActionsController {
 
     JsonObject modelCatalog(String session) {
         return session != null && session.equals(modelCatalogSession) ? modelCatalog : null;
+    }
+
+    void invalidateModelCatalog() {
+        modelCatalogSession = null;
+        modelCatalog = null;
     }
 
     JsonObject reasoningEffort(String session, DshRemoteState.SessionView view) {
@@ -195,6 +202,108 @@ final class DshSessionActionsController {
                             }
                             chooseSearchResult(query);
                         });
+    }
+
+    void manageSessions() {
+        operations.execute(
+                () -> {
+                    try {
+                        DshRuntimeService.getInstance(project).startAsync().join();
+                        long deadline =
+                                System.nanoTime()
+                                        + java.util.concurrent.TimeUnit.SECONDS.toNanos(15);
+                        while (!DshRemoteService.PHASE_CONNECTED.equals(remote.phase())
+                                && System.nanoTime() < deadline) {
+                            Thread.sleep(100);
+                        }
+                        if (!DshRemoteService.PHASE_CONNECTED.equals(remote.phase())) {
+                            throw new IllegalStateException("DSH Runtime sessions are not ready");
+                        }
+                        ApplicationManager.getApplication().invokeLater(this::chooseManagedSession);
+                    } catch (Exception error) {
+                        report(error);
+                    }
+                });
+    }
+
+    private void chooseManagedSession() {
+        DshRemoteState.Snapshot snapshot = remote.snapshot();
+        LinkedHashSet<String> ids = new LinkedHashSet<>(snapshot.pinnedSessionIds);
+        for (JsonElement candidate : snapshot.catalog) {
+            if (candidate.isJsonObject()) {
+                String id = DshJson.string(candidate.getAsJsonObject(), "sessionId");
+                if (id != null) ids.add(id);
+            }
+        }
+        ids.addAll(snapshot.archivedSessionIds);
+        if (ids.isEmpty()) {
+            notifyUser(DshBundle.message("dsh.session.manage.empty"));
+            return;
+        }
+        List<String> labels = new ArrayList<>();
+        List<String> choices = new ArrayList<>(ids);
+        for (String id : choices) {
+            String title = id;
+            for (JsonElement candidate : snapshot.catalog) {
+                if (candidate.isJsonObject()
+                        && id.equals(DshJson.string(candidate.getAsJsonObject(), "sessionId"))) {
+                    title = DshJson.stringOr(candidate.getAsJsonObject(), "title", id);
+                    break;
+                }
+            }
+            String status =
+                    snapshot.archivedSessionIds.contains(id)
+                            ? DshBundle.message("dsh.session.manage.archived")
+                            : snapshot.pinnedSessionIds.contains(id)
+                                    ? DshBundle.message("dsh.session.manage.pinned")
+                                    : "";
+            labels.add(title + "  (" + id + ")" + (status.isBlank() ? "" : "  · " + status));
+        }
+        int picked =
+                Messages.showChooseDialog(
+                        project,
+                        DshBundle.message("dsh.session.manage.choose"),
+                        DshBundle.message("dsh.session.manage.title"),
+                        Messages.getQuestionIcon(),
+                        labels.toArray(new String[0]),
+                        labels.get(0));
+        if (picked < 0) return;
+        String id = choices.get(picked);
+        boolean archived = snapshot.archivedSessionIds.contains(id);
+        boolean pinned = snapshot.pinnedSessionIds.contains(id);
+        String[] actions =
+                archived
+                        ? new String[] {DshBundle.message("dsh.session.manage.restore")}
+                        : new String[] {
+                            DshBundle.message("dsh.session.manage.open"),
+                            DshBundle.message(
+                                    pinned ? "dsh.session.manage.unpin" : "dsh.session.manage.pin")
+                        };
+        int action =
+                Messages.showChooseDialog(
+                        project,
+                        labels.get(picked),
+                        DshBundle.message("dsh.session.manage.title"),
+                        Messages.getQuestionIcon(),
+                        actions,
+                        actions[0]);
+        if (action < 0) return;
+        if (!archived && action == 0) {
+            selectSession.accept(id);
+            refreshState.run();
+            return;
+        }
+        operations.execute(
+                () -> {
+                    try {
+                        if (archived) remote.unarchiveSession(id);
+                        else if (pinned) remote.unpinSession(id);
+                        else remote.pinSession(id);
+                        refreshState.run();
+                    } catch (Exception error) {
+                        report(error);
+                    }
+                });
     }
 
     private void chooseSearchResult(String query) {
@@ -312,6 +421,34 @@ final class DshSessionActionsController {
             remote.archiveSession(session);
             clearSession.run();
             refreshState.run();
+        } catch (DshRemoteException active) {
+            if (!"workspace/session-active".equals(active.code())) {
+                report(active);
+                return;
+            }
+            ApplicationManager.getApplication()
+                    .invokeLater(
+                            () -> {
+                                int answer =
+                                        Messages.showYesNoDialog(
+                                                project,
+                                                DshBundle.message(
+                                                        "dsh.session.archive.stop.message"),
+                                                DshBundle.message("dsh.session.archive.title"),
+                                                Messages.getWarningIcon());
+                                if (answer == Messages.YES) {
+                                    operations.execute(
+                                            () -> {
+                                                try {
+                                                    remote.archiveSession(session, true);
+                                                    clearSession.run();
+                                                    refreshState.run();
+                                                } catch (Exception error) {
+                                                    report(error);
+                                                }
+                                            });
+                                }
+                            });
         } catch (Exception error) {
             report(error);
         }

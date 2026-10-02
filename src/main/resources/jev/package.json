@@ -1,0 +1,60 @@
+{
+  "name": "dsh-jev-integration",
+  "version": "0.1.0",
+  "description": "Shared Jev Runtime integration layer for DeepSeek Harness hosts",
+  "type": "module",
+  "private": false,
+  "main": "./dist/runtime/src/index.js",
+  "types": "./dist/runtime/src/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/runtime/src/index.d.ts",
+      "import": "./dist/runtime/src/index.js"
+    },
+    "./protocol": {
+      "types": "./dist/protocol/src/index.d.ts",
+      "import": "./dist/protocol/src/index.js"
+    },
+    "./schema": "./dist/protocol/schema/jev-integration.schema.json"
+  },
+  "files": [
+    "dist",
+    "runtime/cordis.patch.yml",
+    "protocol/schema",
+    "protocol/examples",
+    "protocol/kotlin",
+    "protocol/README.md",
+    "examples",
+    "README.md",
+    "README.zh-CN.md",
+    "THIRD_PARTY_NOTICES.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "smoke": "node scripts/smoke.mjs",
+    "pack:check": "node scripts/pack-check.mjs"
+  },
+  "engines": {
+    "node": ">=22.19.0",
+    "dsh": ">=0.1.5-rc.1"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": ">=4.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@deepseek-ai/cordis": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "typescript": "5.9.3"
+  },
+  "dsh": {
+    "manifestVersion": 1,
+    "bundle": {
+      "patch": "./dist/runtime/cordis.patch.yml"
+    }
+  }
+}

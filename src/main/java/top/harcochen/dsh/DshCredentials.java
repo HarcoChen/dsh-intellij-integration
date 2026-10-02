@@ -8,6 +8,7 @@ import com.intellij.openapi.project.Project;
 /** Keeps the API key in IntelliJ's password store instead of project XML or logs. */
 public final class DshCredentials {
     private static final String SERVICE = "top.harcochen.dsh.api-key";
+    private static final String JEV_SERVICE = "top.harcochen.dsh.jev-api-key";
 
     private DshCredentials() {}
 
@@ -23,6 +24,20 @@ public final class DshCredentials {
 
     public static void clear(Project project) {
         PasswordSafe.getInstance().set(attributes(project), null);
+    }
+
+    public static void storeJev(Project project, String value) {
+        PasswordSafe.getInstance().set(jevAttributes(project), new Credentials("jev", value));
+    }
+
+    public static String readJev(Project project) {
+        Credentials credentials = PasswordSafe.getInstance().get(jevAttributes(project));
+        return credentials == null ? null : credentials.getPasswordAsString();
+    }
+
+    private static CredentialAttributes jevAttributes(Project project) {
+        return new CredentialAttributes(
+                JEV_SERVICE + ":" + project.getLocationHash(), "jev", false);
     }
 
     private static CredentialAttributes attributes(Project project) {

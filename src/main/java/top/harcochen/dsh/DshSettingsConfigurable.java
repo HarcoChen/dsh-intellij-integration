@@ -38,6 +38,15 @@ public final class DshSettingsConfigurable implements Configurable {
     private JBCheckBox installWhenMissing;
     private JBCheckBox useManagedRuntime;
     private JBCheckBox enableCompaction;
+    private JBCheckBox jevEnabled;
+    private JBTextField jevBaseUrl;
+    private JBTextField jevModel;
+    private JBCheckBox jevLoopGuard;
+    private JBCheckBox jevResultShaper;
+    private JBCheckBox jevDoneGate;
+    private JBCheckBox jevToolPruner;
+    private JBCheckBox jevSkillRouter;
+    private JBCheckBox jevDecisionTools;
     private JBCheckBox recoveryEnabled;
     private JBCheckBox recoveryIsolation;
 
@@ -80,6 +89,15 @@ public final class DshSettingsConfigurable implements Configurable {
         useManagedRuntime = new JBCheckBox(DshBundle.message("dsh.settings.managed.runtime.label"));
         enableCompaction =
                 new JBCheckBox(DshBundle.message("dsh.settings.enable.compaction.label"));
+        jevEnabled = new JBCheckBox(DshBundle.message("dsh.settings.jev.enabled"));
+        jevBaseUrl = new JBTextField();
+        jevModel = new JBTextField();
+        jevLoopGuard = new JBCheckBox(DshBundle.message("dsh.settings.jev.loop.guard"));
+        jevResultShaper = new JBCheckBox(DshBundle.message("dsh.settings.jev.result.shaper"));
+        jevDoneGate = new JBCheckBox(DshBundle.message("dsh.settings.jev.done.gate"));
+        jevToolPruner = new JBCheckBox(DshBundle.message("dsh.settings.jev.tool.pruner"));
+        jevSkillRouter = new JBCheckBox(DshBundle.message("dsh.settings.jev.skill.router"));
+        jevDecisionTools = new JBCheckBox(DshBundle.message("dsh.settings.jev.decision.tools"));
 
         addRow(
                 DshBundle.message("dsh.settings.command.label"),
@@ -143,6 +161,21 @@ public final class DshSettingsConfigurable implements Configurable {
         addCheckbox(installWhenMissing);
         addCheckbox(useManagedRuntime);
         addCheckbox(enableCompaction);
+        addCheckbox(jevEnabled);
+        addRow(
+                DshBundle.message("dsh.settings.jev.base.url"),
+                jevBaseUrl,
+                DshBundle.message("dsh.settings.jev.base.url.tooltip"));
+        addRow(
+                DshBundle.message("dsh.settings.jev.model"),
+                jevModel,
+                DshBundle.message("dsh.settings.jev.model.tooltip"));
+        addCheckbox(jevLoopGuard);
+        addCheckbox(jevResultShaper);
+        addCheckbox(jevDoneGate);
+        addCheckbox(jevToolPruner);
+        addCheckbox(jevSkillRouter);
+        addCheckbox(jevDecisionTools);
         recoveryEnabled = new JBCheckBox(DshBundle.message("dsh.settings.recovery.enabled"));
         recoveryIsolation = new JBCheckBox(DshBundle.message("dsh.settings.recovery.isolation"));
         addCheckbox(recoveryEnabled);
@@ -215,6 +248,15 @@ public final class DshSettingsConfigurable implements Configurable {
                 || installWhenMissing.isSelected() != state.installWhenMissing
                 || useManagedRuntime.isSelected() != state.useManagedRuntime
                 || enableCompaction.isSelected() != state.enableCompaction
+                || jevEnabled.isSelected() != state.jevEnabled
+                || !safe(jevBaseUrl.getText()).equals(safe(state.jevBaseUrl))
+                || !safe(jevModel.getText()).equals(safe(state.jevModel))
+                || jevLoopGuard.isSelected() != state.jevLoopGuard
+                || jevResultShaper.isSelected() != state.jevResultShaper
+                || jevDoneGate.isSelected() != state.jevDoneGate
+                || jevToolPruner.isSelected() != state.jevToolPruner
+                || jevSkillRouter.isSelected() != state.jevSkillRouter
+                || jevDecisionTools.isSelected() != state.jevDecisionTools
                 || recoveryEnabled.isSelected() != state.recoveryEnabled
                 || recoveryIsolation.isSelected() != state.recoveryAutoPersistBundleIsolation;
     }
@@ -259,11 +301,36 @@ public final class DshSettingsConfigurable implements Configurable {
             throw new ConfigurationException(
                     DshBundle.message("dsh.settings.error.api.key.env.invalid"));
         }
+        String jevEndpoint = safe(jevBaseUrl.getText()).trim();
+        try {
+            java.net.URI uri = java.net.URI.create(jevEndpoint);
+            if (!"https".equals(uri.getScheme())
+                    || uri.getHost() == null
+                    || uri.getUserInfo() != null) {
+                throw new IllegalArgumentException("Invalid Jev endpoint");
+            }
+        } catch (RuntimeException invalid) {
+            throw new ConfigurationException(
+                    DshBundle.message("dsh.settings.jev.base.url.invalid"));
+        }
+        String jevModelValue = safe(jevModel.getText()).trim();
+        if (jevModelValue.isBlank()) {
+            throw new ConfigurationException(DshBundle.message("dsh.settings.jev.model.invalid"));
+        }
         state.command = safe(command.getText());
         state.commandArgs = safe(commandArgs.getText());
         state.serverUrl = safe(serverUrl.getText());
         state.serverPort = port;
         state.runtimeVersion = version;
+        state.jevBaseUrl = jevEndpoint;
+        state.jevModel = jevModelValue;
+        state.jevEnabled = jevEnabled.isSelected();
+        state.jevLoopGuard = jevLoopGuard.isSelected();
+        state.jevResultShaper = jevResultShaper.isSelected();
+        state.jevDoneGate = jevDoneGate.isSelected();
+        state.jevToolPruner = jevToolPruner.isSelected();
+        state.jevSkillRouter = jevSkillRouter.isSelected();
+        state.jevDecisionTools = jevDecisionTools.isSelected();
         state.startupTimeoutMs = startup;
         state.requestTimeoutMs = request;
         state.maxContextBytes = context;
@@ -300,6 +367,15 @@ public final class DshSettingsConfigurable implements Configurable {
         installWhenMissing.setSelected(state.installWhenMissing);
         useManagedRuntime.setSelected(state.useManagedRuntime);
         enableCompaction.setSelected(state.enableCompaction);
+        jevEnabled.setSelected(state.jevEnabled);
+        jevBaseUrl.setText(safe(state.jevBaseUrl));
+        jevModel.setText(safe(state.jevModel));
+        jevLoopGuard.setSelected(state.jevLoopGuard);
+        jevResultShaper.setSelected(state.jevResultShaper);
+        jevDoneGate.setSelected(state.jevDoneGate);
+        jevToolPruner.setSelected(state.jevToolPruner);
+        jevSkillRouter.setSelected(state.jevSkillRouter);
+        jevDecisionTools.setSelected(state.jevDecisionTools);
         recoveryEnabled.setSelected(state.recoveryEnabled);
         recoveryIsolation.setSelected(state.recoveryAutoPersistBundleIsolation);
     }

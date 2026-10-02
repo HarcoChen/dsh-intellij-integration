@@ -34,7 +34,7 @@ final class DshRuntimeHelper {
             String cwd,
             String version,
             DshSettingsState settings,
-            String overlay) {
+            List<String> overlayPaths) {
         JsonObject config = new JsonObject();
         config.addProperty("command", command.get(0));
         JsonArray args = new JsonArray();
@@ -46,7 +46,7 @@ final class DshRuntimeHelper {
         config.addProperty("enabled", settings.recoveryEnabled);
         config.addProperty("isolate", settings.recoveryAutoPersistBundleIsolation);
         JsonArray overlays = new JsonArray();
-        if (overlay != null) overlays.add(overlay);
+        for (String overlay : overlayPaths) overlays.add(overlay);
         config.add("overlays", overlays);
         return config;
     }

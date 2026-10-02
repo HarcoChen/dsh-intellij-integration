@@ -23623,6 +23623,10 @@
     "Rename session": "\u91CD\u547D\u540D\u4F1A\u8BDD",
     "Fork session": "Fork \u4F1A\u8BDD",
     "Archive session": "\u5F52\u6863\u4F1A\u8BDD",
+    "Manage sessions": "\u7BA1\u7406\u4F1A\u8BDD",
+    "Manage DeepSeek account": "\u7BA1\u7406 DeepSeek \u8D26\u6237",
+    "Manage schedules": "\u7BA1\u7406\u65E5\u7A0B",
+    "Configure Jev API key": "\u914D\u7F6E Jev API Key",
     "Open session trace": "\u6253\u5F00\u4F1A\u8BDD Trace",
     "Stop runtime": "\u505C\u6B62\u8FD0\u884C\u65F6",
     "Start runtime": "\u542F\u52A8\u8FD0\u884C\u65F6",
@@ -24342,6 +24346,9 @@
       { key: "rename", label: t("Rename session"), action: { type: "renameSession" }, disabled: !hasSession },
       { key: "fork", label: t("Fork session"), action: { type: "forkSession" }, disabled: !hasSession },
       { key: "archive", label: t("Archive session"), action: { type: "archiveSession" }, disabled: !hasSession },
+      { key: "manageSessions", label: t("Manage sessions"), action: { type: "manageSessions" } },
+      { key: "manageAccount", label: t("Manage DeepSeek account"), action: { type: "manageAccount" } },
+      { key: "manageSchedules", label: t("Manage schedules"), action: { type: "manageSchedules" } },
       { key: "trace", label: t("Open session trace"), action: { type: "openTrace" }, disabled: !hasSession },
       { key: "feedback", label: t("Submit feedback"), action: { type: "openSessionFeedback" }, disabled: !hasSession },
       {
@@ -24358,6 +24365,7 @@
       { key: "providers", label: t("Manage providers"), action: { type: "manageProviders" } },
       { key: "settings", label: t("Manage plugin settings"), action: { type: "manageSettings" } },
       { key: "key", label: t("Configure API key"), action: { type: "configureApiKey" } },
+      { key: "jevKey", label: t("Configure Jev API key"), action: { type: "configureJevApiKey" } },
       {
         key: "focus",
         label: focusMode ? t("Focus mode: on") : t("Focus mode: off"),

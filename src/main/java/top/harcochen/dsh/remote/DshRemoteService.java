@@ -82,7 +82,8 @@ public final class DshRemoteService implements Disposable {
                     Map.of(),
                     Map.of(),
                     List.of(),
-                    java.util.Set.of());
+                    java.util.Set.of(),
+                    List.of());
 
     public DshRemoteService(@NotNull Project project) {
         this.project = project;
@@ -126,7 +127,8 @@ public final class DshRemoteService implements Disposable {
                 Map.of(),
                 Map.of(),
                 List.of(),
-                java.util.Set.of());
+                java.util.Set.of(),
+                List.of());
     }
 
     // ---------------------------------------------------------------------------
@@ -282,9 +284,127 @@ public final class DshRemoteService implements Disposable {
     }
 
     public void archiveSession(String sessionId) throws DshRemoteException {
+        archiveSession(sessionId, false);
+    }
+
+    public void archiveSession(String sessionId, boolean stopActivity) throws DshRemoteException {
         unary.call(
                 DshRemoteContracts.WORKSPACE_ARCHIVE_SESSION,
-                DshRemoteContracts.argsWorkspaceArchiveSession(sessionId));
+                DshRemoteContracts.argsWorkspaceArchiveSession(sessionId, stopActivity));
+    }
+
+    public void unarchiveSession(String sessionId) throws DshRemoteException {
+        unary.call(
+                DshRemoteContracts.WORKSPACE_UNARCHIVE_SESSION,
+                DshRemoteContracts.argsWorkspaceSession(sessionId));
+    }
+
+    public void pinSession(String sessionId) throws DshRemoteException {
+        unary.call(
+                DshRemoteContracts.WORKSPACE_PIN_SESSION,
+                DshRemoteContracts.argsWorkspaceSession(sessionId));
+    }
+
+    public void unpinSession(String sessionId) throws DshRemoteException {
+        unary.call(
+                DshRemoteContracts.WORKSPACE_UNPIN_SESSION,
+                DshRemoteContracts.argsWorkspaceSession(sessionId));
+    }
+
+    public JsonObject initializeDefaultWorkspace() throws DshRemoteException {
+        return objectValue(
+                unary.call(
+                        DshRemoteContracts.WORKSPACE_INITIALIZE_DEFAULT,
+                        DshRemoteContracts.argsEmpty()));
+    }
+
+    public JsonElement scheduleCatalog() throws DshRemoteException {
+        return unary.call(DshRemoteContracts.SCHEDULE_CATALOG, DshRemoteContracts.argsEmpty());
+    }
+
+    public JsonElement listSchedules(String sessionId) throws DshRemoteException {
+        return unary.call(
+                DshRemoteContracts.SCHEDULE_LIST,
+                DshRemoteContracts.argsScheduleSession(sessionId));
+    }
+
+    public JsonElement scheduleHistory(
+            String sessionId, String scheduleId, int limit, String before)
+            throws DshRemoteException {
+        return unary.call(
+                DshRemoteContracts.SCHEDULE_HISTORY,
+                DshRemoteContracts.argsScheduleHistory(sessionId, scheduleId, limit, before));
+    }
+
+    public JsonElement updateSchedule(JsonObject request) throws DshRemoteException {
+        JsonObject args = new JsonObject();
+        args.add("request", request.deepCopy());
+        return unary.call(DshRemoteContracts.SCHEDULE_UPDATE, args);
+    }
+
+    public JsonElement deleteSchedule(String sessionId, String scheduleId)
+            throws DshRemoteException {
+        JsonObject request = new JsonObject();
+        request.addProperty("sessionId", sessionId);
+        request.addProperty("id", scheduleId);
+        JsonObject args = new JsonObject();
+        args.add("request", request);
+        return unary.call(DshRemoteContracts.SCHEDULE_DELETE, args);
+    }
+
+    public JsonObject accountState() throws DshRemoteException {
+        return objectValue(
+                unary.call(DshRemoteContracts.ACCOUNT_GET_STATE, DshRemoteContracts.argsEmpty()));
+    }
+
+    public JsonElement accountProfile(JsonObject client) throws DshRemoteException {
+        return unary.call(
+                DshRemoteContracts.ACCOUNT_GET_PROFILE,
+                DshRemoteContracts.argsAccountClient(client));
+    }
+
+    public JsonElement accountBalance(JsonObject client) throws DshRemoteException {
+        return unary.call(
+                DshRemoteContracts.ACCOUNT_GET_BALANCE,
+                DshRemoteContracts.argsAccountClient(client));
+    }
+
+    public JsonElement accountBonuses(JsonObject client) throws DshRemoteException {
+        return unary.call(
+                DshRemoteContracts.ACCOUNT_GET_BONUSES,
+                DshRemoteContracts.argsAccountClient(client));
+    }
+
+    public JsonElement acknowledgeAccountBonus(String accountId, String orderId, JsonObject client)
+            throws DshRemoteException {
+        return unary.call(
+                DshRemoteContracts.ACCOUNT_ACK_BONUS,
+                DshRemoteContracts.argsAccountAckBonus(accountId, orderId, client));
+    }
+
+    public JsonObject startAccountSignIn(JsonObject client, String callbackOrigin)
+            throws DshRemoteException {
+        return objectValue(
+                unary.call(
+                        DshRemoteContracts.ACCOUNT_START_SIGN_IN,
+                        DshRemoteContracts.argsAccountStartSignIn(client, callbackOrigin)));
+    }
+
+    public JsonElement hasRunningAccountTasks() throws DshRemoteException {
+        return unary.call(DshRemoteContracts.ACCOUNT_RUNNING_TASKS, DshRemoteContracts.argsEmpty());
+    }
+
+    public JsonObject signOutAccount(JsonObject client) throws DshRemoteException {
+        return objectValue(
+                unary.call(
+                        DshRemoteContracts.ACCOUNT_SIGN_OUT,
+                        DshRemoteContracts.argsAccountClient(client)));
+    }
+
+    public void initializeDefaultModel() throws DshRemoteException {
+        unary.call(
+                DshRemoteContracts.SESSION_INITIALIZE_DEFAULT_MODEL,
+                DshRemoteContracts.argsEmpty());
     }
 
     public JsonObject prompt(
@@ -1015,6 +1135,24 @@ public final class DshRemoteService implements Disposable {
         @Override
         public void onAuthFailure(DshRemoteException error) {
             LOG.warn("DSH Runtime authentication failed: " + error.display());
+        }
+
+        @Override
+        public void onAccountEvent(String event) {
+            String key =
+                    "deepseek-account/session-expired".equals(event)
+                            ? "dsh.account.session.expired"
+                            : "dsh.account.model.sign.in.required";
+            com.intellij.openapi.application.ApplicationManager.getApplication()
+                    .invokeLater(
+                            () ->
+                                    com.intellij.notification.NotificationGroupManager.getInstance()
+                                            .getNotificationGroup("DeepSeek Harness")
+                                            .createNotification(
+                                                    top.harcochen.dsh.DshBundle.message(key),
+                                                    com.intellij.notification.NotificationType
+                                                            .WARNING)
+                                            .notify(project));
         }
     }
 

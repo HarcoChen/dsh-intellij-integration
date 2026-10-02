@@ -45,6 +45,7 @@ public final class DshRemoteState {
     // ---- workspace registry --------------------------------------------------
     private final Map<String, JsonObject> workspacesById = new LinkedHashMap<>();
     private final Set<String> archivedSessionIds = new LinkedHashSet<>();
+    private final List<String> pinnedSessionIds = new ArrayList<>();
 
     // ---- session/control state ----------------------------------------------
     private final Map<String, SessionControl> controlBySession = new LinkedHashMap<>();
@@ -76,6 +77,7 @@ public final class DshRemoteState {
         pendingControlBaseline = null;
         workspacesById.clear();
         archivedSessionIds.clear();
+        pinnedSessionIds.clear();
     }
 
     void setPhase(String phase, String message) {
@@ -222,6 +224,8 @@ public final class DshRemoteState {
                 }
                 archivedSessionIds.clear();
                 archivedSessionIds.addAll(archived);
+                pinnedSessionIds.clear();
+                replacePinned(value.get("pinnedSessionIds"));
             }
             case "upsert" -> {
                 JsonObject workspace =
@@ -265,10 +269,24 @@ public final class DshRemoteState {
                         archivedSessionIds.add(candidate.getAsString());
                 }
             }
+            case "pinned" -> replacePinned(frame.get("pinnedSessionIds"));
             default -> {
                 // Unknown workspace frame types are ignored; the next baseline recalibrates.
             }
         }
+    }
+
+    private void replacePinned(JsonElement value) {
+        if (value == null || !value.isJsonArray()) return;
+        List<String> ids = new ArrayList<>();
+        for (JsonElement candidate : value.getAsJsonArray()) {
+            if (candidate.isJsonPrimitive() && candidate.getAsJsonPrimitive().isString()) {
+                String id = candidate.getAsString();
+                if (!ids.contains(id)) ids.add(id);
+            }
+        }
+        pinnedSessionIds.clear();
+        pinnedSessionIds.addAll(ids);
     }
 
     // ---------------------------------------------------------------------------
@@ -615,6 +633,7 @@ public final class DshRemoteState {
         public final Map<String, FollowView> follows;
         public final List<JsonObject> workspaces;
         public final Set<String> archivedSessionIds;
+        public final List<String> pinnedSessionIds;
 
         Snapshot(
                 String phase,
@@ -624,7 +643,8 @@ public final class DshRemoteState {
                 Map<String, SessionView> sessions,
                 Map<String, FollowView> follows,
                 List<JsonObject> workspaces,
-                Set<String> archivedSessionIds) {
+                Set<String> archivedSessionIds,
+                List<String> pinnedSessionIds) {
             this.phase = phase;
             this.message = message;
             this.generation = generation;
@@ -633,6 +653,7 @@ public final class DshRemoteState {
             this.follows = follows;
             this.workspaces = workspaces;
             this.archivedSessionIds = archivedSessionIds;
+            this.pinnedSessionIds = pinnedSessionIds;
         }
     }
 
@@ -669,6 +690,7 @@ public final class DshRemoteState {
             row.addProperty("running", bool(raw, "running", false));
             row.addProperty("attention", hasPendingInteraction(control));
             row.addProperty("archived", archivedSessionIds.contains(sessionId));
+            row.addProperty("pinned", pinnedSessionIds.contains(sessionId));
             JsonObject workspace = workspaceBySession.get(sessionId);
             if (workspace != null) {
                 copyIfPresent(workspace, row, "workspaceId");
@@ -715,8 +737,16 @@ public final class DshRemoteState {
                             control == null ? Set.of() : Set.copyOf(control.durableRequestIds)));
         }
         rows.sort(
-                Comparator.comparing((JsonObject value) -> bool(value, "running", false))
-                        .reversed());
+                Comparator.comparingInt(
+                                (JsonObject value) -> {
+                                    int index =
+                                            pinnedSessionIds.indexOf(string(value, "sessionId"));
+                                    return index < 0 ? Integer.MAX_VALUE : index;
+                                })
+                        .thenComparing(
+                                Comparator.comparing(
+                                                (JsonObject value) -> bool(value, "running", false))
+                                        .reversed()));
         // Child sessions can carry live control projections without appearing in session/list.
         for (Map.Entry<String, SessionControl> entry : controlBySession.entrySet()) {
             SessionControl control = entry.getValue();
@@ -753,7 +783,8 @@ public final class DshRemoteState {
                 Map.copyOf(sessions),
                 Map.copyOf(followViews),
                 List.copyOf(workspacesById.values()),
-                Set.copyOf(archivedSessionIds));
+                Set.copyOf(archivedSessionIds),
+                List.copyOf(pinnedSessionIds));
     }
 
     private static String projectedTitle(

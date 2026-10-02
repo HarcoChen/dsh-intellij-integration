@@ -1,19 +1,19 @@
-// runtime-helper/main.ts
+// main.ts
 var import_node_child_process3 = require("node:child_process");
 var import_node_util3 = require("node:util");
 
-// runtime-helper/upstream/runtimeLock.ts
+// upstream/runtimeLock.ts
 var import_node_net = require("node:net");
 var import_node_crypto = require("node:crypto");
 var import_promises = require("node:fs/promises");
 var import_node_path = require("node:path");
 
-// runtime-helper/upstream/localize.ts
+// upstream/localize.ts
 function t(value, args = {}) {
   return value.replace(/\{([^}]+)\}/g, (match, key) => key in args ? String(args[key]) : match);
 }
 
-// runtime-helper/upstream/runtimeProcess.ts
+// upstream/runtimeProcess.ts
 var import_node_child_process = require("node:child_process");
 var import_node_util = require("node:util");
 var execFileAsync = (0, import_node_util.promisify)(import_node_child_process.execFile);
@@ -115,7 +115,7 @@ function terminateOwnedRuntime(child2) {
   return ownership.termination;
 }
 
-// runtime-helper/upstream/runtimeLock.ts
+// upstream/runtimeLock.ts
 function validPid(value) {
   return typeof value === "number" && Number.isSafeInteger(value) && value > 0;
 }
@@ -282,11 +282,11 @@ async function removeRuntimeLock(snapshot) {
   }
 }
 
-// runtime-helper/upstream/runtimeMigration.ts
+// upstream/runtimeMigration.ts
 var import_node_child_process2 = require("node:child_process");
 var import_node_util2 = require("node:util");
 
-// runtime-helper/upstream/remote/errors.ts
+// upstream/remote/errors.ts
 var RemoteError = class _RemoteError extends Error {
   /** Structural marker preserved across duplicate bundles/realms. */
   isDSHRemoteError = true;
@@ -331,7 +331,7 @@ function httpMessage(endpoint, status) {
   return `Remote RPC ${endpoint} returned HTTP ${status}`;
 }
 
-// runtime-helper/upstream/runtimeMigration.ts
+// upstream/runtimeMigration.ts
 var exec = (0, import_node_util2.promisify)(import_node_child_process2.execFile);
 function migrationUrl(snapshot) {
   try {
@@ -416,11 +416,11 @@ async function stopLegacyRuntime(snapshot, approved, sharedLockPath, signal) {
   });
 }
 
-// runtime-helper/upstream/localRuntimeUpgrade.ts
+// upstream/localRuntimeUpgrade.ts
 var import_promises2 = require("node:fs/promises");
 var import_node_path2 = require("node:path");
 
-// runtime-helper/upstream/localUi.ts
+// upstream/localUi.ts
 var import_node_crypto2 = require("node:crypto");
 var pending = /* @__PURE__ */ new Map();
 function acceptReply(message) {
@@ -448,7 +448,7 @@ var env = { clipboard: { async writeText(text) {
   process.stdout.write("\nDSH_INTELLIJ_HELPER " + JSON.stringify({ event: "clipboard", value: { text } }) + "\n");
 } } };
 
-// runtime-helper/upstream/runtimeVersion.ts
+// upstream/runtimeVersion.ts
 function parseVersion(value) {
   if (value === void 0) return void 0;
   const match = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/u.exec(value);
@@ -482,14 +482,14 @@ function isOlderRuntimeVersion(actual, target) {
   return compareRuntimeVersions(actual, target) === -1;
 }
 
-// runtime-helper/upstream/managedRuntime/types.ts
+// upstream/managedRuntime/types.ts
 var RUNTIME_MINIMUM_VERSION = "0.1.5-rc.1";
 function isSupportedRuntimeVersion(version) {
   const order = compareRuntimeVersions(version, RUNTIME_MINIMUM_VERSION);
   return order !== void 0 && order >= 0;
 }
 
-// runtime-helper/upstream/localRuntimeUpgrade.ts
+// upstream/localRuntimeUpgrade.ts
 var PACKAGE = "@deepseek-ai/dsh";
 async function npmInstallation(command, npm, prefix, node) {
   try {
@@ -649,17 +649,17 @@ async function offerLocalRuntimeUpgrade(options) {
   }
 }
 
-// runtime-helper/main.ts
+// main.ts
 var import_node_readline = require("node:readline");
 var import_node_path9 = require("node:path");
 var import_promises8 = require("node:fs/promises");
 
-// runtime-helper/upstream/guards.ts
+// upstream/guards.ts
 function isRecord(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
-// runtime-helper/upstream/recovery/composition.ts
+// upstream/recovery/composition.ts
 var import_node_crypto3 = require("node:crypto");
 var import_promises3 = require("node:fs/promises");
 var import_node_os = require("node:os");
@@ -939,10 +939,10 @@ function compositionDiff(current, lastKnownGood) {
   };
 }
 
-// runtime-helper/upstream/recovery/recoverySession.ts
+// upstream/recovery/recoverySession.ts
 var import_node_crypto6 = require("node:crypto");
 
-// runtime-helper/upstream/recovery/ledger.ts
+// upstream/recovery/ledger.ts
 var import_node_crypto4 = require("node:crypto");
 var import_promises4 = require("node:fs/promises");
 var import_node_path4 = require("node:path");
@@ -1221,7 +1221,7 @@ async function renameWithRetry(source, target) {
   }
 }
 
-// runtime-helper/upstream/recovery/variantEngine.ts
+// upstream/recovery/variantEngine.ts
 var import_node_crypto5 = require("node:crypto");
 var import_node_path5 = require("node:path");
 function pathKey(path) {
@@ -1417,7 +1417,7 @@ var VariantEngine = class {
   }
 };
 
-// runtime-helper/upstream/recovery/recoverySession.ts
+// upstream/recovery/recoverySession.ts
 var SAFE_MAX_BOOTS = 8;
 var TERMINAL_FAILURE_CLASSES = /* @__PURE__ */ new Set(["auth", "sandbox-build", "launcher"]);
 var RecoverySession = class {
@@ -1715,7 +1715,7 @@ var RecoverySession = class {
   }
 };
 
-// runtime-helper/upstream/recovery/diagnostics.ts
+// upstream/recovery/diagnostics.ts
 var import_node_crypto7 = require("node:crypto");
 var import_promises5 = require("node:fs/promises");
 var import_node_path6 = require("node:path");
@@ -1905,7 +1905,7 @@ var RecoveryDiagnostics = class {
   }
 };
 
-// runtime-helper/upstream/recovery/fixExecutor.ts
+// upstream/recovery/fixExecutor.ts
 var import_node_crypto8 = require("node:crypto");
 var import_promises6 = require("node:fs/promises");
 var import_node_path7 = require("node:path");
@@ -2081,14 +2081,14 @@ async function assertRegularFile(path) {
   if (!info.isFile() || info.isSymbolicLink()) throw new FixConflictError(`Refusing to restore non-regular file: ${path}`);
 }
 
-// runtime-helper/upstream/recovery/healthOracle.ts
+// upstream/recovery/healthOracle.ts
 var import_node_crypto10 = require("node:crypto");
 var import_node_string_decoder = require("node:string_decoder");
 
-// runtime-helper/upstream/remote/unaryClient.ts
+// upstream/remote/unaryClient.ts
 var import_node_crypto9 = require("node:crypto");
 
-// runtime-helper/upstream/remote/contracts.ts
+// upstream/remote/contracts.ts
 var REMOTE_API_PREFIX = "/api/";
 var REMOTE_EVENT_STREAM_ENDPOINT = "$events";
 var REMOTE_EVENT_RESULT_ENDPOINT = "$events/result";
@@ -2187,7 +2187,7 @@ function visitJsonValue(value, ancestors) {
   }
 }
 
-// runtime-helper/upstream/remote/unaryClient.ts
+// upstream/remote/unaryClient.ts
 var RemoteUnaryClient = class {
   constructor(options) {
     this.options = options;
@@ -2231,15 +2231,10 @@ var RemoteUnaryClient = class {
       if (!response.ok) {
         throw new RemoteHttpError(endpoint, response.status);
       }
-      let decoded;
-      try {
-        decoded = await response.json();
-      } catch (cause) {
-        throw new RemoteProtocolError(`Remote ${endpoint} returned invalid JSON`, { cause });
-      }
       let full;
       try {
-        full = parseRemoteServerResponse(decoded);
+        const mediaType = response.headers.get("content-type")?.split(";", 1)[0]?.trim().toLowerCase();
+        full = mediaType === "multipart/form-data" ? await parseBinaryResponse(response) : parseRemoteServerResponse(await response.json());
       } catch (cause) {
         throw new RemoteProtocolError(`Remote ${endpoint} returned an invalid response`, { cause });
       }
@@ -2279,13 +2274,88 @@ var RemoteUnaryClient = class {
     return this.options.requestHeaders?.() ?? {};
   }
 };
+async function parseBinaryResponse(response) {
+  const form = await response.formData();
+  const fields = /* @__PURE__ */ new Map();
+  form.forEach((value, name) => {
+    if (fields.has(name)) throw new TypeError("Remote binary response has duplicate fields");
+    fields.set(name, value);
+  });
+  const metadata = fields.get("metadata");
+  fields.delete("metadata");
+  if (typeof metadata !== "string") throw new TypeError("Remote binary response has no metadata field");
+  const envelope = JSON.parse(metadata);
+  if (!isPlainRecord2(envelope) || !exactKeys2(envelope, ["type", "rpcId", "result", "attachments"]) || !Array.isArray(envelope.attachments) || envelope.attachments.length === 0) {
+    throw new TypeError("Remote binary response metadata is malformed");
+  }
+  const full = parseRemoteServerResponse({
+    type: envelope.type,
+    rpcId: envelope.rpcId,
+    result: envelope.result
+  });
+  if (!full.result.ok || full.result.value === void 0) {
+    throw new TypeError("Remote binary response must contain a successful value");
+  }
+  const root = { value: full.result.value };
+  const paths = /* @__PURE__ */ new Set();
+  for (const rawAttachment of envelope.attachments) {
+    if (!isPlainRecord2(rawAttachment) || !exactKeys2(rawAttachment, ["path", "codec", "part"]) || rawAttachment.codec !== "bytes" || typeof rawAttachment.part !== "string" || !/^bytes-[0-9]+$/u.test(rawAttachment.part) || !Array.isArray(rawAttachment.path) || !rawAttachment.path.every(
+      (segment) => typeof segment === "string" || typeof segment === "number" && Number.isSafeInteger(segment) && segment >= 0
+    )) {
+      throw new TypeError("Remote binary response attachment is malformed");
+    }
+    const pathKey3 = JSON.stringify(rawAttachment.path);
+    if (paths.has(pathKey3)) throw new TypeError("Remote binary response repeats an attachment path");
+    paths.add(pathKey3);
+    const bytes = fields.get(rawAttachment.part);
+    fields.delete(rawAttachment.part);
+    if (!(bytes instanceof Blob)) throw new TypeError("Remote binary response is missing a byte part");
+    let parent = root;
+    let key = "value";
+    for (const segment of rawAttachment.path) {
+      const value = Reflect.get(parent, key);
+      if (typeof value !== "object" || value === null) {
+        throw new TypeError("Remote binary response path is invalid");
+      }
+      if (Array.isArray(value)) {
+        if (typeof segment !== "number" || segment >= value.length) {
+          throw new TypeError("Remote binary response path is invalid");
+        }
+      } else if (typeof segment !== "string") {
+        throw new TypeError("Remote binary response path is invalid");
+      }
+      if (!Object.hasOwn(value, segment)) throw new TypeError("Remote binary response path is invalid");
+      parent = value;
+      key = segment;
+    }
+    if (Reflect.get(parent, key) !== null) {
+      throw new TypeError("Remote binary response byte placeholder is invalid");
+    }
+    Object.defineProperty(parent, key, {
+      value: new Uint8Array(await bytes.arrayBuffer()),
+      enumerable: true,
+      writable: true,
+      configurable: true
+    });
+  }
+  if (fields.size !== 0) throw new TypeError("Remote binary response has unexpected fields");
+  return {
+    type: "server-response",
+    rpcId: full.rpcId,
+    result: { ok: true, value: root.value }
+  };
+}
+function exactKeys2(value, keys) {
+  const actual = Reflect.ownKeys(value);
+  return actual.length === keys.length && actual.every((key) => typeof key === "string" && keys.includes(key));
+}
 function isPlainRecord2(value) {
   if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
   const prototype = Object.getPrototypeOf(value);
   return prototype === Object.prototype || prototype === null;
 }
 
-// runtime-helper/upstream/recovery/sandbox.ts
+// upstream/recovery/sandbox.ts
 var import_promises7 = require("node:fs/promises");
 var import_node_os2 = require("node:os");
 var import_node_path8 = require("node:path");
@@ -2491,7 +2561,7 @@ var SandboxManager = class {
   }
 };
 
-// runtime-helper/upstream/recovery/healthOracle.ts
+// upstream/recovery/healthOracle.ts
 var pause2 = (ms) => new Promise((resolve6) => setTimeout(resolve6, ms));
 function isAuthenticationFailure(error) {
   return error instanceof RemoteHttpError && error.isAuthenticationFailure;
@@ -2707,7 +2777,7 @@ var HealthOracle = class {
   }
 };
 
-// runtime-helper/main.ts
+// main.ts
 var exec2 = (0, import_node_util3.promisify)(import_node_child_process3.execFile);
 var input = (0, import_node_readline.createInterface)({ input: process.stdin });
 input.on("line", (line) => {

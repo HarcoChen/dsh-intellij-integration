@@ -39,6 +39,18 @@ public final class DshSettingsState implements PersistentStateComponent<DshSetti
     /** Enable the compaction command by injecting a launcher patch into web-profile launches. */
     public boolean enableCompaction = true;
 
+    /** Optional bundled System One plugin, mounted only into Runtimes started by this IDE. */
+    public boolean jevEnabled = false;
+
+    public String jevBaseUrl = "https://api.typesafe.ai/v1/systemone";
+    public String jevModel = "jev-latest";
+    public boolean jevLoopGuard = false;
+    public boolean jevResultShaper = false;
+    public boolean jevDoneGate = false;
+    public boolean jevToolPruner = false;
+    public boolean jevSkillRouter = false;
+    public boolean jevDecisionTools = false;
+
     public String runtimeVersion = DshRuntimeVersion.DEFAULT;
     public String npmRegistry = "https://registry.npmmirror.com";
     public int startupTimeoutMs = 30_000;
@@ -85,7 +97,24 @@ public final class DshSettingsState implements PersistentStateComponent<DshSetti
         recoveryEnabled = state.recoveryEnabled;
         recoveryAutoPersistBundleIsolation = state.recoveryAutoPersistBundleIsolation;
         enableCompaction = state.enableCompaction;
+        jevEnabled = state.jevEnabled;
+        jevBaseUrl =
+                state.jevBaseUrl == null || state.jevBaseUrl.isBlank()
+                        ? "https://api.typesafe.ai/v1/systemone"
+                        : state.jevBaseUrl;
+        jevModel =
+                state.jevModel == null || state.jevModel.isBlank() ? "jev-latest" : state.jevModel;
+        jevLoopGuard = state.jevLoopGuard;
+        jevResultShaper = state.jevResultShaper;
+        jevDoneGate = state.jevDoneGate;
+        jevToolPruner = state.jevToolPruner;
+        jevSkillRouter = state.jevSkillRouter;
+        jevDecisionTools = state.jevDecisionTools;
         runtimeVersion = state.runtimeVersion;
+        // Persisted versions have no default-origin marker; preserve explicit version pins.
+        if (runtimeVersion == null || runtimeVersion.isBlank()) {
+            runtimeVersion = DshRuntimeVersion.DEFAULT;
+        }
         if ("0.1.2-rc.1".equals(runtimeVersion)) {
             runtimeVersion = DshRuntimeVersion.DEFAULT;
             if ("dlx @deepseek-ai/dsh@0.1.2-rc.1 web --no-open".equals(commandArgs)) {
