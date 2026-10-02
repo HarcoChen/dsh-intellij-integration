@@ -202,6 +202,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
                         remote,
                         operations,
                         () -> sessionId,
+                        id -> projectionCell(id, "schedule"),
                         this::notify,
                         error -> lastError = error,
                         this::postStateLater);
@@ -238,6 +239,10 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
                         id -> {
                             sessionId = id;
                             newSessionDraft = false;
+                            lastError = null;
+                            subagents.clearPreview();
+                            switchFollowedSession();
+                            subagents.refresh(id);
                         },
                         () -> {
                             sessionId = null;
@@ -1290,8 +1295,10 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
         state.add("commands", sessionState.commandCatalog(sessionId));
         JsonArray todos = DshSessionStateStore.todos(cellValue(sessionId, "todos"));
         if (todos != null) state.add("todos", todos);
-        JsonArray schedule = DshSessionStateStore.schedule(cellValue(sessionId, "schedule"));
-        JsonArray liveSchedule = schedules.current(sessionId);
+        DshRemoteState.ProjectionCell scheduleCell = projectionCell(sessionId, "schedule");
+        JsonArray schedule =
+                DshSessionStateStore.schedule(scheduleCell == null ? null : scheduleCell.value());
+        JsonArray liveSchedule = schedules.current(sessionId, scheduleCell);
         if (liveSchedule != null) schedule = liveSchedule;
         if (schedule != null) state.add("schedule", schedule);
         JsonObject imageLimits =

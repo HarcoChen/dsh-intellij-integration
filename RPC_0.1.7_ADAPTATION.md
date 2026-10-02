@@ -6,8 +6,8 @@ Target source: `../dsh-ide/deepseek-harness` tag `dsh-v0.1.7-rc.2`, commit
 controller signatures were checked directly.
 
 The default local Runtime and managed download target are `0.1.7-rc.2`. The
-minimum compatible Runtime remains `0.1.5-rc.1`. Existing persisted settings
-that still contain the previous `0.1.5-rc.2` default migrate to the new default.
+minimum compatible Runtime remains `0.1.5-rc.1`. Persisted explicit Runtime versions, including `0.1.5-rc.2`, are preserved;
+missing or blank versions use the new default.
 
 The IntelliJ host now consumes the RC.2 Workspace pin, unpin, unarchive, and
 default-initialization RPCs. `workspace/follow` pins are retained in snapshot

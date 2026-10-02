@@ -347,17 +347,21 @@ public final class DshRuntimeService implements Disposable {
     private Process launch(DshSettingsState settings) {
         List<List<String>> candidates = launcherCandidates(settings);
         List<String> overlays = new ArrayList<>();
-        try {
-            String jevPatch = DshJevIntegration.prepare(settings);
-            for (List<String> candidate : candidates) {
-                if (webProfileIndex(candidate) >= 0) {
-                    insertWebLauncherPatch(candidate, jevPatch);
-                    if (!overlays.contains(jevPatch)) overlays.add(jevPatch);
+        String jevPatch = null;
+        if (settings.jevEnabled) {
+            try {
+                jevPatch = DshJevIntegration.prepare(settings);
+                for (List<String> candidate : candidates) {
+                    if (webProfileIndex(candidate) >= 0) {
+                        insertWebLauncherPatch(candidate, jevPatch);
+                        if (!overlays.contains(jevPatch)) overlays.add(jevPatch);
+                    }
                 }
+                if (!overlays.isEmpty()) appendLog("[dsh:jev] built-in integration mounted");
+            } catch (IOException unavailable) {
+                appendLog(
+                        "[dsh:jev] built-in integration unavailable: " + unavailable.getMessage());
             }
-            if (!overlays.isEmpty()) appendLog("[dsh:jev] built-in integration mounted");
-        } catch (IOException unavailable) {
-            appendLog("[dsh:jev] built-in integration unavailable: " + unavailable.getMessage());
         }
         if (settings.enableCompaction) {
             String patch = writeCompactionPatch();
@@ -425,9 +429,11 @@ public final class DshRuntimeService implements Disposable {
                 if (apiKey != null && !apiKey.isBlank()) {
                     builder.environment().put(apiKeyName, apiKey);
                 }
-                String jevApiKey = DshCredentials.readJev(project);
-                if (jevApiKey != null && !jevApiKey.isBlank()) {
-                    builder.environment().put("TYPESAFE_API_KEY", jevApiKey);
+                if (settings.jevEnabled && jevPatch != null && command.contains(jevPatch)) {
+                    String jevApiKey = DshCredentials.readJev(project);
+                    if (jevApiKey != null && !jevApiKey.isBlank()) {
+                        builder.environment().put("TYPESAFE_API_KEY", jevApiKey);
+                    }
                 }
                 List<String> original = List.copyOf(resolvedCommand);
                 builder.command(

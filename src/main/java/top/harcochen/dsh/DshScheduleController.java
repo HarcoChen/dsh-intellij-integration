@@ -8,11 +8,14 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.Messages;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.Supplier;
 import top.harcochen.dsh.remote.DshRemoteException;
 import top.harcochen.dsh.remote.DshRemoteService;
+import top.harcochen.dsh.remote.DshRemoteState;
 
 /** RC.2 Schedule catalog and current-session reminder management. */
 final class DshScheduleController {
@@ -21,11 +24,15 @@ final class DshScheduleController {
     private final DshRuntimeService runtime;
     private final ExecutorService operations;
     private final Supplier<String> sessionId;
+    private final Function<String, DshRemoteState.ProjectionCell> scheduleCell;
     private final Consumer<String> notifier;
     private final Consumer<String> errorSink;
     private final Runnable stateChanged;
-    private volatile JsonArray currentSchedules;
-    private volatile String currentScheduleSession;
+
+    private record ScheduleSnapshot(
+            String session, JsonArray schedules, DshRemoteState.ProjectionCell cell) {}
+
+    private volatile ScheduleSnapshot currentSchedules;
 
     DshScheduleController(
             Project project,
@@ -33,6 +40,7 @@ final class DshScheduleController {
             DshRemoteService remote,
             ExecutorService operations,
             Supplier<String> sessionId,
+            Function<String, DshRemoteState.ProjectionCell> scheduleCell,
             Consumer<String> notifier,
             Consumer<String> errorSink,
             Runnable stateChanged) {
@@ -41,6 +49,7 @@ final class DshScheduleController {
         this.remote = remote;
         this.operations = operations;
         this.sessionId = sessionId;
+        this.scheduleCell = scheduleCell;
         this.notifier = notifier;
         this.errorSink = errorSink;
         this.stateChanged = stateChanged;
@@ -48,13 +57,19 @@ final class DshScheduleController {
 
     void refreshCurrent(String selected) {
         if (selected == null || selected.isBlank()) return;
+        DshRemoteState.ProjectionCell cell = scheduleCell.apply(selected);
+        DshRemoteState.ProjectionCell snapshot =
+                cell == null
+                        ? null
+                        : new DshRemoteState.ProjectionCell(cell.value().deepCopy(), cell.seq());
         operations.execute(
                 () -> {
                     try {
                         JsonElement value = remote.listSchedules(selected);
                         if (!value.isJsonArray() || !selected.equals(sessionId.get())) return;
-                        currentSchedules = value.getAsJsonArray().deepCopy();
-                        currentScheduleSession = selected;
+                        currentSchedules =
+                                new ScheduleSnapshot(
+                                        selected, value.getAsJsonArray().deepCopy(), snapshot);
                         stateChanged.run();
                     } catch (DshRemoteException missing) {
                         if (!"http-404".equals(missing.code()))
@@ -65,11 +80,13 @@ final class DshScheduleController {
                 });
     }
 
-    JsonArray current(String selected) {
+    JsonArray current(String selected, DshRemoteState.ProjectionCell cell) {
+        ScheduleSnapshot cached = currentSchedules;
         return selected != null
-                        && selected.equals(currentScheduleSession)
-                        && currentSchedules != null
-                ? currentSchedules.deepCopy()
+                        && cached != null
+                        && selected.equals(cached.session())
+                        && Objects.equals(cell, cached.cell())
+                ? cached.schedules().deepCopy()
                 : null;
     }
 

@@ -111,9 +111,8 @@ public final class DshSettingsState implements PersistentStateComponent<DshSetti
         jevSkillRouter = state.jevSkillRouter;
         jevDecisionTools = state.jevDecisionTools;
         runtimeVersion = state.runtimeVersion;
-        if (runtimeVersion == null
-                || runtimeVersion.isBlank()
-                || "0.1.5-rc.2".equals(runtimeVersion)) {
+        // Persisted versions have no default-origin marker; preserve explicit version pins.
+        if (runtimeVersion == null || runtimeVersion.isBlank()) {
             runtimeVersion = DshRuntimeVersion.DEFAULT;
         }
         if ("0.1.2-rc.1".equals(runtimeVersion)) {
