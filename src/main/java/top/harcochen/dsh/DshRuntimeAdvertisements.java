@@ -7,6 +7,7 @@ import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.attribute.PosixFilePermission;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.security.MessageDigest;
 import java.util.ArrayList;
@@ -37,9 +38,13 @@ final class DshRuntimeAdvertisements {
         try {
             Path dir = directory();
             if (Files.isSymbolicLink(dir)) return;
-            Files.createDirectories(dir);
             if (dir.getFileSystem().supportedFileAttributeViews().contains("posix"))
-                Files.setPosixFilePermissions(dir, PosixFilePermissions.fromString("rwx------"));
+                Files.createDirectories(
+                        dir,
+                        PosixFilePermissions.asFileAttribute(
+                                PosixFilePermissions.fromString("rwx------")));
+            else Files.createDirectories(dir);
+            if (!trustedDirectory(dir)) return;
             JsonObject value = new JsonObject();
             value.addProperty("ownerId", owner);
             value.addProperty("pid", ProcessHandle.current().pid());
@@ -81,7 +86,7 @@ final class DshRuntimeAdvertisements {
         try {
             Path dir = directory();
             List<Path> paths = new ArrayList<>();
-            if (Files.isDirectory(dir, LinkOption.NOFOLLOW_LINKS))
+            if (trustedDirectory(dir))
                 try (var files = Files.list(dir)) {
                     paths.addAll(
                             files.filter(
@@ -123,6 +128,25 @@ final class DshRuntimeAdvertisements {
             /* Existing explicit server URLs remain usable. */
         }
         return result;
+    }
+
+    private static boolean trustedDirectory(Path dir) {
+        try {
+            if (!Files.isDirectory(dir, LinkOption.NOFOLLOW_LINKS)) return false;
+            var user =
+                    dir.getFileSystem()
+                            .getUserPrincipalLookupService()
+                            .lookupPrincipalByName(System.getProperty("user.name"));
+            if (!Files.getOwner(dir, LinkOption.NOFOLLOW_LINKS).equals(user)) return false;
+            if (dir.getFileSystem().supportedFileAttributeViews().contains("posix")) {
+                var permissions = Files.getPosixFilePermissions(dir, LinkOption.NOFOLLOW_LINKS);
+                if (permissions.contains(PosixFilePermission.GROUP_WRITE)
+                        || permissions.contains(PosixFilePermission.OTHERS_WRITE)) return false;
+            }
+            return true;
+        } catch (Exception unavailable) {
+            return false;
+        }
     }
 
     private static long modified(Path path) {

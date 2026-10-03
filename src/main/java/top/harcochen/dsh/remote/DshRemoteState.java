@@ -577,6 +577,12 @@ public final class DshRemoteState {
         control.putInteraction(item);
     }
 
+    JsonObject peekInteraction(String sessionId, String key) {
+        SessionControl control = controlBySession.get(sessionId);
+        JsonObject item = control == null ? null : control.interactions.get(key);
+        return item == null ? null : item.deepCopy();
+    }
+
     JsonObject claimInteraction(String sessionId, String key) {
         SessionControl control = controlBySession.get(sessionId);
         JsonObject item = control == null ? null : control.interactions.get(key);
@@ -970,6 +976,12 @@ public final class DshRemoteState {
             ProjectionCell cell = projections.get("userQuestions");
             JsonObject projection = cell == null ? null : DshUserQuestions.normalize(cell.value());
             if (projection == null) return;
+            Set<String> missing = new HashSet<>();
+            for (JsonElement value : projection.getAsJsonArray("settled")) {
+                String call = string(value.getAsJsonObject(), "callId");
+                if (!interactions.containsKey("u:" + call)) missing.add(call);
+            }
+            if (missing.isEmpty()) return;
             Map<String, JsonElement> calls = new HashMap<>();
             for (JsonElement value : events) {
                 JsonObject event = value.getAsJsonObject();
@@ -977,6 +989,8 @@ public final class DshRemoteState {
                         || !event.has("data")
                         || !event.get("data").isJsonObject()) continue;
                 JsonObject data = event.getAsJsonObject("data");
+                String call = string(data, "callId");
+                if (!missing.contains(call)) continue;
                 JsonElement args = data.get("arguments");
                 if (args != null && args.isJsonPrimitive())
                     try {
@@ -987,13 +1001,13 @@ public final class DshRemoteState {
                 if (args != null
                         && args.isJsonObject()
                         && DshUserQuestions.questions(args.getAsJsonObject().get("questions")))
-                    calls.put(string(data, "callId"), args.getAsJsonObject().get("questions"));
+                    calls.put(call, args.getAsJsonObject().get("questions"));
             }
             for (JsonElement value : projection.getAsJsonArray("settled")) {
                 JsonObject settled = value.getAsJsonObject();
                 String call = string(settled, "callId");
                 String key = "u:" + call;
-                if (interactions.containsKey(key) || !calls.containsKey(call)) continue;
+                if (!missing.contains(call) || !calls.containsKey(call)) continue;
                 JsonObject item = new JsonObject();
                 item.addProperty("key", key);
                 item.addProperty("kind", "question");

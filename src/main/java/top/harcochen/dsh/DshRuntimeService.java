@@ -364,6 +364,9 @@ public final class DshRuntimeService implements Disposable {
         Map<String, String> environment = executionEnvironment();
         if (settings.autonomousDebugging) {
             try {
+                DshDebugBridge previousBridge = debugBridge;
+                debugBridge = null;
+                if (previousBridge != null) previousBridge.close();
                 debugBridge =
                         new DshDebugBridge(
                                 project,
@@ -918,12 +921,11 @@ public final class DshRuntimeService implements Disposable {
                                 && (status.state == RuntimeState.RUNNING
                                         || status.state == RuntimeState.RECOVERING)) {
                             DshRuntimeEndpoint endpoint = currentEndpoint();
-                            if (endpoint != null && isRemoteHealthy(endpoint.baseUrl)) {
-                                // A wrapper may finish while its Runtime still serves. Drop process
-                                // ownership and retain the healthy discovery record instead of
-                                // spawning again.
+                            if (detachedRuntime
+                                    && endpoint != null
+                                    && isRemoteHealthy(endpoint.baseUrl)) {
+                                // Only an explicitly detached Runtime relinquishes ownership.
                                 owner.clear();
-                                detachedRuntime = true;
                                 process = null;
                                 managedHelper = null;
                                 setStatus(

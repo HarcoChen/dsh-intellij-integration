@@ -869,8 +869,10 @@ public final class DshRemoteConnection implements AutoCloseable {
     private void expireQuestion(
             String sessionId, String callId, String eventId, QuestionWait wait, long gen) {
         if (gen != generation || questionWaits.get(eventId) != wait) return;
-        JsonObject item = state.claimInteraction(sessionId, "u:" + callId);
+        JsonObject item = state.peekInteraction(sessionId, "u:" + callId);
         if (item == null || !"open".equals(string(item, "questionState"))) return;
+        item = state.claimInteraction(sessionId, "u:" + callId);
+        if (item == null) return;
         questionWaits.remove(eventId);
         wait.close();
         publish();

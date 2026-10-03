@@ -27,6 +27,7 @@ import java.util.concurrent.Flow;
 import java.util.function.Consumer;
 import org.jetbrains.annotations.NotNull;
 import top.harcochen.dsh.DshBundle;
+import top.harcochen.dsh.DshJson;
 import top.harcochen.dsh.DshRuntimeService;
 import top.harcochen.dsh.DshSettingsState;
 
@@ -105,14 +106,18 @@ public final class DshRemoteService implements Disposable {
                                 || !catalog.get("options").isJsonArray()
                                 || !catalog.has("defaultOptions")
                                 || !catalog.get("defaultOptions").isJsonArray()
-                                || stringOf(catalog, "defaultPreset") == null)
+                                || DshJson.strictString(catalog, "defaultPreset") == null)
                             throw new IllegalArgumentException("Invalid permission catalog");
                         java.util.Set<String> seen = new java.util.HashSet<>();
                         for (JsonElement item : catalog.getAsJsonArray("options")) {
-                            if (!item.isJsonObject()
-                                    || stringOf(item.getAsJsonObject(), "value") == null
-                                    || stringOf(item.getAsJsonObject(), "name") == null
-                                    || !seen.add(stringOf(item.getAsJsonObject(), "value")))
+                            if (!item.isJsonObject())
+                                throw new IllegalArgumentException("Invalid permission option");
+                            JsonObject option = item.getAsJsonObject();
+                            String optionValue = DshJson.strictString(option, "value");
+                            if (optionValue == null
+                                    || optionValue.isBlank()
+                                    || DshJson.strictString(option, "name") == null
+                                    || !seen.add(optionValue))
                                 throw new IllegalArgumentException("Invalid permission option");
                             options.add(item.deepCopy());
                         }
@@ -121,6 +126,7 @@ public final class DshRemoteService implements Disposable {
                             LOG.debug("Permission catalog unavailable", missing);
                     } catch (RuntimeException invalid) {
                         LOG.warn("Invalid permission catalog", invalid);
+                        options = new JsonArray();
                     }
                     if (!key.equals(permissionEpoch) || snapshot.generation != next.generation)
                         return;

@@ -134,11 +134,14 @@ final class DshRuntimeWorkspaceBrowser implements AutoCloseable {
                             ApplicationManager.getApplication()
                                     .invokeLater(
                                             () -> {
-                                                if (!closed && !project.isDisposed())
-                                                    new PreviewDialog(
-                                                                    session, filePath, endpoint,
-                                                                    file)
-                                                            .show();
+                                                if (closed || project.isDisposed()) return;
+                                                try {
+                                                    assertEndpoint(endpoint);
+                                                } catch (IllegalStateException stale) {
+                                                    return;
+                                                }
+                                                new PreviewDialog(session, filePath, endpoint, file)
+                                                        .show();
                                             });
                             return;
                         }
@@ -244,8 +247,13 @@ final class DshRuntimeWorkspaceBrowser implements AutoCloseable {
                                 ApplicationManager.getApplication()
                                         .invokeLater(
                                                 () -> {
-                                                    if (!disposed && !closed)
-                                                        updateText(result.text());
+                                                    if (disposed || closed) return;
+                                                    try {
+                                                        assertEndpoint(endpoint);
+                                                    } catch (IllegalStateException stale) {
+                                                        return;
+                                                    }
+                                                    updateText(result.text());
                                                 });
                             } while (dirty.get() && !disposed && !closed);
                         } catch (Exception error) {

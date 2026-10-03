@@ -67,6 +67,7 @@ public final class DshChatEditorProvider implements FileEditorProvider, DumbAwar
             this.file = file;
             DshActions.withPanel(
                     project,
+                    false,
                     host -> {
                         if (disposed) return;
                         mirror = host.createMirror();

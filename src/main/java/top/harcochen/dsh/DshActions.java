@@ -12,15 +12,23 @@ public final class DshActions {
 
     /** Reveal the tool window and hand the panel to the operation once it is up. */
     public static void withPanel(Project project, Consumer<DshToolWindowPanel> operation) {
-        openToolWindow(project);
+        withPanel(project, true, operation);
+    }
+
+    /** Obtain the shared panel, optionally revealing the tool window. */
+    public static void withPanel(
+            Project project, boolean show, Consumer<DshToolWindowPanel> operation) {
         ToolWindow window = ToolWindowManager.getInstance(project).getToolWindow("DSH");
         if (window == null) return;
-        window.show(
+        Runnable usePanel =
                 () -> {
+                    // Access initializes lazy content even while the tool window is hidden.
                     if (window.getContentManager().getContentCount() == 0) return;
                     var component = window.getContentManager().getContent(0).getComponent();
                     if (component instanceof DshToolWindowPanel panel) operation.accept(panel);
-                });
+                };
+        if (show) window.show(usePanel);
+        else usePanel.run();
     }
 
     public static void openToolWindow(Project project) {
