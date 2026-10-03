@@ -5,6 +5,10 @@
 契约逐项对照 `deepseek-harness/` 的 `dsh-v0.2.0-rc.2`，commit
 `639ed015397290b3745d163aafe02ffee4aa3f84`。Workspace 始终指 Harness 领域对象。
 
+本文记录 0.10.2 主要增量的迁移与验证，不代表整个插件已经与 companion 完全对齐。
+2026-10-03 的后续审计确认还存在历史缺口，包括 Preset 旧管理操作、自主调试、编辑器
+Tab 聊天和剩余共享锁生命周期；当前清单见 [TODO](TODO.md#current-parity-gaps--audit-2026-10-03)。
+
 ## 迁移内容
 
 - 默认 Runtime 和契约 pin 为 `0.2.0-rc.2`，兼容下限仍为 `0.1.5-rc.1`。

@@ -5,6 +5,54 @@ An item is complete only after the host action, runtime protocol, projected stat
 
 Status: `[x]` implemented, `[-]` usable but not yet at VS Code parity, `[ ]` not implemented.
 
+## Current parity gaps — audit 2026-10-03
+
+The 0.10.2 batch migrated its main new features; it does not establish complete parity
+with the whole companion extension. Earlier checked items and validation notes below
+are implementation history, not a blanket completion claim.
+
+### Present in dsh-ide, still missing or different here
+
+- [ ] **P1: Agent Preset management contract cleanup.** The native dialog still offers
+  open-directory/delete when RC.2 omits `trust`, treating the preset as user-owned.
+  It also retains copy wrappers. RC.2 exposes only list/read/select; remove those
+  obsolete actions and add the companion's explicit Make default action using
+  the available settings namespace (`selectedDefault` for agent-preset-registry).
+  This is a compatibility defect, not only a UI difference.
+- [ ] **P1: Autonomous debugger control.** Port the companion's optional local MCP
+  bridge for launch, breakpoints, stepping and inspection using IntelliJ XDebugger
+  APIs. Current Debug Context captures a read-only snapshot only.
+- [ ] **P1: Editor-tab chat.** Add an editor-area chat entry sharing the same Remote
+  service, selected Session and state as the tool window; no second chat store.
+- [-] **P1: Runtime discovery/lifecycle parity.** Advertisement read/write works,
+  but startup, orphan recovery and shutdown still use the previous shared-lock
+  lifecycle. The companion now uses per-owner advertisements and a short startup
+  mutex; migrate the remaining lifecycle and verify simultaneous editor startup,
+  wrapper exit and stale legacy records.
+- [-] **P2: IDE terminal context.** The companion captures local terminal context;
+  IntelliJ currently reports this entry unavailable. Evaluate stable public
+  terminal APIs before implementing capture; keep Runtime Terminal separate.
+- [-] **P2: Question-draft persistence.** Drafts survive Host pushes, reconnects
+  and JCEF view recreation through a bounded Project-service memory cache. They
+  do not survive restarting the IDE, unlike the companion's saved Webview state.
+
+### Also unfinished in the companion
+
+- [ ] Runtime Terminal retention, output restoration and input.
+- [ ] Plugin/Bundle installation and removal. Lists and enablement are implemented.
+
+### Remaining acceptance work
+
+- [ ] Install the ZIP in real IntelliJ IDEA/PyCharm and exercise native dialogs,
+  file previews, clipboard, drag/drop and lifecycle behavior.
+- [ ] Windows/Linux command discovery, startup/shutdown and process cleanup.
+- [ ] Cross-machine Runtime deployment and connection-loss matrix.
+- [ ] Real account sign-in, Schedule delivery, Jev/Laya and third-party plugin HMR.
+
+VS Code-specific Chat Participant/provider APIs are not copied as IntelliJ features.
+Harness Web/Desktop-only model search, Desktop command management and telemetry
+are outside this IDE port's parity target.
+
 ## P0 — everyday chat workflow
 
 - [x] Render fenced code blocks with host-owned `renderId` / `codeBlockId` payloads.
@@ -54,7 +102,7 @@ Status: `[x]` implemented, `[-]` usable but not yet at VS Code parity, `[ ]` not
 - [x] Call `settings.openDocument` for `openSettingsDocument`, falling back to the browser root.
 - [x] Project `settings.describe` and implement validated `settings.mutate` mutations.
 - [x] Replace raw JSON provider output with a native provider/status view.
-- [x] Replace raw Agent Preset text output with native list/detail/copy/edit flows.
+- [-] Agent Preset list/detail/select are native; RC.2 management cleanup remains above.
 - [x] Preserve runtime session metadata such as attention, archived state, workspace identity, and model label.
 
 ## P0 — Runtime authentication compatibility
@@ -85,7 +133,8 @@ action validation, and the user-visible failure path are wired together.
 - [x] Subagent timing: consume `subagentTiming` and show settled/active duration in the tree and preview.
   - [x] Use live control projections, including children outside the session catalog, and compare timing watermarks.
   - [x] Refresh duration and activity in both views; reject malformed, fractional, or unsafe integer durations.
-- [x] Managed Runtime distribution: cache and integrity-check the platform Runtime instead of relying only on pnpm/npx.
+- [x] Historical managed Runtime distribution implementation; automatic download is deprecated
+  as of the 0.10.2 batch in favor of local/Desktop dsh discovery.
 - [x] Conversation outline: provide a native session message navigator.
 - [x] Agent status candidates: support a validated list of status labels instead of one fixed label.
 - [-] Terminal context: deferred until IntelliJ exposes a stable shell-execution event API; do not depend on terminal plugin internals.
