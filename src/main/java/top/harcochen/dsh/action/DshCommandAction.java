@@ -29,6 +29,7 @@ public final class DshCommandAction extends DumbAwareAction {
                     case "Dsh.BrowseRuntimeFiles" -> "browseRuntimeFiles";
                     case "Dsh.RefreshRuntimeFile" -> "refreshRuntimeFile";
                     case "Dsh.ShowWhatsNew" -> "showWhatsNew";
+                    case "Dsh.OpenInEditor" -> "openInEditor";
                     case "Dsh.Diagnose" -> "diagnoseEnvironment";
                     default -> "openBrowser";
                 };

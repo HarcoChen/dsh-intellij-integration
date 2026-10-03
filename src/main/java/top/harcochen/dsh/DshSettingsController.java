@@ -98,12 +98,18 @@ final class DshSettingsController {
                         JsonObject result = remote.setPluginEnabled(target, enabled, bundle);
                         mutation.add("result", result);
                         mutation.addProperty(
+                                "restartRequired",
+                                "restart-required".equals(DshJson.string(result, "application")));
+                        mutation.addProperty(
+                                "failed", "failed".equals(DshJson.string(result, "application")));
+                        mutation.addProperty(
                                 "message",
                                 DshBundle.message(
                                         "dsh.plugin.change."
                                                 + DshJson.string(result, "application")));
                     } catch (Exception error) {
                         mutation.addProperty("message", DshJson.message(error));
+                        mutation.addProperty("failed", true);
                     }
                     synchronized (this) {
                         if (token != generation.get() || panel == null) return;

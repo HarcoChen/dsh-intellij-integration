@@ -53,3 +53,12 @@ version 0.1.0 (`795907cbdf3347f97b27c473f4f6194f5877a74d`) from the companion
 dsh-ide checkout. Its MIT license and own
 third-party notices are retained alongside the distribution. The integration
 calls a separately operated System One endpoint only when enabled.
+
+
+## dsh-ide loopback debugger MCP transport
+
+`runtime-helper/upstream/debugMcpServer.ts` is vendored from dsh-ide commit
+`deb8d8f882586c42a20abfbb5609cb0643fac309` under its retained MIT license.
+`debugProtocol.ts` supplies IDE-neutral type definitions; `runtime-helper/main.ts`
+connects this transport to IntelliJ's public debugger APIs through private stdin/stdout.
+The generated helper retains the license alongside the existing vendor distribution.

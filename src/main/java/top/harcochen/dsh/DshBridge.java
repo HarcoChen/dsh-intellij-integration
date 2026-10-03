@@ -76,7 +76,7 @@ public final class DshBridge implements Disposable {
                         if (action.isJsonObject()
                                 && "__dshSavedState"
                                         .equals(DshJson.string(action.getAsJsonObject(), "type"))) {
-                            saveState.accept(action.getAsJsonObject().get("state"));
+                            saveState.accept(action.getAsJsonObject());
                             return null;
                         }
                         ApplicationManager.getApplication()
@@ -131,9 +131,15 @@ public final class DshBridge implements Disposable {
                         + injectedPost
                         + "},"
                         + "getState:function(){return window.__dshState;},"
-                        + "setState:function(state){window.__dshState=state;"
-                        + "this.postMessage({type:'__dshSavedState',"
-                        + "state:{questionDrafts:state.questionDrafts}});}"
+                        + "setState:function(state){"
+                        + "var before=(window.__dshState||{}).questionDrafts||{};"
+                        + "var after=state.questionDrafts||{};var changes={};"
+                        + "Object.keys(before).concat(Object.keys(after)).forEach(function(key){"
+                        + "if(JSON.stringify(before[key])!==JSON.stringify(after[key]))"
+                        + "changes[key]=Object.prototype.hasOwnProperty.call(after,key)?after[key]:null;});"
+                        + "window.__dshState=state;"
+                        + "if(Object.keys(changes).length)this.postMessage({"
+                        + "type:'__dshSavedState',changes:changes});}"
                         + "};};"
                         + "</script><script>"
                         + script
@@ -151,7 +157,7 @@ public final class DshBridge implements Disposable {
                 "(function(){var value=JSON.parse('"
                         + escaped
                         + "');"
-                        + "window.__dshState=value.state||value;window.postMessage(value,'*');})();";
+                        + "window.postMessage(value,'*');})();";
         browser.getCefBrowser().executeJavaScript(script, browser.getCefBrowser().getURL(), 0);
     }
 

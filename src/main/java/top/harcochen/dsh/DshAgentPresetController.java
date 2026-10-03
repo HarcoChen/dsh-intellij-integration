@@ -137,7 +137,7 @@ final class DshAgentPresetController {
                                 value.has("presets") && value.get("presets").isJsonArray()
                                         ? value.getAsJsonArray("presets")
                                         : new JsonArray();
-                        boolean authorable = DshJson.bool(value, "authorable", false);
+                        String defaultNamespace = defaultNamespace();
                         List<String> labels = new ArrayList<>();
                         List<JsonObject> rows = new ArrayList<>();
                         for (JsonElement candidate : presets) {
@@ -155,8 +155,6 @@ final class DshAgentPresetController {
                             if (DshJson.bool(preset, "isDefault", false)) {
                                 label.append("  (default)");
                             }
-                            label.append("  \u00b7  ")
-                                    .append(DshJson.stringOr(preset, "trust", "user"));
                             String broken = DshJson.string(preset, "broken");
                             if (broken != null && !broken.isBlank()) {
                                 label.append("  \u00b7  broken");
@@ -169,7 +167,7 @@ final class DshAgentPresetController {
                             return;
                         }
                         ApplicationManager.getApplication()
-                                .invokeLater(() -> chooseAction(labels, rows, authorable));
+                                .invokeLater(() -> chooseAction(labels, rows, defaultNamespace));
                     } catch (Exception error) {
                         String message = DshJson.message(error);
                         errorSink.accept(message);
@@ -179,7 +177,7 @@ final class DshAgentPresetController {
                 });
     }
 
-    private void chooseAction(List<String> labels, List<JsonObject> rows, boolean authorable) {
+    private void chooseAction(List<String> labels, List<JsonObject> rows, String defaultNamespace) {
         int selected =
                 Messages.showChooseDialog(
                         project,
@@ -193,22 +191,17 @@ final class DshAgentPresetController {
         }
         JsonObject preset = rows.get(selected);
         String id = DshJson.string(preset, "id");
-        boolean shipped = "system".equals(DshJson.string(preset, "trust"));
         List<String> actionLabels = new ArrayList<>();
         List<String> actionIds = new ArrayList<>();
         actionLabels.add(DshBundle.message("dsh.presets.action.view.composition"));
         actionIds.add("view");
         actionLabels.add(DshBundle.message("dsh.presets.action.use.for.next.session"));
         actionIds.add("use");
-        if (authorable) {
-            actionLabels.add(DshBundle.message("dsh.presets.action.copy"));
-            actionIds.add("copy");
-        }
-        if (!shipped) {
-            actionLabels.add(DshBundle.message("dsh.presets.action.open.directory"));
-            actionIds.add("open-dir");
-            actionLabels.add(DshBundle.message("dsh.presets.action.delete"));
-            actionIds.add("delete");
+        if (defaultNamespace != null
+                && !DshJson.bool(preset, "isDefault", false)
+                && DshJson.string(preset, "broken") == null) {
+            actionLabels.add(DshBundle.message("dsh.presets.action.make.default"));
+            actionIds.add("default");
         }
         actionLabels.add(DshBundle.message("dsh.presets.action.cancel"));
         actionIds.add("cancel");
@@ -229,56 +222,48 @@ final class DshAgentPresetController {
         if (chosen < 0 || chosen >= actionIds.size()) {
             return;
         }
-        performAction(actionIds.get(chosen), preset, id);
+        performAction(actionIds.get(chosen), id, defaultNamespace);
     }
 
-    private void performAction(String action, JsonObject preset, String id) {
+    private String defaultNamespace() {
+        try {
+            JsonObject described = remote.describeSettings();
+            if (!DshJson.bool(described, "writable", false) || !described.has("namespaces"))
+                return null;
+            for (JsonElement value : described.getAsJsonArray("namespaces")) {
+                String ns = DshJson.string(value.getAsJsonObject(), "ns");
+                if ("agent-preset-registry".equals(ns) || "agent-presets".equals(ns)) return ns;
+            }
+        } catch (Exception unavailable) {
+            LOG.debug("Preset default settings unavailable", unavailable);
+        }
+        return null;
+    }
+
+    private void performAction(String action, String id, String namespace) {
         switch (action) {
-            case "copy" -> copy(id);
-            case "open-dir" ->
+            case "default" ->
                     operations.execute(
                             () -> {
                                 try {
-                                    remote.openAgentPresetDirectory(id);
+                                    JsonObject patch = new JsonObject();
+                                    patch.addProperty(
+                                            "agent-presets".equals(namespace)
+                                                    ? "default"
+                                                    : "selectedDefault",
+                                            id);
+                                    remote.updateSettings(namespace, patch);
+                                    catalog = new JsonArray();
+                                    notifyUser(DshBundle.message("dsh.presets.default.saved", id));
+                                    refreshState.run();
                                 } catch (Exception error) {
-                                    notifyUser(
-                                            DshBundle.message(
-                                                    "dsh.presets.open.failed",
-                                                    DshJson.message(error)));
+                                    notifyUser(DshJson.message(error));
                                 }
                             });
-            case "delete" -> delete(preset, id);
             case "view" -> showComposition(id);
             case "use" -> select(id);
             default -> {}
         }
-    }
-
-    private void delete(JsonObject preset, String id) {
-        int confirmed =
-                Messages.showYesNoDialog(
-                        project,
-                        DshBundle.message(
-                                "dsh.presets.delete.confirm.message",
-                                DshJson.stringOr(preset, "name", id)),
-                        DshBundle.message("dsh.presets.delete.confirm.title"),
-                        Messages.getWarningIcon());
-        if (confirmed != Messages.YES) {
-            return;
-        }
-        operations.execute(
-                () -> {
-                    try {
-                        remote.removeAgentPreset(id);
-                        catalog = new JsonArray();
-                        notifyUser(DshBundle.message("dsh.presets.delete.success", id));
-                        refreshState.run();
-                    } catch (Exception error) {
-                        notifyUser(
-                                DshBundle.message(
-                                        "dsh.presets.delete.failed", DshJson.message(error)));
-                    }
-                });
     }
 
     private void showComposition(String id) {
@@ -288,9 +273,6 @@ final class DshAgentPresetController {
                         JsonObject document = remote.readAgentPreset(id);
                         StringBuilder text = new StringBuilder();
                         text.append(DshJson.stringOr(document, "name", id)).append('\n');
-                        text.append(DshBundle.message("dsh.presets.detail.trust"))
-                                .append(DshJson.stringOr(document, "trust", "user"))
-                                .append('\n');
                         String description = DshJson.string(document, "description");
                         if (description != null && !description.isBlank()) {
                             text.append(DshBundle.message("dsh.presets.detail.description"))
@@ -306,47 +288,6 @@ final class DshAgentPresetController {
                         notifyUser(
                                 DshBundle.message(
                                         "dsh.presets.read.detail.failed", DshJson.message(error)));
-                    }
-                });
-    }
-
-    private void copy(String from) {
-        String requested =
-                Messages.showInputDialog(
-                        project,
-                        DshBundle.message("dsh.presets.copy.id.message"),
-                        DshBundle.message("dsh.presets.copy.id.title"),
-                        Messages.getQuestionIcon(),
-                        from + "-copy",
-                        null);
-        if (requested == null) {
-            return;
-        }
-        String id = requested.trim();
-        if (!id.matches("[a-z0-9][a-z0-9._-]{0,63}")) {
-            notifyUser(DshBundle.message("dsh.presets.copy.invalid.id"));
-            return;
-        }
-        String name =
-                Messages.showInputDialog(
-                        project,
-                        DshBundle.message("dsh.presets.copy.name.message"),
-                        DshBundle.message("dsh.presets.copy.name.title"),
-                        Messages.getQuestionIcon(),
-                        id,
-                        null);
-        operations.execute(
-                () -> {
-                    try {
-                        remote.copyAgentPreset(
-                                from, id, name == null || name.isBlank() ? null : name.trim());
-                        catalog = new JsonArray();
-                        notifyUser(DshBundle.message("dsh.presets.copy.success", from, id));
-                        refreshState.run();
-                    } catch (Exception error) {
-                        notifyUser(
-                                DshBundle.message(
-                                        "dsh.presets.copy.failed", DshJson.message(error)));
                     }
                 });
     }

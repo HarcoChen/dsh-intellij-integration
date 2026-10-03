@@ -37,6 +37,7 @@ public final class DshSettingsConfigurable implements Configurable {
     private JBCheckBox persistSession;
     private JBCheckBox installWhenMissing;
     private JBCheckBox useManagedRuntime;
+    private JBCheckBox autonomousDebugging;
     private JBCheckBox enableCompaction;
     private JBCheckBox jevEnabled;
     private JBTextField jevBaseUrl;
@@ -87,6 +88,7 @@ public final class DshSettingsConfigurable implements Configurable {
         installWhenMissing =
                 new JBCheckBox(DshBundle.message("dsh.settings.install.when.missing.label"));
         useManagedRuntime = new JBCheckBox(DshBundle.message("dsh.settings.managed.runtime.label"));
+        autonomousDebugging = new JBCheckBox(DshBundle.message("dsh.settings.autonomous.debug"));
         enableCompaction =
                 new JBCheckBox(DshBundle.message("dsh.settings.enable.compaction.label"));
         jevEnabled = new JBCheckBox(DshBundle.message("dsh.settings.jev.enabled"));
@@ -158,6 +160,7 @@ public final class DshSettingsConfigurable implements Configurable {
         panel.add(agentStatusLabels, labelsField);
         addCheckbox(autoStart);
         addCheckbox(persistSession);
+        addCheckbox(autonomousDebugging);
         addCheckbox(enableCompaction);
         addCheckbox(jevEnabled);
         addRow(
@@ -245,6 +248,7 @@ public final class DshSettingsConfigurable implements Configurable {
                 || persistSession.isSelected() != state.persistSession
                 || installWhenMissing.isSelected() != state.installWhenMissing
                 || useManagedRuntime.isSelected() != state.useManagedRuntime
+                || autonomousDebugging.isSelected() != state.autonomousDebugging
                 || enableCompaction.isSelected() != state.enableCompaction
                 || jevEnabled.isSelected() != state.jevEnabled
                 || !safe(jevBaseUrl.getText()).equals(safe(state.jevBaseUrl))
@@ -343,6 +347,7 @@ public final class DshSettingsConfigurable implements Configurable {
         state.persistSession = persistSession.isSelected();
         state.installWhenMissing = installWhenMissing.isSelected();
         state.useManagedRuntime = useManagedRuntime.isSelected();
+        state.autonomousDebugging = autonomousDebugging.isSelected();
         state.enableCompaction = enableCompaction.isSelected();
         state.recoveryEnabled = recoveryEnabled.isSelected();
         state.recoveryAutoPersistBundleIsolation = recoveryIsolation.isSelected();
@@ -368,6 +373,7 @@ public final class DshSettingsConfigurable implements Configurable {
         persistSession.setSelected(state.persistSession);
         installWhenMissing.setSelected(state.installWhenMissing);
         useManagedRuntime.setSelected(state.useManagedRuntime);
+        autonomousDebugging.setSelected(state.autonomousDebugging);
         enableCompaction.setSelected(state.enableCompaction);
         jevEnabled.setSelected(state.jevEnabled);
         jevBaseUrl.setText(safe(state.jevBaseUrl));

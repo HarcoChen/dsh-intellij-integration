@@ -34,13 +34,23 @@ and actions through private stdin. Prefixed stdout frames carry status, process
 identity, confirmation requests and results. Runtime output passes through the IDE's
 log redactor. Credentials are inherited in the child environment, never in launch
 arguments. Recovery storage is under the IDE system directory, keyed by project path;
-the launch lock is shared with dsh-ide in the OS temporary directory.
+discovery records are shared with dsh-ide in the OS temporary directory.
 
 Recovery is bounded and validates candidates in a sandbox before applying reversible
 fixes. Cancellation and shutdown terminate the owned process tree; an unverified
-shutdown retains the lock. Local npm upgrades and orphan migration require an IDE
-confirmation. Restoring prior recovery changes first stops the owned Runtime.
+shutdown retains ownership evidence and the Runtime advertisement. Local npm upgrades
+require an IDE confirmation. Legacy records are never reclaimed or used as process
+ownership. Restoring prior recovery changes first stops the owned Runtime.
 
 Validation uses temporary homes, loopback model stubs and upstream process integration
 scripts; this repository deliberately does not add unit tests. macOS execution has
 been verified. Windows/Linux process execution and installed-IDE UI remain manual gates.
+
+
+The loopback MCP transport additionally vendors `debugMcpServer.ts` from companion
+`deb8d8f882586c42a20abfbb5609cb0643fac309`, with IDE-neutral protocol types. Its
+bearer is passed over private stdin and inherited environment only. The Java host
+owns public debugger operations; the helper owns HTTP framing and cancellation.
+The old orphan-lock operation is removed: legacy locks are discovery hints only.
+Launcher exit after (or before) readiness retains a proven serving endpoint and
+relinquishes child ownership rather than starting another Runtime.

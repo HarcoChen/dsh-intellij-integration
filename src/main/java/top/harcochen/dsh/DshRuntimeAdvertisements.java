@@ -20,7 +20,7 @@ final class DshRuntimeAdvertisements {
     private final String owner = UUID.randomUUID().toString();
     private final long createdAt = System.currentTimeMillis();
 
-    private static Path directory() throws Exception {
+    static Path directory() throws Exception {
         String user =
                 HexFormat.of()
                         .formatHex(
@@ -80,21 +80,24 @@ final class DshRuntimeAdvertisements {
         List<DshRuntimeEndpoint> result = new ArrayList<>();
         try {
             Path dir = directory();
-            if (!Files.isDirectory(dir, LinkOption.NOFOLLOW_LINKS)) return result;
-            List<Path> paths;
-            try (var files = Files.list(dir)) {
-                paths =
-                        files.filter(
-                                        path ->
-                                                path.getFileName()
-                                                        .toString()
-                                                        .matches("[a-f0-9-]{36}\\.json"))
-                                .sorted(
-                                        Comparator.comparingLong(DshRuntimeAdvertisements::modified)
-                                                .reversed())
-                                .limit(16)
-                                .toList();
-            }
+            List<Path> paths = new ArrayList<>();
+            if (Files.isDirectory(dir, LinkOption.NOFOLLOW_LINKS))
+                try (var files = Files.list(dir)) {
+                    paths.addAll(
+                            files.filter(
+                                            path ->
+                                                    path.getFileName()
+                                                            .toString()
+                                                            .matches("[a-f0-9-]{36}\\.json"))
+                                    .sorted(
+                                            Comparator.comparingLong(
+                                                            DshRuntimeAdvertisements::modified)
+                                                    .reversed())
+                                    .limit(16)
+                                    .toList());
+                }
+            paths.add(Path.of(System.getProperty("java.io.tmpdir"), "dsh-runtime.lock"));
+            paths.add(Path.of(System.getProperty("java.io.tmpdir"), "dsh-vscode-runtime.lock"));
             for (Path path : paths) {
                 if (!Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS)
                         || Files.size(path) > 64 * 1024) continue;
@@ -105,7 +108,10 @@ final class DshRuntimeAdvertisements {
                     if (!DshRuntimeVersion.compatible(DshJson.string(record, "runtimeVersion")))
                         continue;
                     DshRuntimeEndpoint base =
-                            DshRuntimeEndpoint.parse(DshJson.string(record, "baseUrl"), true);
+                            DshRuntimeEndpoint.parse(
+                                    DshJson.stringOr(
+                                            record, "baseUrl", DshJson.string(record, "url")),
+                                    true);
                     DshRuntimeEndpoint launch =
                             DshRuntimeEndpoint.parse(DshJson.string(record, "launchUrl"), true);
                     if (base != null && launch != null && base.baseUrl.equals(launch.baseUrl))

@@ -58,6 +58,8 @@
         <projectService serviceImplementation="top.harcochen.dsh.DshRuntimeService"/>
         <projectService serviceImplementation="top.harcochen.dsh.remote.DshRemoteService"/>
         <projectService serviceImplementation="top.harcochen.dsh.DshSettingsState"/>
+        <projectService serviceImplementation="top.harcochen.dsh.DshChatDraftState"/>
+        <fileEditorProvider implementation="top.harcochen.dsh.DshChatEditorProvider"/>
         <projectConfigurable parentId="tools" id="top.harcochen.dsh.settings"
                              displayName="DeepSeek Harness"
                              instance="top.harcochen.dsh.DshSettingsConfigurable"/>
@@ -85,6 +87,7 @@
         <action id="Dsh.BrowseRuntimeFiles" class="top.harcochen.dsh.action.DshCommandAction" />
         <action id="Dsh.RefreshRuntimeFile" class="top.harcochen.dsh.action.DshCommandAction" />
         <action id="Dsh.ShowWhatsNew" class="top.harcochen.dsh.action.DshCommandAction" />
+        <action id="Dsh.OpenInEditor" class="top.harcochen.dsh.action.DshCommandAction" />
         <action id="Dsh.Diagnose" class="top.harcochen.dsh.action.DshCommandAction" />
         <action id="Dsh.AskAboutSelection" class="top.harcochen.dsh.action.DshAskAboutSelectionAction">
             <add-to-group group-id="EditorPopupMenu" anchor="last" />
@@ -95,14 +98,14 @@
         </action>
         <action id="Dsh.InsertEditorReference" class="top.harcochen.dsh.action.DshInsertEditorReferenceAction" />
         <action id="Dsh.ExplainDebugState" class="top.harcochen.dsh.action.DshExplainDebugStateAction">
-            <add-to-group group-id="XDebugger.ToolBar" anchor="last" />
+            <add-to-group group-id="XDebugger.ToolWindow.TopToolbar" anchor="last" />
         </action>
         <action id="Dsh.ExplainDiff" class="top.harcochen.dsh.action.DshGitDiffTaskAction" />
         <action id="Dsh.FixDiff" class="top.harcochen.dsh.action.DshGitDiffTaskAction" />
         <action id="Dsh.ReviewDiff" class="top.harcochen.dsh.action.DshGitDiffTaskAction" />
         <action id="Dsh.DocsDiff" class="top.harcochen.dsh.action.DshGitDiffTaskAction" />
         <group id="Dsh.GitDiffTasks" popup="true">
-            <add-to-group group-id="Vcs.ContextMenu" anchor="last" />
+            <add-to-group group-id="Vcs.Operations.Popup" anchor="last" />
             <reference ref="Dsh.ExplainDiff" />
             <reference ref="Dsh.FixDiff" />
             <reference ref="Dsh.ReviewDiff" />

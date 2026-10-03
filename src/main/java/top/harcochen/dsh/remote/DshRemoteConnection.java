@@ -550,6 +550,7 @@ public final class DshRemoteConnection implements AutoCloseable {
                     () -> {
                         if (gen != generation) return;
                         if ("settings/document-updated".equals(event)
+                                || "commands/change".equals(event)
                                 || "agent-preset/selected".equals(event)) {
                             settingsEpoch++;
                             publish();

@@ -21,6 +21,7 @@ try {
     const anchor = '        { key: "workspaces",';
     if (!header.includes(anchor)) throw new Error('Header adapter anchor changed');
     header = header.replace(anchor, [
+        '        { key: "editorTab", label: t("Open chat in editor tab"), action: { type: "openInEditor" } },',
         '        { key: "account", label: t("Manage DeepSeek account"), action: { type: "manageAccount" } },',
         '        { key: "schedules", label: t("Manage schedules"), action: { type: "manageSchedules" } },',
         '        { key: "runtimeFiles", label: t("Browse Runtime workspace files"), action: { type: "browseRuntimeFiles" }, disabled: !hasSession },',
@@ -36,6 +37,7 @@ try {
         'Manage DeepSeek account': '管理 DeepSeek 账户', 'Manage schedules': '管理日程',
         'Browse Runtime workspace files': '浏览 Runtime 工作区文件', 'Configure Jev API key': '配置 Jev API Key',
         'What’s new': '更新说明', 'Enable the Schedule bundle in plugin settings to use reminders.': '请在插件设置中启用 Schedule bundle 以使用提醒。',
+        'Open chat in editor tab': '在编辑器标签页打开聊天',
     };
     const localeAnchor = 'const ZH_CN:';
     const start = locale.indexOf('{', locale.indexOf(localeAnchor));

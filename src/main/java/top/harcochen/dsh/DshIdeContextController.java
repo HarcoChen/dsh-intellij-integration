@@ -437,6 +437,65 @@ final class DshIdeContextController {
         replaceContextItem(item);
     }
 
+    static List<String> diagnostics(Project project, VirtualFile file) {
+        Document document = FileDocumentManager.getInstance().getDocument(file);
+        if (document == null) return List.of();
+        String pathLabel = file.getPath();
+        return ReadAction.compute(
+                () -> {
+                    List<String> collected = new ArrayList<>();
+                    com.intellij.openapi.editor.markup.MarkupModel markup =
+                            com.intellij.openapi.editor.impl.DocumentMarkupModel.forDocument(
+                                    document, project, false);
+                    if (markup == null) {
+                        return collected;
+                    }
+                    List<com.intellij.openapi.editor.markup.RangeHighlighter> highlighters =
+                            new ArrayList<>(List.of(markup.getAllHighlighters()));
+                    highlighters.sort(
+                            Comparator.comparingInt(
+                                    com.intellij.openapi.editor.markup.RangeHighlighter
+                                            ::getStartOffset));
+                    for (com.intellij.openapi.editor.markup.RangeHighlighter highlighter :
+                            highlighters) {
+                        if (collected.size() >= 500) {
+                            break;
+                        }
+                        Object tooltip = highlighter.getErrorStripeTooltip();
+                        if (!(tooltip
+                                instanceof
+                                com.intellij.codeInsight.daemon.impl.HighlightInfo info)) {
+                            continue;
+                        }
+                        String description = info.getDescription();
+                        if (description == null || description.isBlank()) {
+                            continue;
+                        }
+                        if (info.getSeverity()
+                                        .compareTo(
+                                                com.intellij.lang.annotation.HighlightSeverity
+                                                        .WEAK_WARNING)
+                                < 0) {
+                            continue;
+                        }
+                        int offset = Math.min(info.getStartOffset(), document.getTextLength());
+                        int line = document.getLineNumber(offset) + 1;
+                        int column = offset - document.getLineStartOffset(line - 1) + 1;
+                        collected.add(
+                                pathLabel
+                                        + ":"
+                                        + line
+                                        + ":"
+                                        + column
+                                        + " ["
+                                        + info.getSeverity().getName()
+                                        + "] "
+                                        + description.trim());
+                    }
+                    return collected;
+                });
+    }
+
     private void attachDiagnostics() {
         Editor editor = FileEditorManager.getInstance(project).getSelectedTextEditor();
         VirtualFile file =
@@ -449,61 +508,7 @@ final class DshIdeContextController {
         }
         String pathLabel = displayPath(file);
         Document document = editor.getDocument();
-        List<String> lines =
-                ReadAction.compute(
-                        () -> {
-                            List<String> collected = new ArrayList<>();
-                            com.intellij.openapi.editor.markup.MarkupModel markup =
-                                    com.intellij.openapi.editor.impl.DocumentMarkupModel
-                                            .forDocument(document, project, false);
-                            if (markup == null) {
-                                return collected;
-                            }
-                            List<com.intellij.openapi.editor.markup.RangeHighlighter> highlighters =
-                                    new ArrayList<>(List.of(markup.getAllHighlighters()));
-                            highlighters.sort(
-                                    Comparator.comparingInt(
-                                            com.intellij.openapi.editor.markup.RangeHighlighter
-                                                    ::getStartOffset));
-                            for (com.intellij.openapi.editor.markup.RangeHighlighter highlighter :
-                                    highlighters) {
-                                if (collected.size() >= 500) {
-                                    break;
-                                }
-                                Object tooltip = highlighter.getErrorStripeTooltip();
-                                if (!(tooltip
-                                        instanceof
-                                        com.intellij.codeInsight.daemon.impl.HighlightInfo info)) {
-                                    continue;
-                                }
-                                String description = info.getDescription();
-                                if (description == null || description.isBlank()) {
-                                    continue;
-                                }
-                                if (info.getSeverity()
-                                                .compareTo(
-                                                        com.intellij.lang.annotation
-                                                                .HighlightSeverity.WEAK_WARNING)
-                                        < 0) {
-                                    continue;
-                                }
-                                int offset =
-                                        Math.min(info.getStartOffset(), document.getTextLength());
-                                int line = document.getLineNumber(offset) + 1;
-                                int column = offset - document.getLineStartOffset(line - 1) + 1;
-                                collected.add(
-                                        pathLabel
-                                                + ":"
-                                                + line
-                                                + ":"
-                                                + column
-                                                + " ["
-                                                + info.getSeverity().getName()
-                                                + "] "
-                                                + description.trim());
-                            }
-                            return collected;
-                        });
+        List<String> lines = diagnostics(project, file);
         String full =
                 lines.isEmpty()
                         ? pathLabel + ": no diagnostics reported by the IDE."

@@ -71,13 +71,10 @@ public final class DshRemoteContracts {
     public static final String AGENT_PRESETS_LIST = "agentPresets/list";
     public static final String AGENT_PRESETS_SELECT = "agentPresets/select";
     public static final String AGENT_PRESETS_READ = "agentPresets/read";
-    public static final String AGENT_PRESETS_COPY = "agentPresets/copy";
-    public static final String AGENT_PRESETS_DELETE = "agentPresets/deletePreset";
     public static final String SETTINGS_DESCRIBE = "settings/describe";
     public static final String SETTINGS_MUTATE = "settings/mutate";
     public static final String SETTINGS_UPDATE = "settings/update";
     public static final String SETTINGS_OPEN_DOCUMENT = "settings/openSettingsDocument";
-    public static final String SETTINGS_OPEN_PRESET_DIRECTORY = "settings/openAgentPresetDirectory";
     public static final String GOALS_CREATE = "goals/create";
     public static final String GOALS_EDIT = "goals/edit";
     public static final String GOALS_PAUSE = "goals/pause";
@@ -539,29 +536,6 @@ public final class DshRemoteContracts {
 
     /** `agentPresets/read(agentPreset)`. */
     public static JsonObject argsAgentPresetRead(String agentPreset) {
-        JsonObject args = new JsonObject();
-        args.addProperty("agentPreset", agentPreset);
-        return args;
-    }
-
-    /** `agentPresets/copy(from, id, name?)`. */
-    public static JsonObject argsAgentPresetCopy(String from, String id, String name) {
-        JsonObject args = new JsonObject();
-        args.addProperty("from", from);
-        args.addProperty("id", id);
-        if (name != null && !name.isBlank()) args.addProperty("name", name);
-        return args;
-    }
-
-    /** `agentPresets/deletePreset(id)`. */
-    public static JsonObject argsAgentPresetDelete(String id) {
-        JsonObject args = new JsonObject();
-        args.addProperty("id", id);
-        return args;
-    }
-
-    /** `settings/openAgentPresetDirectory(agentPreset)`. */
-    public static JsonObject argsSettingsOpenPresetDirectory(String agentPreset) {
         JsonObject args = new JsonObject();
         args.addProperty("agentPreset", agentPreset);
         return args;

@@ -225,8 +225,9 @@ public final class DshRemoteUnaryClient {
             call(DshRemoteContracts.SESSION_LIST, DshRemoteContracts.argsSessionList());
             return true;
         } catch (DshRemoteException error) {
-            return error.layer() == DshRemoteException.Layer.REMOTE
-                    || error.layer() == DshRemoteException.Layer.PROTOCOL;
+            return error.httpStatus() == 0
+                    && (error.layer() == DshRemoteException.Layer.REMOTE
+                            || (error.code() != null && error.code().startsWith("gateway/")));
         }
     }
 

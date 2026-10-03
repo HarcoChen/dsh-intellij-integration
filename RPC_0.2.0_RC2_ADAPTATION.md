@@ -5,9 +5,8 @@
 契约逐项对照 `deepseek-harness/` 的 `dsh-v0.2.0-rc.2`，commit
 `639ed015397290b3745d163aafe02ffee4aa3f84`。Workspace 始终指 Harness 领域对象。
 
-本文记录 0.10.2 主要增量的迁移与验证，不代表整个插件已经与 companion 完全对齐。
-2026-10-03 的后续审计确认还存在历史缺口，包括 Preset 旧管理操作、自主调试、编辑器
-Tab 聊天和剩余共享锁生命周期；当前清单见 [TODO](TODO.md#current-parity-gaps--audit-2026-10-03)。
+本文记录 0.10.2 迁移及后续差异补全。当前可迁移差异已经补齐；当前平台的终端 API
+和通用调试接口限制见 [TODO](TODO.md#platform-exceptions--deliberately-not-implemented)。
 
 ## 迁移内容
 
@@ -17,7 +16,7 @@ Tab 聊天和剩余共享锁生命周期；当前清单见 [TODO](TODO.md#curren
   `ASK_TIMED_OUT` rejection。普通 waterfall 回答与 `userQuestions/answer` 延迟
   回答共享 `u:<callId>` 卡片身份；连接代、原子 claim 和状态投影阻止重复或过期提交。
   延迟回答 accepted 仅表示排队，直到 durable settled 投影到达才展示已记录的回答。
-  JCEF 草稿按 Session/call 保存到 Project Remote Service 的有界内存缓存，视图重建
+  JCEF 草稿按 Session/call 保存到项目本地设置的有界缓存，视图重建和 IDE 重启
   可恢复，回答结算后清理。不会把草稿写入仓库或外部服务。
 - Jobs 使用 `job/list` 全量 roster 和 `job/follow` 非消费输出流，按绝对字节游标
   重连续读。单任务保留最多 128 Ki UTF-16 code units，缺失或截断会显示提示。
@@ -41,7 +40,7 @@ Tab 聊天和剩余共享锁生命周期；当前清单见 [TODO](TODO.md#curren
   原 Runtime，关闭即释放 watcher。IntelliJ Document 显示时统一行分隔符，不写回 Host。
 - `auto` 只发现兼容的本机或官方 Desktop 注册的 dsh，缺失时提供官方下载入口。
   停止自动 npm/CNB 安装，保留明确 pnpm/npx 启动。可读取 dsh-ide per-owner Runtime
-  广告，并只发布/撤回自己的广告；原有锁继续用于本插件拥有进程的生命周期管理。
+  广告，并只发布/撤回自己的广告；旧锁只作只读线索，不参与启动或回收；进程所有权保存在本编辑器内存中。
 - Laya/Jev 接受 HTTPS 或 localhost/127.0.0.1 HTTP，保留现有 Jev package pin。
   首次打开新插件版本时显示一次更新通知，也可从 Find Action 手动打开。
 - React bundle 从上述 companion commit 重建，保留 IntelliJ 原生账户和日程管理
@@ -80,3 +79,32 @@ Webview 与 helper 均已打包。
 IC / PC 2024.3.6 Plugin Verifier 均报告 Compatible，保留现有 deprecated API 提示。
 真实 IDE 中的 ZIP 安装、原生文件预览交互、Windows/Linux 进程执行和跨机器部署仍需
 人工验收；没有执行真实账号登录、Schedule 到期投递或第三方插件 HMR。
+
+
+## Goal 差异补全（2026-10-03）
+
+补齐 Preset 默认项、可选自主调试、编辑器 Tab、持久化问答草稿和 Runtime 生命周期。
+Preset 的 copy/delete/directory opener 已清理；不再把 RC.2 缺省 trust 解释为可编辑用户预设。
+调试通过本机带凭据的 MCP 挂到 owned Runtime，bearer 从进程环境读取，不写入 patch。
+只操作已有 IDE 配置与公共 XDebugger 操作；不支持的产品专用/DAP 选项明确报错。
+
+聊天 Tab 与工具窗口使用同一个控制器和会话状态，独立释放 JCEF 视图。草稿写入项目本地
+IDE 设置，保存的是每个视图实际发生的变更，避免空闲镜像覆盖另一视图的输入。
+旧 Runtime 锁只作为发现线索，不参与启动/回收；并发 gate 与 companion 的端口和时间界限一致。
+包装启动器提前退出时仍验证其持续服务的端点，并撤销进程所有权、保留发现记录；明确关闭
+只停止自己仍拥有的进程。健康探测拒绝普通 HTTP 错误和非法 Remote envelope。
+
+补充验证使用临时 validation plugin 和隔离 IC 2024.3.6 项目：真实 Java debug_start、断点、
+暂停、栈/变量/源码、单步、MCP 鉴权与调用；真实 RC.2 通过官方 MCP client 发现并调用 IDE 工具；
+原生 Runtime/helper/debug-server 启停、Editor FileEditor 入口、草稿状态存储。
+启动插入 patch 保持 `--profile web` 为完整参数对。另用隔离 wrapper 验证启动器退出早于
+Runtime ready 时仍不重复启动，退出 helper 保留已移交的服务。没有加入单元测试。
+
+终端例外依据为 [JetBrains SDK](https://plugins.jetbrains.com/docs/intellij/embedded-terminal.html)：
+Reworked Terminal 公共 API 从 2025.3 提供且仍实验，无法作为本插件 2024.3 的共同能力。
+完整差异清单、通用调试接口限制及仍需环境验收的项目统一在 TODO 中维护。
+
+问答草稿的真实 IDE 存储验证确认 `DshChatDrafts` 已写入项目 IDE 状态文件；同时验证
+空闲镜像的空增量不会覆盖另一视图草稿。调试上下文复用已有源码诊断读取路径。
+
+补充确认：真实 IntelliJ 重启后从本地项目状态恢复问答草稿；Preset 的默认项更改通过 RC.2 的配置 namespace 和 roster 验证。

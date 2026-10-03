@@ -84,6 +84,13 @@ final class DshSessionStateStore {
         }
     }
 
+    void clearFeatureCatalogs() {
+        synchronized (lock) {
+            commandCatalogs.clear();
+            skillCatalogs.clear();
+        }
+    }
+
     boolean hasSkillCatalog(String session) {
         synchronized (lock) {
             return skillCatalogs.containsKey(session);

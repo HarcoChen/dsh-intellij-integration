@@ -71,6 +71,24 @@ The Activity Dock also shows validated active reminders and, when the Runtime ex
 read-only plugin inventory and dynamic Cordis plugin state. Dynamic plugin stop/remove/decline
 actions are host-validated; the IDE never executes an untrusted Client-half plugin.
 
+### Chat and debug from the editor
+
+Use **DSH: Open Chat in Editor Tab** from Find Action or the chat menu. The tab mirrors
+its tool window: both share the selected Session, messages, controls and Runtime.
+Closing a tab releases its view. Question drafts are saved in the project's local
+IDE settings, including across IDE restarts; idle views do not overwrite edits.
+
+Enable **Allow Agent to control this IDE debugger** in plugin settings, then restart
+its locally owned Runtime. The Agent can start an existing Run/Debug configuration,
+manage source breakpoints, pause/resume/step, select paused threads and frames, and
+read bounded context through a local authenticated MCP endpoint. Source diagnostics
+reuse existing IDE highlights; sensitive variable values are redacted by name.
+The endpoint cannot create arbitrary launch configurations or evaluate expressions.
+Externally managed Runtimes retain their own integrations.
+
+Product-specific debugger options and terminal context on the 2024.3 baseline are
+listed with API evidence in [TODO](TODO.md#platform-exceptions--deliberately-not-implemented).
+
 ### Keep the Runtime close to your tools
 
 The plugin manages local Runtime startup, shutdown, and restart. Automatic startup discovers a compatible installed `dsh`; if none is available, it offers the official DeepSeek Desktop download. Explicit pnpm/npx launch commands remain available for advanced setups and use the configured Runtime version. You can also connect to an existing Runtime or open its Web UI in a browser.
@@ -83,7 +101,7 @@ The IDE also bundles the shared Laya/Jev Runtime integration and mounts it into 
 
 Owned local Runtimes retry after crashes and can recover through isolated validation, bounded repair attempts, and reversible bundle isolation. The status banner offers cancellation, restoration, and redacted diagnostics export. Both automatic recovery and persistent bundle isolation can be disabled in settings. The bundled Node helper runs locally; it needs Node.js 24+ even with an installed standalone `dsh`.
 
-Only a compatible Runtime advertised by an editor is reused automatically. The plugin reads dsh-ide Runtime advertisements and publishes only its own discovery record; legacy editor locks remain readable. Updating a verified local npm installation or stopping an identified abandoned Runtime requires a native confirmation dialog. Manually configured external Runtimes remain externally managed. Upgrade old Runtimes before connecting; 0.1.5 history migrations are not a downgrade path.
+Only a compatible Runtime advertised by an editor is reused automatically. The plugin reads dsh-ide Runtime advertisements and publishes only its own discovery record; legacy editor locks are read-only hints and never block startup. A short loopback gate reduces simultaneous startup races. A wrapper that exits while its Runtime still serves relinquishes ownership without causing a duplicate launch. Updating a verified local npm installation requires a native confirmation dialog. Manually configured external Runtimes remain externally managed. Upgrade old Runtimes before connecting; 0.1.5 history migrations are not a downgrade path.
 
 Optional Agent Teams show members, tasks, dependencies, and write-scope warnings in the Activity Dock. Team members use the existing subagent history, follow-up, and interrupt controls. Enable the official Team profile bundle in the Runtime to use this feature; the plugin reads its Session projection.
 
@@ -104,6 +122,7 @@ Open **Settings | Tools | DeepSeek Harness**.
 | Server URL / Port | `""` / `0` | Prefer an already running DSH Runtime; port `0` selects an available port for local startup. |
 | Auto start | `true` | Start or connect to the Runtime when the project opens. |
 | Runtime version | `0.2.0-rc.2` | Version for explicit package-manager launch commands; the minimum supported local Runtime is `0.1.5-rc.1`. |
+| Autonomous debugger | Disabled | Local MCP access to existing IDE configurations and public debugger controls; restart an owned Runtime after enabling. |
 | Laya/Jev integration | Disabled | Bundled System One integration for locally started Runtimes; the endpoint, model, and optional policies are configurable. |
 | npm registry | `https://registry.npmmirror.com` | Registry mirror used as a download fallback. |
 | Timeouts | `30s` startup, `600s` request | How long to wait for startup and individual RPC calls. |

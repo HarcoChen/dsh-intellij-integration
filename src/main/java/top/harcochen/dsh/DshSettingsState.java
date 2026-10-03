@@ -36,6 +36,7 @@ public final class DshSettingsState implements PersistentStateComponent<DshSetti
 
     public boolean recoveryEnabled = true;
     public boolean recoveryAutoPersistBundleIsolation = true;
+    public boolean autonomousDebugging = false;
 
     /** Enable the compaction command by injecting a launcher patch into web-profile launches. */
     public boolean enableCompaction = true;
@@ -97,6 +98,7 @@ public final class DshSettingsState implements PersistentStateComponent<DshSetti
         useManagedRuntime = state.useManagedRuntime;
         recoveryEnabled = state.recoveryEnabled;
         recoveryAutoPersistBundleIsolation = state.recoveryAutoPersistBundleIsolation;
+        autonomousDebugging = state.autonomousDebugging;
         enableCompaction = state.enableCompaction;
         jevEnabled = state.jevEnabled;
         jevBaseUrl =

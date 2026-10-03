@@ -67,6 +67,15 @@ final class DshPromptController {
     private static final int MAX_PENDING_PROMPTS_PER_SESSION = 64;
 
     private volatile boolean commandRegistryUnavailable;
+    private final java.util.concurrent.atomic.AtomicLong catalogEpoch =
+            new java.util.concurrent.atomic.AtomicLong();
+
+    void invalidateCatalogs() {
+        catalogEpoch.incrementAndGet();
+        commandRegistryUnavailable = false;
+        sessionState.clearFeatureCatalogs();
+    }
+
     private volatile boolean submitting;
     private volatile boolean cancelling;
     private CompletableFuture<Void> planCommandTail = CompletableFuture.completedFuture(null);
@@ -470,13 +479,16 @@ final class DshPromptController {
                 || !catalogRequests.add("commands:" + session)) {
             return;
         }
+        long epoch = catalogEpoch.get();
         operations.execute(
                 () -> {
                     try {
-                        sessionState.putCommandCatalog(session, remote.listCommands(session));
+                        JsonArray commands = remote.listCommands(session);
+                        if (epoch == catalogEpoch.get())
+                            sessionState.putCommandCatalog(session, commands);
                         stateChanged.run();
                     } catch (DshRemoteException error) {
-                        if (error.isCapabilityMissing()) {
+                        if (error.isCapabilityMissing() && epoch == catalogEpoch.get()) {
                             commandRegistryUnavailable = true;
                             LOG.info(
                                     "The connected Harness serves no command registry; using IDE commands only");
@@ -487,6 +499,7 @@ final class DshPromptController {
                         LOG.debug("DSH command catalog refresh failed", error);
                     } finally {
                         catalogRequests.remove("commands:" + session);
+                        if (epoch != catalogEpoch.get()) refreshCommandCatalog(session);
                     }
                 });
     }
@@ -497,15 +510,19 @@ final class DshPromptController {
                 || !catalogRequests.add("skills:" + session)) {
             return;
         }
+        long epoch = catalogEpoch.get();
         operations.execute(
                 () -> {
                     try {
-                        sessionState.putSkillCatalog(session, remote.listSkills(session));
+                        JsonArray skills = remote.listSkills(session);
+                        if (epoch == catalogEpoch.get())
+                            sessionState.putSkillCatalog(session, skills);
                         stateChanged.run();
                     } catch (Exception error) {
                         LOG.debug("DSH skill catalog refresh failed", error);
                     } finally {
                         catalogRequests.remove("skills:" + session);
+                        if (epoch != catalogEpoch.get()) refreshSkillCatalog(session);
                     }
                 });
     }

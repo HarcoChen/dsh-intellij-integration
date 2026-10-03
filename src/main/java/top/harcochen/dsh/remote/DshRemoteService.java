@@ -74,22 +74,13 @@ public final class DshRemoteService implements Disposable {
     private final Object listenerLock = new Object();
     private volatile JsonArray permissionOptions;
     private volatile String permissionEpoch;
-    private volatile JsonElement webviewDrafts = new JsonObject();
 
     public JsonElement webviewDrafts() {
-        return webviewDrafts.deepCopy();
+        return project.getService(top.harcochen.dsh.DshChatDraftState.class).view();
     }
 
     public void saveWebviewDrafts(JsonElement state) {
-        if (state == null || !state.isJsonObject()) return;
-        JsonElement drafts = state.getAsJsonObject().get("questionDrafts");
-        if (drafts == null
-                || !drafts.isJsonObject()
-                || drafts.toString().length() > 512_000
-                || drafts.getAsJsonObject().size() > 100) return;
-        JsonObject saved = new JsonObject();
-        saved.add("questionDrafts", drafts.deepCopy());
-        webviewDrafts = saved;
+        project.getService(top.harcochen.dsh.DshChatDraftState.class).merge(state);
     }
 
     public JsonArray permissionOptions() {
@@ -792,25 +783,6 @@ public final class DshRemoteService implements Disposable {
                 unary.call(
                         DshRemoteContracts.AGENT_PRESETS_READ,
                         DshRemoteContracts.argsAgentPresetRead(agentPreset)));
-    }
-
-    public void copyAgentPreset(String from, String agentPreset, String name)
-            throws DshRemoteException {
-        unary.call(
-                DshRemoteContracts.AGENT_PRESETS_COPY,
-                DshRemoteContracts.argsAgentPresetCopy(from, agentPreset, name));
-    }
-
-    public void removeAgentPreset(String agentPreset) throws DshRemoteException {
-        unary.call(
-                DshRemoteContracts.AGENT_PRESETS_DELETE,
-                DshRemoteContracts.argsAgentPresetDelete(agentPreset));
-    }
-
-    public void openAgentPresetDirectory(String agentPreset) throws DshRemoteException {
-        unary.call(
-                DshRemoteContracts.SETTINGS_OPEN_PRESET_DIRECTORY,
-                DshRemoteContracts.argsSettingsOpenPresetDirectory(agentPreset));
     }
 
     public JsonObject describeSettings() throws DshRemoteException {

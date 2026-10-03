@@ -1,17 +1,308 @@
 // main.ts
-var import_node_child_process3 = require("node:child_process");
-var import_node_util3 = require("node:util");
+var import_node_child_process2 = require("node:child_process");
+var import_node_util2 = require("node:util");
+var import_node_crypto12 = require("node:crypto");
 
-// upstream/runtimeLock.ts
-var import_node_net = require("node:net");
+// upstream/debugMcpServer.ts
 var import_node_crypto = require("node:crypto");
+var import_node_http = require("node:http");
+var SUPPORTED_PROTOCOL_VERSIONS = ["2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05", "2024-10-07"];
+var LATEST_PROTOCOL_VERSION = SUPPORTED_PROTOCOL_VERSIONS[0];
+var MAX_BODY_BYTES = 256 * 1024;
+var TOKEN_MIN_LENGTH = 32;
+var PARSE_ERROR = -32700;
+var INVALID_REQUEST = -32600;
+var METHOD_NOT_FOUND = -32601;
+var INVALID_PARAMS = -32602;
+var INTERNAL_ERROR = -32603;
+async function startDebugMcpServer(options) {
+  const token = options.token;
+  if (token.length < TOKEN_MIN_LENGTH) {
+    throw new Error(`debug MCP token must be at least ${TOKEN_MIN_LENGTH} characters`);
+  }
+  const host = options.host ?? "127.0.0.1";
+  const endpointPath = normalizePath(options.path ?? "/mcp");
+  const serverName = options.serverName ?? "dsh-debug";
+  const serverVersion = options.serverVersion ?? "0.0.0";
+  const log2 = options.log ?? (() => void 0);
+  const toolByName = new Map(options.tools.map((tool) => [tool.name, tool]));
+  const handler = (request, response) => {
+    void route({
+      request,
+      response,
+      token,
+      endpointPath,
+      host: () => allowedHosts(host, boundPort),
+      serverName,
+      serverVersion,
+      toolByName,
+      options,
+      log: log2
+    });
+  };
+  const server = (0, import_node_http.createServer)(handler);
+  server.on("clientError", (error) => log2(`rejected MCP client connection: ${error.message}`));
+  await new Promise((resolve6, reject) => {
+    const onError = (error) => reject(error);
+    server.once("error", onError);
+    server.listen(options.port ?? 0, host, () => {
+      server.removeListener("error", onError);
+      resolve6();
+    });
+  });
+  const address = server.address();
+  const boundPort = typeof address === "object" && address ? address.port : options.port ?? 0;
+  const url = `http://${host}:${boundPort}${endpointPath}`;
+  log2(`listening on ${url}`);
+  let stopping;
+  const stop = () => {
+    stopping = stopping ?? new Promise((resolve6) => {
+      server.close(() => resolve6());
+      server.closeAllConnections?.();
+    });
+    return stopping;
+  };
+  return { url, token, stop };
+}
+async function route(context) {
+  const { request, response } = context;
+  const method = request.method ?? "GET";
+  if (method !== "POST") {
+    respond(response, 405, { allowed: "POST" });
+    return;
+  }
+  if (requestUrl(request) !== context.endpointPath) {
+    respond(response, 404, { payload: rpcError(null, INVALID_REQUEST, "not found") });
+    return;
+  }
+  if (!authorize(request, context.token)) {
+    respond(response, 401, {
+      wwwAuthenticate: `Bearer realm="${context.serverName}"`,
+      payload: rpcError(null, INVALID_REQUEST, "missing or invalid bearer token")
+    });
+    return;
+  }
+  const hostHeader = request.headers.host;
+  if (!hostHeader || !context.host().has(hostHeader.toLowerCase())) {
+    context.log(`rejected request with Host: ${hostHeader ?? "(none)"}`);
+    respond(response, 403, { payload: rpcError(null, INVALID_REQUEST, "Host header does not match the loopback endpoint") });
+    return;
+  }
+  const protocolHeader = request.headers["mcp-protocol-version"];
+  if (typeof protocolHeader === "string" && protocolHeader.length > 0 && !SUPPORTED_PROTOCOL_VERSIONS.includes(protocolHeader)) {
+    respond(response, 400, { payload: rpcError(null, INVALID_REQUEST, `unsupported MCP-Protocol-Version ${protocolHeader}`) });
+    return;
+  }
+  const contentType = request.headers["content-type"];
+  if (typeof contentType === "string" && !contentType.toLowerCase().includes("application/json")) {
+    respond(response, 415, { payload: rpcError(null, INVALID_REQUEST, "content-type must be application/json") });
+    return;
+  }
+  const accept = request.headers.accept;
+  if (typeof accept === "string" && accept.length > 0 && !accept.includes("application/json") && !accept.includes("*/*")) {
+    respond(response, 406, { payload: rpcError(null, INVALID_REQUEST, "this endpoint serves application/json only") });
+    return;
+  }
+  const declaredLength = Number(request.headers["content-length"]);
+  if (Number.isFinite(declaredLength) && declaredLength > MAX_BODY_BYTES) {
+    respond(response, 413, { payload: rpcError(null, INVALID_REQUEST, `request body exceeds ${MAX_BODY_BYTES} bytes`) });
+    return;
+  }
+  let body;
+  try {
+    body = await readBody(request);
+  } catch (error) {
+    context.log(`body read failed: ${errorMessage(error)}`);
+    respond(response, 400, { payload: rpcError(null, PARSE_ERROR, "could not read request body") });
+    return;
+  }
+  let parsed;
+  try {
+    parsed = JSON.parse(body);
+  } catch {
+    respond(response, 400, { payload: rpcError(null, PARSE_ERROR, "request body is not valid JSON") });
+    return;
+  }
+  if (Array.isArray(parsed)) {
+    respond(response, 400, { payload: rpcError(null, INVALID_REQUEST, "batched requests are not supported") });
+    return;
+  }
+  const message = toRpcMessage(parsed);
+  if (!message) {
+    respond(response, 400, { payload: rpcError(null, INVALID_REQUEST, "expected a JSON-RPC request object") });
+    return;
+  }
+  if (message.isNotification) {
+    response.writeHead(202, { "content-type": "application/json", "cache-control": "no-store" });
+    response.end();
+    return;
+  }
+  try {
+    const result = await handleRequest(message, context);
+    if (result.error) {
+      respond(response, 200, { payload: rpcError(message.id, result.error.code, result.error.message) });
+      return;
+    }
+    respond(response, 200, { payload: { jsonrpc: "2.0", id: message.id, result: result.value } });
+  } catch (error) {
+    context.log(`request ${message.method} failed: ${errorMessage(error)}`);
+    respond(response, 200, { payload: rpcError(message.id, INTERNAL_ERROR, "internal error") });
+  }
+}
+async function handleRequest(message, context) {
+  switch (message.method) {
+    case "initialize": {
+      const requested = typeof message.params.protocolVersion === "string" ? message.params.protocolVersion : void 0;
+      const protocolVersion = requested && SUPPORTED_PROTOCOL_VERSIONS.includes(requested) ? requested : LATEST_PROTOCOL_VERSION;
+      return {
+        value: {
+          protocolVersion,
+          capabilities: { tools: { listChanged: false } },
+          serverInfo: { name: context.serverName, version: context.serverVersion },
+          instructions: "These tools drive the debugger in the IDE the agent is paired with. Start a launch configuration the user already has, set breakpoints, then wait for a pause and read debug_context."
+        }
+      };
+    }
+    case "ping":
+      return { value: {} };
+    case "tools/list":
+      return { value: { tools: context.options.tools } };
+    case "tools/call": {
+      const name = typeof message.params.name === "string" ? message.params.name : void 0;
+      if (!name) return { error: { code: INVALID_PARAMS, message: "name is required" } };
+      const tool = context.toolByName.get(name);
+      if (!tool) return { error: { code: INVALID_PARAMS, message: `unknown tool "${name}"` } };
+      const argsValue = message.params.arguments;
+      if (argsValue !== void 0 && (typeof argsValue !== "object" || argsValue === null || Array.isArray(argsValue))) {
+        return { error: { code: INVALID_PARAMS, message: "arguments must be an object" } };
+      }
+      context.log(`call ${name}`);
+      let outcome;
+      try {
+        outcome = await context.options.execute(name, argsValue ?? {});
+      } catch (error) {
+        outcome = { text: `${name} failed: ${errorMessage(error)}`, isError: true };
+      }
+      return {
+        value: {
+          content: [{ type: "text", text: outcome.text }],
+          isError: outcome.isError
+        }
+      };
+    }
+    default:
+      return { error: { code: METHOD_NOT_FOUND, message: `method ${message.method} is not supported` } };
+  }
+}
+function readBody(request) {
+  return new Promise((resolve6, reject) => {
+    const chunks = [];
+    let size = 0;
+    request.on("data", (chunk) => {
+      size += chunk.length;
+      if (size > MAX_BODY_BYTES) {
+        reject(new Error("request body too large"));
+        request.destroy();
+        return;
+      }
+      chunks.push(chunk);
+    });
+    request.on("error", reject);
+    request.on("end", () => resolve6(Buffer.concat(chunks).toString("utf8")));
+  });
+}
+function toRpcMessage(value) {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return void 0;
+  const record = value;
+  if (record.jsonrpc !== "2.0" || typeof record.method !== "string") return void 0;
+  const id = record.id;
+  const hasId = typeof id === "string" || typeof id === "number" || id === null;
+  return {
+    method: record.method,
+    params: typeof record.params === "object" && record.params !== null && !Array.isArray(record.params) ? record.params : {},
+    id: hasId ? id : null,
+    isNotification: !hasId || record.method.startsWith("notifications/")
+  };
+}
+function authorize(request, token) {
+  const header = request.headers.authorization;
+  if (typeof header !== "string" || !header.toLowerCase().startsWith("bearer ")) return false;
+  return secretsMatch(header.slice(7).trim(), token);
+}
+function secretsMatch(presented, expected) {
+  const left = Buffer.from(presented, "utf8");
+  const right = Buffer.from(expected, "utf8");
+  if (left.length !== right.length) return false;
+  return (0, import_node_crypto.timingSafeEqual)(left, right);
+}
+function allowedHosts(host, port) {
+  const targets = /* @__PURE__ */ new Set([`${host}:${port}`, `localhost:${port}`, `127.0.0.1:${port}`, `[::1]:${port}`]);
+  if (host.startsWith("[")) targets.add(host);
+  return targets;
+}
+function requestUrl(request) {
+  const raw = request.url ?? "/";
+  const index = raw.indexOf("?");
+  return index === -1 ? raw : raw.slice(0, index);
+}
+function normalizePath(value) {
+  const trimmed = value.startsWith("/") ? value : `/${value}`;
+  return trimmed.length > 1 && trimmed.endsWith("/") ? trimmed.slice(0, -1) : trimmed;
+}
+function respond(response, status, init = {}) {
+  const headers = {
+    "content-type": "application/json",
+    "cache-control": "no-store"
+  };
+  if (init.allowed) headers.allow = init.allowed;
+  if (init.wwwAuthenticate) headers["www-authenticate"] = init.wwwAuthenticate;
+  const body = init.payload === void 0 ? "" : JSON.stringify(init.payload);
+  if (body) headers["content-length"] = String(Buffer.byteLength(body, "utf8"));
+  response.writeHead(status, headers);
+  response.end(body);
+}
+function rpcError(id, code, message) {
+  return {
+    jsonrpc: "2.0",
+    id,
+    error: { code, message }
+  };
+}
+function errorMessage(error) {
+  return error instanceof Error ? error.message : String(error);
+}
+
+// upstream/localRuntimeUpgrade.ts
 var import_promises = require("node:fs/promises");
 var import_node_path = require("node:path");
 
-// upstream/localize.ts
-function t(value, args = {}) {
-  return value.replace(/\{([^}]+)\}/g, (match, key) => key in args ? String(args[key]) : match);
+// upstream/localUi.ts
+var import_node_crypto2 = require("node:crypto");
+var pending = /* @__PURE__ */ new Map();
+function acceptReply(message) {
+  if (message.type === "prompt-result") {
+    pending.get(message.id)?.(message.value);
+    pending.delete(message.id);
+  }
 }
+function prompt(message, options, detail) {
+  const id = (0, import_node_crypto2.randomUUID)();
+  process.stdout.write("\nDSH_INTELLIJ_HELPER " + JSON.stringify({ event: "prompt", value: { id, message, detail, options } }) + "\n");
+  return new Promise((resolve6) => pending.set(id, resolve6));
+}
+var ProgressLocation = { Notification: 1 };
+var window = {
+  showWarningMessage(message, config, ...options) {
+    return prompt(message, options, config.detail);
+  },
+  async withProgress(_options, task) {
+    return task({}, { isCancellationRequested: false, onCancellationRequested: () => ({ dispose() {
+    } }) });
+  }
+};
+var env = { clipboard: { async writeText(text) {
+  process.stdout.write("\nDSH_INTELLIJ_HELPER " + JSON.stringify({ event: "clipboard", value: { text } }) + "\n");
+} } };
 
 // upstream/runtimeProcess.ts
 var import_node_child_process = require("node:child_process");
@@ -115,338 +406,10 @@ function terminateOwnedRuntime(child2) {
   return ownership.termination;
 }
 
-// upstream/runtimeLock.ts
-function validPid(value) {
-  return typeof value === "number" && Number.isSafeInteger(value) && value > 0;
+// upstream/localize.ts
+function t(value, args = {}) {
+  return value.replace(/\{([^}]+)\}/g, (match, key) => key in args ? String(args[key]) : match);
 }
-function exactRuntimeVersion(value) {
-  return typeof value === "string" && /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/u.test(value);
-}
-function processHasExited(pid) {
-  try {
-    process.kill(pid, 0);
-    return false;
-  } catch (error) {
-    return error.code === "ESRCH";
-  }
-}
-async function readRuntimeLock(path) {
-  try {
-    const stat2 = await (0, import_promises.lstat)(path);
-    if (!stat2.isFile()) return { path, stat: stat2, contents: "" };
-    const contents = await (0, import_promises.readFile)(path, "utf8");
-    let record;
-    try {
-      const value = JSON.parse(contents);
-      if (typeof value === "object" && value !== null && !Array.isArray(value)) {
-        const raw = value;
-        if (validPid(raw.pid) && (raw.runtimePid === void 0 || validPid(raw.runtimePid)) && (raw.runtimeProcess === void 0 || raw.runtimeProcess === "direct" || raw.runtimeProcess === "wrapper") && (raw.runtimeProcessGroup === void 0 || validPid(raw.runtimeProcessGroup) && raw.runtimeProcessGroup === raw.runtimePid) && (raw.runtimeVersion === void 0 || exactRuntimeVersion(raw.runtimeVersion)) && (raw.ownerId === void 0 || typeof raw.ownerId === "string" && raw.ownerId.length > 0) && (raw.compositionHash === void 0 || typeof raw.compositionHash === "string" && /^[a-f0-9]{64}$/u.test(raw.compositionHash)) && (raw.recoverySessionId === void 0 || typeof raw.recoverySessionId === "string" && raw.recoverySessionId.length > 0) && (raw.url === void 0 || typeof raw.url === "string") && (raw.launchUrl === void 0 || typeof raw.launchUrl === "string")) record = raw;
-      }
-    } catch {
-    }
-    return { path, stat: stat2, contents, record };
-  } catch (error) {
-    if (error.code === "ENOENT") return void 0;
-    throw error;
-  }
-}
-async function listenerHasExited(address) {
-  let url;
-  try {
-    url = new URL(address);
-  } catch {
-    return false;
-  }
-  if (url.protocol !== "http:" || !url.port || url.username || url.password || !["127.0.0.1", "localhost", "0.0.0.0", "[::1]"].includes(url.hostname)) return false;
-  if (url.hostname === "localhost") return false;
-  const host = url.hostname === "[::1]" ? "::1" : url.hostname === "0.0.0.0" ? "127.0.0.1" : url.hostname;
-  return new Promise((resolve6) => {
-    const socket = (0, import_node_net.createConnection)({ host, port: Number(url.port) });
-    const finish = (exited) => {
-      socket.destroy();
-      resolve6(exited);
-    };
-    socket.setTimeout(1e3, () => finish(false));
-    socket.once("connect", () => finish(false));
-    socket.once("error", (error) => finish(error.code === "ECONNREFUSED"));
-  });
-}
-async function runtimeHasExited(record) {
-  if (record.runtimeProcessGroup !== void 0) {
-    if (!await processGroupHasExited(record.runtimeProcessGroup)) return false;
-  } else if (record.runtimePid !== void 0 && !processHasExited(record.runtimePid)) return false;
-  const address = record.url ?? record.launchUrl;
-  if (!address) return record.runtimeProcessGroup !== void 0 || record.runtimePid !== void 0 && record.runtimeProcess === "direct";
-  if (record.url && record.launchUrl) {
-    try {
-      if (new URL(record.url).origin !== new URL(record.launchUrl).origin) return false;
-    } catch {
-      return false;
-    }
-  }
-  return listenerHasExited(address);
-}
-function sameRuntimeLockFile(left, right) {
-  return left.dev === right.dev && left.ino === right.ino && right.isFile();
-}
-async function acquireMutationGate(path, deadline) {
-  const canonical = (0, import_node_path.join)(await (0, import_promises.realpath)((0, import_node_path.dirname)(path)), (0, import_node_path.basename)(path));
-  const key = process.platform === "win32" ? canonical.toLowerCase() : canonical;
-  const port = 16384 + (0, import_node_crypto.createHash)("sha256").update(key).digest().readUInt32BE(0) % 16384;
-  while (true) {
-    const server = (0, import_node_net.createServer)((socket) => socket.destroy());
-    try {
-      await new Promise((resolve6, reject) => {
-        server.once("error", reject);
-        server.listen({ host: "127.0.0.1", port, exclusive: true }, () => {
-          server.removeListener("error", reject);
-          resolve6();
-        });
-      });
-      return server;
-    } catch (error) {
-      server.close();
-      if (error.code !== "EADDRINUSE") throw error;
-      if (Date.now() >= deadline) throw new Error(t("DSH Runtime lock recovery is busy: {path}. Retry shortly.", { path }));
-      await new Promise((resolve6) => setTimeout(resolve6, 25));
-    }
-  }
-}
-async function mutateRuntimeLock(path, action) {
-  const gate = await acquireMutationGate(path, Date.now() + 2e3);
-  try {
-    return await mutateRuntimeLockWithGate(path, action);
-  } finally {
-    await new Promise((resolve6, reject) => gate.close((error) => error ? reject(error) : resolve6()));
-  }
-}
-async function mutateRuntimeLockWithGate(path, action) {
-  const guardPath = `${path}.mutation`;
-  const deadline = Date.now() + 2e3;
-  const contents = JSON.stringify({ pid: process.pid, createdAt: Date.now(), ownerId: (0, import_node_crypto.randomUUID)() });
-  let guard;
-  while (!guard) {
-    try {
-      guard = await publishMutationGuard(guardPath, contents);
-    } catch (error) {
-      if (error.code !== "EEXIST") throw error;
-      const abandoned = await readRuntimeLock(guardPath);
-      if (!abandoned) continue;
-      if (abandoned.record && processHasExited(abandoned.record.pid) && await removeRuntimeLock(abandoned)) continue;
-      if (Date.now() >= deadline) {
-        throw new Error(t("DSH Runtime lock mutation is busy or abandoned: {path}. Retry; if it persists, verify its owner has exited before manual cleanup.", { path: guardPath }));
-      }
-      await new Promise((resolve6) => setTimeout(resolve6, 25));
-    }
-  }
-  try {
-    return await action();
-  } finally {
-    const stat2 = await guard.stat();
-    await guard.close();
-    const current = await readRuntimeLock(guardPath);
-    if (current && current.contents === contents && sameRuntimeLockFile(stat2, current.stat)) await removeRuntimeLock(current);
-  }
-}
-async function publishMutationGuard(path, contents) {
-  const staging = `${path}.${(0, import_node_crypto.randomUUID)()}.tmp`;
-  const handle = await (0, import_promises.open)(staging, "wx", 384);
-  let published = false;
-  try {
-    await handle.writeFile(contents, "utf8");
-    await (0, import_promises.link)(staging, path);
-    published = true;
-    await (0, import_promises.unlink)(staging);
-    return handle;
-  } catch (error) {
-    const stat2 = await handle.stat().finally(() => handle.close());
-    if (published) {
-      const current = await readRuntimeLock(path);
-      if (current && sameRuntimeLockFile(stat2, current.stat) && current.contents === contents) {
-        await removeRuntimeLock(current);
-      }
-    }
-    await (0, import_promises.unlink)(staging).catch(() => void 0);
-    throw error;
-  }
-}
-async function removeRuntimeLock(snapshot) {
-  const current = await readRuntimeLock(snapshot.path);
-  if (!current || !sameRuntimeLockFile(snapshot.stat, current.stat) || current.contents !== snapshot.contents) return false;
-  try {
-    await (0, import_promises.unlink)(snapshot.path);
-    return true;
-  } catch (error) {
-    if (error.code === "ENOENT") return false;
-    throw error;
-  }
-}
-
-// upstream/runtimeMigration.ts
-var import_node_child_process2 = require("node:child_process");
-var import_node_util2 = require("node:util");
-
-// upstream/remote/errors.ts
-var RemoteError = class _RemoteError extends Error {
-  /** Structural marker preserved across duplicate bundles/realms. */
-  isDSHRemoteError = true;
-  code;
-  details;
-  endpoint;
-  constructor(code, message, details = {}, endpoint) {
-    super(message);
-    this.name = "RemoteError";
-    this.code = code;
-    this.details = details;
-    this.endpoint = endpoint;
-  }
-  static fromFailure(failure, endpoint) {
-    return new _RemoteError(failure.code, failure.message, failure.details, endpoint);
-  }
-};
-var RemoteHttpError = class extends Error {
-  constructor(endpoint, status, message = httpMessage(endpoint, status)) {
-    super(message);
-    this.endpoint = endpoint;
-    this.status = status;
-    this.name = "RemoteHttpError";
-  }
-  get isAuthenticationFailure() {
-    return this.status === 401 || this.status === 403;
-  }
-};
-var RemoteProtocolError = class extends Error {
-  constructor(message, options) {
-    super(message, options);
-    this.name = "RemoteProtocolError";
-  }
-};
-function isAbortError(error) {
-  return error instanceof DOMException && error.name === "AbortError" || error instanceof Error && error.name === "AbortError";
-}
-function httpMessage(endpoint, status) {
-  if (status === 401) return `Remote RPC ${endpoint} requires authentication (HTTP 401)`;
-  if (status === 403) return `Remote RPC ${endpoint} is not authorized (HTTP 403)`;
-  if (status === 404) return `Remote RPC ${endpoint} is unavailable (HTTP 404)`;
-  return `Remote RPC ${endpoint} returned HTTP ${status}`;
-}
-
-// upstream/runtimeMigration.ts
-var exec = (0, import_node_util2.promisify)(import_node_child_process2.execFile);
-function migrationUrl(snapshot) {
-  try {
-    const url = new URL(snapshot.record?.url ?? snapshot.record?.launchUrl ?? "");
-    if (url.protocol !== "http:" || !url.port || url.username || url.password || url.hash || url.pathname !== "/" || !["127.0.0.1", "[::1]", "localhost"].includes(url.hostname)) return void 0;
-    return url;
-  } catch {
-    return void 0;
-  }
-}
-async function listenerIdentity(port) {
-  try {
-    if (process.platform === "win32") {
-      const script = `$pids = @(Get-NetTCPConnection -LocalPort ${port} -State Listen -ErrorAction Stop | Select-Object -ExpandProperty OwningProcess -Unique); if ($pids.Count -ne 1) { exit 2 }; $p = Get-CimInstance Win32_Process -Filter ("ProcessId=" + $pids[0]); @{pid=$p.ProcessId; command=$p.CommandLine; born=$p.CreationDate.ToString("o")} | ConvertTo-Json -Compress`;
-      const { stdout: stdout2 } = await exec("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", script], { timeout: 3e3, windowsHide: true });
-      const value = JSON.parse(stdout2);
-      if (!Number.isSafeInteger(value.pid) || Number(value.pid) <= 0 || typeof value.command !== "string" || typeof value.born !== "string") return void 0;
-      return { pid: Number(value.pid), command: value.command, signature: `${value.born}
-${value.command}` };
-    }
-    const { stdout } = await exec("lsof", ["-nP", "-a", `-iTCP:${port}`, "-sTCP:LISTEN", "-Fp"], { timeout: 2e3 });
-    const pids = [...new Set(stdout.split("\n").filter((line) => /^p\d+$/u.test(line)).map((line) => Number(line.slice(1))))];
-    if (pids.length !== 1 || pids[0] <= 0) return void 0;
-    const { stdout: signature } = await exec("ps", ["-p", String(pids[0]), "-o", "lstart=,args="], { timeout: 2e3 });
-    const { stdout: command } = await exec("ps", ["-p", String(pids[0]), "-o", "args="], { timeout: 2e3 });
-    return { pid: pids[0], signature: signature.trim(), command: command.trim() };
-  } catch {
-    return void 0;
-  }
-}
-async function inspectLegacyRuntime(snapshot) {
-  if (!snapshot.record || !processHasExited(snapshot.record.pid)) return void 0;
-  const url = migrationUrl(snapshot);
-  if (!url) return void 0;
-  const candidate = await listenerIdentity(Number(url.port));
-  if (!candidate || candidate.pid === process.pid) return void 0;
-  const command = candidate.command.replace(/\\/gu, "/");
-  if (!/^(?:"[^"]*\/node(?:\.exe)?"|\S*\bnode(?:\.exe)?)\s+(?:"[^"\r\n]*\/@deepseek-ai\/dsh\/lib\/bin\.js"|[^\s"\r\n]*\/@deepseek-ai\/dsh\/lib\/bin\.js)(?:\s|$)/u.test(command)) return void 0;
-  return { pid: candidate.pid, signature: candidate.signature, baseUrl: url.origin };
-}
-async function stopLegacyRuntime(snapshot, approved, sharedLockPath, signal) {
-  signal?.throwIfAborted();
-  await mutateRuntimeLock(sharedLockPath, async () => {
-    signal?.throwIfAborted();
-    const current = await readRuntimeLock(snapshot.path);
-    if (!current || !sameRuntimeLockFile(snapshot.stat, current.stat) || current.contents !== snapshot.contents) {
-      throw new Error(t("The Runtime lock changed while awaiting confirmation. Retry without stopping any process."));
-    }
-    const actual = await inspectLegacyRuntime(current);
-    if (!actual || actual.pid !== approved.pid || actual.signature !== approved.signature || actual.baseUrl !== approved.baseUrl) {
-      throw new Error(t("The old Runtime process changed or its owner is still alive. No process was stopped."));
-    }
-    signal?.throwIfAborted();
-    process.kill(actual.pid, "SIGTERM");
-    const deadline = Date.now() + 3e3;
-    while (Date.now() < deadline && (!processHasExited(actual.pid) || !await runtimeHasExited(current.record))) {
-      await new Promise((resolve6) => setTimeout(resolve6, 50));
-    }
-    if (!processHasExited(actual.pid)) {
-      const latest = await readRuntimeLock(snapshot.path);
-      const remaining = latest && latest.contents === current.contents && sameRuntimeLockFile(current.stat, latest.stat) ? await inspectLegacyRuntime(latest) : void 0;
-      if (!remaining || remaining.pid !== actual.pid || remaining.signature !== actual.signature || remaining.baseUrl !== actual.baseUrl) {
-        throw new Error(t("The old Runtime process changed or its owner is still alive. No process was stopped."));
-      }
-      signal?.throwIfAborted();
-      try {
-        process.kill(actual.pid, "SIGKILL");
-      } catch (error) {
-        if (error.code !== "ESRCH") throw error;
-      }
-      const forceDeadline = Date.now() + 3e3;
-      while (Date.now() < forceDeadline && !processHasExited(actual.pid)) {
-        await new Promise((resolve6) => setTimeout(resolve6, 50));
-      }
-    }
-    if (!processHasExited(actual.pid) || !await runtimeHasExited(current.record)) {
-      throw new Error(t("The old Runtime or its listener is still running. Its shared lock was retained. Retry after it exits."));
-    }
-    if (!await removeRuntimeLock(current)) {
-      throw new Error(t("The Runtime stopped, but its lock changed. Retry to inspect the current lock."));
-    }
-  });
-}
-
-// upstream/localRuntimeUpgrade.ts
-var import_promises2 = require("node:fs/promises");
-var import_node_path2 = require("node:path");
-
-// upstream/localUi.ts
-var import_node_crypto2 = require("node:crypto");
-var pending = /* @__PURE__ */ new Map();
-function acceptReply(message) {
-  if (message.type === "prompt-result") {
-    pending.get(message.id)?.(message.value);
-    pending.delete(message.id);
-  }
-}
-function prompt(message, options, detail) {
-  const id = (0, import_node_crypto2.randomUUID)();
-  process.stdout.write("\nDSH_INTELLIJ_HELPER " + JSON.stringify({ event: "prompt", value: { id, message, detail, options } }) + "\n");
-  return new Promise((resolve6) => pending.set(id, resolve6));
-}
-var ProgressLocation = { Notification: 1 };
-var window = {
-  showWarningMessage(message, config, ...options) {
-    return prompt(message, options, config.detail);
-  },
-  async withProgress(_options, task) {
-    return task({}, { isCancellationRequested: false, onCancellationRequested: () => ({ dispose() {
-    } }) });
-  }
-};
-var env = { clipboard: { async writeText(text) {
-  process.stdout.write("\nDSH_INTELLIJ_HELPER " + JSON.stringify({ event: "clipboard", value: { text } }) + "\n");
-} } };
 
 // upstream/runtimeVersion.ts
 function parseVersion(value) {
@@ -493,25 +456,25 @@ function isSupportedRuntimeVersion(version) {
 var PACKAGE = "@deepseek-ai/dsh";
 async function npmInstallation(command, npm, prefix, node) {
   try {
-    if (!(0, import_node_path2.isAbsolute)(prefix)) return void 0;
-    const packageRoot = (0, import_node_path2.join)(prefix, ...process.platform === "win32" ? [] : ["lib"], "node_modules", PACKAGE);
-    const manifest = JSON.parse(await (0, import_promises2.readFile)((0, import_node_path2.join)(packageRoot, "package.json"), "utf8"));
+    if (!(0, import_node_path.isAbsolute)(prefix)) return void 0;
+    const packageRoot = (0, import_node_path.join)(prefix, ...process.platform === "win32" ? [] : ["lib"], "node_modules", PACKAGE);
+    const manifest = JSON.parse(await (0, import_promises.readFile)((0, import_node_path.join)(packageRoot, "package.json"), "utf8"));
     const bin = typeof manifest.bin === "string" ? manifest.bin : manifest.bin?.dsh;
     if (manifest.name !== PACKAGE || typeof bin !== "string") return void 0;
-    const entry = await (0, import_promises2.realpath)((0, import_node_path2.resolve)(packageRoot, bin));
-    const withinPackage = (0, import_node_path2.relative)(await (0, import_promises2.realpath)(packageRoot), entry);
-    if (withinPackage.startsWith("..") || (0, import_node_path2.isAbsolute)(withinPackage)) return void 0;
-    const commandPath = await (0, import_promises2.realpath)(command);
+    const entry = await (0, import_promises.realpath)((0, import_node_path.resolve)(packageRoot, bin));
+    const withinPackage = (0, import_node_path.relative)(await (0, import_promises.realpath)(packageRoot), entry);
+    if (withinPackage.startsWith("..") || (0, import_node_path.isAbsolute)(withinPackage)) return void 0;
+    const commandPath = await (0, import_promises.realpath)(command);
     if (process.platform === "win32") {
-      if ((0, import_node_path2.resolve)((0, import_node_path2.dirname)(command)).toLowerCase() !== (0, import_node_path2.resolve)(prefix).toLowerCase()) return void 0;
-      const shim = (await (0, import_promises2.readFile)(command, "utf8")).replaceAll("\\", "/");
+      if ((0, import_node_path.resolve)((0, import_node_path.dirname)(command)).toLowerCase() !== (0, import_node_path.resolve)(prefix).toLowerCase()) return void 0;
+      const shim = (await (0, import_promises.readFile)(command, "utf8")).replaceAll("\\", "/");
       if (!shim.includes(`node_modules/${PACKAGE}/${bin.replaceAll("\\", "/")}`)) return void 0;
     } else if (commandPath !== entry) return void 0;
-    const cli = process.platform === "win32" ? await (0, import_promises2.realpath)((0, import_node_path2.join)((0, import_node_path2.dirname)(npm), "node_modules", "npm", "bin", "npm-cli.js")) : await (0, import_promises2.realpath)(npm);
+    const cli = process.platform === "win32" ? await (0, import_promises.realpath)((0, import_node_path.join)((0, import_node_path.dirname)(npm), "node_modules", "npm", "bin", "npm-cli.js")) : await (0, import_promises.realpath)(npm);
     if (!cli.endsWith(`${process.platform === "win32" ? "\\" : "/"}npm-cli.js`)) return void 0;
-    const npmManifest = JSON.parse(await (0, import_promises2.readFile)((0, import_node_path2.join)((0, import_node_path2.dirname)(cli), "..", "package.json"), "utf8"));
+    const npmManifest = JSON.parse(await (0, import_promises.readFile)((0, import_node_path.join)((0, import_node_path.dirname)(cli), "..", "package.json"), "utf8"));
     if (npmManifest.name !== "npm") return void 0;
-    return { prefix, cli, entry, node: (0, import_node_path2.resolve)(node) };
+    return { prefix, cli, entry, node: (0, import_node_path.resolve)(node) };
   } catch {
     return void 0;
   }
@@ -661,9 +624,9 @@ function isRecord(value) {
 
 // upstream/recovery/composition.ts
 var import_node_crypto3 = require("node:crypto");
-var import_promises3 = require("node:fs/promises");
+var import_promises2 = require("node:fs/promises");
 var import_node_os = require("node:os");
-var import_node_path3 = require("node:path");
+var import_node_path2 = require("node:path");
 var SECRET_NAME = /(?:api[-_]?key|auth|credential|password|secret|token|cookie|private[-_]?key)/iu;
 var SECRET_FILE = /(?:^|[\\/])(?:\.env(?:\.[^\\/]+)?|\.credentials(?:\.[^\\/]+)?|.*secret.*)$/iu;
 var INSTALLATION_BUNDLES = /* @__PURE__ */ new Set([
@@ -688,11 +651,11 @@ function stableValue(value) {
   return value;
 }
 function normalizedPath(path) {
-  const normalized2 = (0, import_node_path3.normalize)((0, import_node_path3.resolve)(path)).replace(/\\/gu, "/");
+  const normalized2 = (0, import_node_path2.normalize)((0, import_node_path2.resolve)(path)).replace(/\\/gu, "/");
   return process.platform === "win32" ? normalized2.toLowerCase() : normalized2;
 }
 function secretPath(path) {
-  return SECRET_FILE.test(path) || SECRET_NAME.test((0, import_node_path3.basename)(path));
+  return SECRET_FILE.test(path) || SECRET_NAME.test((0, import_node_path2.basename)(path));
 }
 function safeEnvironment() {
   const entries = Object.entries(process.env);
@@ -702,7 +665,7 @@ function safeEnvironment() {
   const stableValuesHash = sha256(JSON.stringify(safeValues));
   return {
     cwd: normalizedPath(process.cwd()),
-    dshHome: normalizedPath(process.env.DSH_HOME || (0, import_node_path3.join)((0, import_node_os.homedir)(), ".dsh")),
+    dshHome: normalizedPath(process.env.DSH_HOME || (0, import_node_path2.join)((0, import_node_os.homedir)(), ".dsh")),
     platform: process.platform,
     arch: process.arch,
     nodeVersion: process.versions.node,
@@ -714,7 +677,7 @@ function safeEnvironment() {
 async function fingerprintPath(path) {
   const normalized2 = normalizedPath(path);
   try {
-    const stat2 = await (0, import_promises3.lstat)(path);
+    const stat2 = await (0, import_promises2.lstat)(path);
     if (stat2.isSymbolicLink()) {
       return { path: normalized2, kind: "link", mtimeMs: stat2.mtimeMs };
     }
@@ -731,7 +694,7 @@ async function fingerprintPath(path) {
       };
     }
     if (stat2.size > MAX_HASHED_FILE_BYTES) return fingerprint;
-    return { ...fingerprint, contentHash: sha256(await (0, import_promises3.readFile)(path)) };
+    return { ...fingerprint, contentHash: sha256(await (0, import_promises2.readFile)(path)) };
   } catch (error) {
     if (error.code === "ENOENT") {
       return { path: normalized2, kind: "missing" };
@@ -767,12 +730,12 @@ function parsePatchLayer(path, order, extensionOverlayPaths, recoveryOverlayPath
     kind,
     path: normalized2,
     order,
-    sourceLabel: (0, import_node_path3.basename)(path)
+    sourceLabel: (0, import_node_path2.basename)(path)
   };
 }
 async function readPackageJson(path) {
   try {
-    const value = JSON.parse(await (0, import_promises3.readFile)(path, "utf8"));
+    const value = JSON.parse(await (0, import_promises2.readFile)(path, "utf8"));
     return isRecord(value) ? value : void 0;
   } catch {
     return void 0;
@@ -782,15 +745,15 @@ async function resolveBundle(packageName, profileDir) {
   if (INSTALLATION_BUNDLES.has(packageName)) {
     return { packageName, origin: "installation", selected: true };
   }
-  const packageDir = (0, import_node_path3.join)(profileDir, "node_modules", packageName);
-  const packageJsonPath = (0, import_node_path3.join)(packageDir, "package.json");
+  const packageDir = (0, import_node_path2.join)(profileDir, "node_modules", packageName);
+  const packageJsonPath = (0, import_node_path2.join)(packageDir, "package.json");
   const packageJson = await readPackageJson(packageJsonPath);
   const packageExists = (await fingerprintPath(packageDir)).kind !== "missing";
   const packageHash = packageJson ? sha256(JSON.stringify(stableValue(packageJson))) : void 0;
   const dsh = packageJson?.dsh;
   const bundle = isRecord(dsh) ? dsh.bundle : void 0;
   const patchValue = isRecord(bundle) ? bundle.patch : void 0;
-  const patchPath = typeof patchValue === "string" ? (0, import_node_path3.resolve)(packageDir, patchValue) : void 0;
+  const patchPath = typeof patchValue === "string" ? (0, import_node_path2.resolve)(packageDir, patchValue) : void 0;
   const patchFingerprint = patchPath ? await fingerprintPath(patchPath) : void 0;
   return {
     packageName,
@@ -861,11 +824,11 @@ function recomputeComposition(composition, changes) {
   };
 }
 async function buildComposition(input2) {
-  const dshHome = (0, import_node_path3.resolve)(input2.dshHome || process.env.DSH_HOME || (0, import_node_path3.join)((0, import_node_os.homedir)(), ".dsh"));
+  const dshHome = (0, import_node_path2.resolve)(input2.dshHome || process.env.DSH_HOME || (0, import_node_path2.join)((0, import_node_os.homedir)(), ".dsh"));
   const profile = input2.profile || profileNameFromArgs(input2.appArgs);
-  const profileDir = (0, import_node_path3.join)(dshHome, "profiles", profile);
-  const profileManifestPath = input2.profileManifestPath || (0, import_node_path3.join)(profileDir, "package.json");
-  const patchPaths = patchPathsFromArgs(input2.appArgs).map((path) => (0, import_node_path3.resolve)(input2.workspaceRoot, path));
+  const profileDir = (0, import_node_path2.join)(dshHome, "profiles", profile);
+  const profileManifestPath = input2.profileManifestPath || (0, import_node_path2.join)(profileDir, "package.json");
+  const patchPaths = patchPathsFromArgs(input2.appArgs).map((path) => (0, import_node_path2.resolve)(input2.workspaceRoot, path));
   const extensionOverlayPaths = [...input2.extensionOverlayPaths ?? []].map(normalizedPath);
   const recoveryOverlayPaths = [...input2.recoveryOverlayPaths ?? []].map(normalizedPath);
   const patchLayers = [];
@@ -880,10 +843,10 @@ async function buildComposition(input2) {
   const profileManifest = await fingerprintPath(profileManifestPath);
   const profileFiles = [
     profileManifest,
-    await fingerprintPath((0, import_node_path3.join)(profileDir, "cordis.patch.yml"))
+    await fingerprintPath((0, import_node_path2.join)(profileDir, "cordis.patch.yml"))
   ].filter((item) => item.kind !== "missing");
   const homeFiles = [
-    await fingerprintPath((0, import_node_path3.join)(dshHome, "cordis.patch.yml"))
+    await fingerprintPath((0, import_node_path2.join)(dshHome, "cordis.patch.yml"))
   ].filter((item) => item.kind !== "missing");
   const environment = {
     ...safeEnvironment(),
@@ -940,12 +903,149 @@ function compositionDiff(current, lastKnownGood) {
 }
 
 // upstream/recovery/recoverySession.ts
-var import_node_crypto6 = require("node:crypto");
+var import_node_crypto7 = require("node:crypto");
 
 // upstream/recovery/ledger.ts
-var import_node_crypto4 = require("node:crypto");
+var import_node_crypto5 = require("node:crypto");
 var import_promises4 = require("node:fs/promises");
 var import_node_path4 = require("node:path");
+
+// upstream/runtimeLock.ts
+var import_node_net = require("node:net");
+var import_node_crypto4 = require("node:crypto");
+var import_promises3 = require("node:fs/promises");
+var import_node_path3 = require("node:path");
+function validPid(value) {
+  return typeof value === "number" && Number.isSafeInteger(value) && value > 0;
+}
+function exactRuntimeVersion(value) {
+  return typeof value === "string" && /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/u.test(value);
+}
+function processHasExited(pid) {
+  try {
+    process.kill(pid, 0);
+    return false;
+  } catch (error) {
+    return error.code === "ESRCH";
+  }
+}
+async function readRuntimeLock(path) {
+  try {
+    const stat2 = await (0, import_promises3.lstat)(path);
+    if (!stat2.isFile()) return { path, stat: stat2, contents: "" };
+    const contents = await (0, import_promises3.readFile)(path, "utf8");
+    let record;
+    try {
+      const value = JSON.parse(contents);
+      if (typeof value === "object" && value !== null && !Array.isArray(value)) {
+        const raw = value;
+        if (validPid(raw.pid) && (raw.runtimePid === void 0 || validPid(raw.runtimePid)) && (raw.runtimeProcess === void 0 || raw.runtimeProcess === "direct" || raw.runtimeProcess === "wrapper") && (raw.runtimeProcessGroup === void 0 || validPid(raw.runtimeProcessGroup) && raw.runtimeProcessGroup === raw.runtimePid) && (raw.runtimeVersion === void 0 || exactRuntimeVersion(raw.runtimeVersion)) && (raw.ownerId === void 0 || typeof raw.ownerId === "string" && raw.ownerId.length > 0) && (raw.compositionHash === void 0 || typeof raw.compositionHash === "string" && /^[a-f0-9]{64}$/u.test(raw.compositionHash)) && (raw.recoverySessionId === void 0 || typeof raw.recoverySessionId === "string" && raw.recoverySessionId.length > 0) && (raw.url === void 0 || typeof raw.url === "string") && (raw.launchUrl === void 0 || typeof raw.launchUrl === "string")) record = raw;
+      }
+    } catch {
+    }
+    return { path, stat: stat2, contents, record };
+  } catch (error) {
+    if (error.code === "ENOENT") return void 0;
+    throw error;
+  }
+}
+function sameRuntimeLockFile(left, right) {
+  return left.dev === right.dev && left.ino === right.ino && right.isFile();
+}
+async function acquireMutationGate(path, deadline) {
+  const canonical = (0, import_node_path3.join)(await (0, import_promises3.realpath)((0, import_node_path3.dirname)(path)), (0, import_node_path3.basename)(path));
+  const key = process.platform === "win32" ? canonical.toLowerCase() : canonical;
+  const port = 16384 + (0, import_node_crypto4.createHash)("sha256").update(key).digest().readUInt32BE(0) % 16384;
+  while (true) {
+    const server = (0, import_node_net.createServer)((socket) => socket.destroy());
+    try {
+      await new Promise((resolve6, reject) => {
+        server.once("error", reject);
+        server.listen({ host: "127.0.0.1", port, exclusive: true }, () => {
+          server.removeListener("error", reject);
+          resolve6();
+        });
+      });
+      return server;
+    } catch (error) {
+      server.close();
+      if (error.code !== "EADDRINUSE") throw error;
+      if (Date.now() >= deadline) throw new Error(t("DSH Runtime lock recovery is busy: {path}. Retry shortly.", { path }));
+      await new Promise((resolve6) => setTimeout(resolve6, 25));
+    }
+  }
+}
+async function mutateRuntimeLock(path, action) {
+  const gate = await acquireMutationGate(path, Date.now() + 2e3);
+  try {
+    return await mutateRuntimeLockWithGate(path, action);
+  } finally {
+    await new Promise((resolve6, reject) => gate.close((error) => error ? reject(error) : resolve6()));
+  }
+}
+async function mutateRuntimeLockWithGate(path, action) {
+  const guardPath = `${path}.mutation`;
+  const deadline = Date.now() + 2e3;
+  const contents = JSON.stringify({ pid: process.pid, createdAt: Date.now(), ownerId: (0, import_node_crypto4.randomUUID)() });
+  let guard;
+  while (!guard) {
+    try {
+      guard = await publishMutationGuard(guardPath, contents);
+    } catch (error) {
+      if (error.code !== "EEXIST") throw error;
+      const abandoned = await readRuntimeLock(guardPath);
+      if (!abandoned) continue;
+      if (abandoned.record && processHasExited(abandoned.record.pid) && await removeRuntimeLock(abandoned)) continue;
+      if (Date.now() >= deadline) {
+        throw new Error(t("DSH Runtime lock mutation is busy or abandoned: {path}. Retry; if it persists, verify its owner has exited before manual cleanup.", { path: guardPath }));
+      }
+      await new Promise((resolve6) => setTimeout(resolve6, 25));
+    }
+  }
+  try {
+    return await action();
+  } finally {
+    const stat2 = await guard.stat();
+    await guard.close();
+    const current = await readRuntimeLock(guardPath);
+    if (current && current.contents === contents && sameRuntimeLockFile(stat2, current.stat)) await removeRuntimeLock(current);
+  }
+}
+async function publishMutationGuard(path, contents) {
+  const staging = `${path}.${(0, import_node_crypto4.randomUUID)()}.tmp`;
+  const handle = await (0, import_promises3.open)(staging, "wx", 384);
+  let published = false;
+  try {
+    await handle.writeFile(contents, "utf8");
+    await (0, import_promises3.link)(staging, path);
+    published = true;
+    await (0, import_promises3.unlink)(staging);
+    return handle;
+  } catch (error) {
+    const stat2 = await handle.stat().finally(() => handle.close());
+    if (published) {
+      const current = await readRuntimeLock(path);
+      if (current && sameRuntimeLockFile(stat2, current.stat) && current.contents === contents) {
+        await removeRuntimeLock(current);
+      }
+    }
+    await (0, import_promises3.unlink)(staging).catch(() => void 0);
+    throw error;
+  }
+}
+async function removeRuntimeLock(snapshot) {
+  const current = await readRuntimeLock(snapshot.path);
+  if (!current || !sameRuntimeLockFile(snapshot.stat, current.stat) || current.contents !== snapshot.contents) return false;
+  try {
+    await (0, import_promises3.unlink)(snapshot.path);
+    return true;
+  } catch (error) {
+    if (error.code === "ENOENT") return false;
+    throw error;
+  }
+}
+
+// upstream/recovery/ledger.ts
 var EMPTY_LEDGER = {
   schemaVersion: 1,
   revision: 0,
@@ -990,7 +1090,7 @@ var RecoveryLedgerStore = class {
           throw new Error("Another recovery or restore owns the recovery lease; retry after it finishes.");
         }
       }
-      const ownerId = (0, import_node_crypto4.randomUUID)();
+      const ownerId = (0, import_node_crypto5.randomUUID)();
       await (0, import_promises4.writeFile)(this.leasePath, JSON.stringify({ pid: process.pid, ownerId }), { flag: "wx", mode: 384 });
       this.leaseOwner = ownerId;
     });
@@ -1061,7 +1161,7 @@ var RecoveryLedgerStore = class {
     return loaded.state.entries;
   }
   async beginSession(composition, budget, error) {
-    const id = (0, import_node_crypto4.randomUUID)();
+    const id = (0, import_node_crypto5.randomUUID)();
     const session = {
       id,
       startedAt: (/* @__PURE__ */ new Date()).toISOString(),
@@ -1198,7 +1298,7 @@ var ATOMIC_WRITE_RETRY_MS = 50;
 var RETRYABLE_RENAME_CODES = /* @__PURE__ */ new Set(["EPERM", "EACCES", "EBUSY"]);
 async function atomicWrite(path, contents) {
   await (0, import_promises4.mkdir)((0, import_node_path4.dirname)(path), { recursive: true });
-  const temporary = `${path}.${(0, import_node_crypto4.randomUUID)()}.tmp`;
+  const temporary = `${path}.${(0, import_node_crypto5.randomUUID)()}.tmp`;
   try {
     await (0, import_promises4.writeFile)(temporary, contents, { encoding: "utf8", flag: "wx", mode: 384 });
     await renameWithRetry(temporary, path);
@@ -1222,14 +1322,14 @@ async function renameWithRetry(source, target) {
 }
 
 // upstream/recovery/variantEngine.ts
-var import_node_crypto5 = require("node:crypto");
+var import_node_crypto6 = require("node:crypto");
 var import_node_path5 = require("node:path");
 function pathKey(path) {
   const resolvedPath = (0, import_node_path5.resolve)(path);
   return process.platform === "win32" ? resolvedPath.toLowerCase() : resolvedPath;
 }
 function idFor(kind, target) {
-  const digest = (0, import_node_crypto5.createHash)("sha256").update(`${kind}:${target.join("\0")}`).digest("hex").slice(0, 12);
+  const digest = (0, import_node_crypto6.createHash)("sha256").update(`${kind}:${target.join("\0")}`).digest("hex").slice(0, 12);
   return `${kind}-${digest}`;
 }
 function bundleVariant(base, kind, selected, assumption) {
@@ -1617,7 +1717,7 @@ var RecoverySession = class {
       if (usedBoots >= maxBoots) continue;
       const fix = {
         ...candidate,
-        id: `${candidate.id}-${(0, import_node_crypto6.randomUUID)()}`,
+        id: `${candidate.id}-${(0, import_node_crypto7.randomUUID)()}`,
         evidenceBootIds: evidence.map((item) => item.bootId)
       };
       let applied = false;
@@ -1716,7 +1816,7 @@ var RecoverySession = class {
 };
 
 // upstream/recovery/diagnostics.ts
-var import_node_crypto7 = require("node:crypto");
+var import_node_crypto8 = require("node:crypto");
 var import_promises5 = require("node:fs/promises");
 var import_node_path6 = require("node:path");
 var MAX_BOOT_BYTES = 2 * 1024 * 1024;
@@ -1767,7 +1867,7 @@ var RecoveryDiagnostics = class {
     this.logsDirectory = (0, import_node_path6.join)(this.directory, "logs");
     this.exportsDirectory = (0, import_node_path6.join)(this.directory, "diagnostics");
   }
-  async beginBoot(sessionId, variantId, compositionHash, bootId = (0, import_node_crypto7.randomUUID)()) {
+  async beginBoot(sessionId, variantId, compositionHash, bootId = (0, import_node_crypto8.randomUUID)()) {
     if (!/^[a-zA-Z0-9-]+$/u.test(sessionId) || !/^[a-zA-Z0-9-]+$/u.test(bootId)) {
       throw new Error("Invalid recovery log identity");
     }
@@ -1831,7 +1931,7 @@ var RecoveryDiagnostics = class {
     };
   }
   async export(ledger, current, corrupt) {
-    const exportId = `${(/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/gu, "-")}-${(0, import_node_crypto7.randomUUID)().slice(0, 8)}`;
+    const exportId = `${(/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/gu, "-")}-${(0, import_node_crypto8.randomUUID)().slice(0, 8)}`;
     const target = (0, import_node_path6.join)(this.exportsDirectory, exportId);
     await (0, import_promises5.mkdir)((0, import_node_path6.join)(target, "logs"), { recursive: true });
     const documents = {
@@ -1906,11 +2006,11 @@ var RecoveryDiagnostics = class {
 };
 
 // upstream/recovery/fixExecutor.ts
-var import_node_crypto8 = require("node:crypto");
+var import_node_crypto9 = require("node:crypto");
 var import_promises6 = require("node:fs/promises");
 var import_node_path7 = require("node:path");
 function sha2562(value) {
-  return (0, import_node_crypto8.createHash)("sha256").update(value).digest("hex");
+  return (0, import_node_crypto9.createHash)("sha256").update(value).digest("hex");
 }
 function samePath(left, right) {
   return pathKey2(left) === pathKey2(right);
@@ -2082,11 +2182,56 @@ async function assertRegularFile(path) {
 }
 
 // upstream/recovery/healthOracle.ts
-var import_node_crypto10 = require("node:crypto");
+var import_node_crypto11 = require("node:crypto");
 var import_node_string_decoder = require("node:string_decoder");
 
+// upstream/remote/errors.ts
+var RemoteError = class _RemoteError extends Error {
+  /** Structural marker preserved across duplicate bundles/realms. */
+  isDSHRemoteError = true;
+  code;
+  details;
+  endpoint;
+  constructor(code, message, details = {}, endpoint) {
+    super(message);
+    this.name = "RemoteError";
+    this.code = code;
+    this.details = details;
+    this.endpoint = endpoint;
+  }
+  static fromFailure(failure, endpoint) {
+    return new _RemoteError(failure.code, failure.message, failure.details, endpoint);
+  }
+};
+var RemoteHttpError = class extends Error {
+  constructor(endpoint, status, message = httpMessage(endpoint, status)) {
+    super(message);
+    this.endpoint = endpoint;
+    this.status = status;
+    this.name = "RemoteHttpError";
+  }
+  get isAuthenticationFailure() {
+    return this.status === 401 || this.status === 403;
+  }
+};
+var RemoteProtocolError = class extends Error {
+  constructor(message, options) {
+    super(message, options);
+    this.name = "RemoteProtocolError";
+  }
+};
+function isAbortError(error) {
+  return error instanceof DOMException && error.name === "AbortError" || error instanceof Error && error.name === "AbortError";
+}
+function httpMessage(endpoint, status) {
+  if (status === 401) return `Remote RPC ${endpoint} requires authentication (HTTP 401)`;
+  if (status === 403) return `Remote RPC ${endpoint} is not authorized (HTTP 403)`;
+  if (status === 404) return `Remote RPC ${endpoint} is unavailable (HTTP 404)`;
+  return `Remote RPC ${endpoint} returned HTTP ${status}`;
+}
+
 // upstream/remote/unaryClient.ts
-var import_node_crypto9 = require("node:crypto");
+var import_node_crypto10 = require("node:crypto");
 
 // upstream/remote/contracts.ts
 var REMOTE_API_PREFIX = "/api/";
@@ -2192,7 +2337,7 @@ var RemoteUnaryClient = class {
   constructor(options) {
     this.options = options;
     this.doFetch = options.fetch ?? fetch;
-    this.mintRpcId = options.mintRpcId ?? import_node_crypto9.randomUUID;
+    this.mintRpcId = options.mintRpcId ?? import_node_crypto10.randomUUID;
   }
   doFetch;
   mintRpcId;
@@ -2573,7 +2718,7 @@ var HealthOracle = class {
   }
   async evaluate(composition, variant, options = {}) {
     const started = Date.now();
-    const bootId = (0, import_node_crypto10.randomUUID)();
+    const bootId = (0, import_node_crypto11.randomUUID)();
     const controller = new AbortController();
     const relay = () => controller.abort(options.signal?.reason);
     options.signal?.addEventListener("abort", relay, { once: true });
@@ -2778,7 +2923,7 @@ var HealthOracle = class {
 };
 
 // main.ts
-var exec2 = (0, import_node_util3.promisify)(import_node_child_process3.execFile);
+var exec = (0, import_node_util2.promisify)(import_node_child_process2.execFile);
 var input = (0, import_node_readline.createInterface)({ input: process.stdin });
 input.on("line", (line) => {
   try {
@@ -2789,6 +2934,8 @@ input.on("line", (line) => {
 var cancellation = new AbortController();
 var child;
 var recovery;
+var debugServer;
+var debugPending = /* @__PURE__ */ new Map();
 var closing = false;
 var emit = (event, value) => process.stdout.write("\nDSH_INTELLIJ_HELPER " + JSON.stringify({ event, value }) + "\n");
 var log = (message) => process.stdout.write(redactRecoveryText(message) + "\n");
@@ -2810,6 +2957,9 @@ async function shutdown() {
   closing = true;
   cancellation.abort(new Error("Runtime stopped"));
   recovery?.cancel();
+  await debugServer?.stop();
+  for (const settle of debugPending.values()) settle({ text: "Debugger connection closed", isError: true });
+  debugPending.clear();
   if (child)
     await terminateOwnedRuntime(child);
   if (recovery?.getSessionId())
@@ -2834,25 +2984,37 @@ input.once("line", (line) => void main(JSON.parse(line)).catch(async (error) => 
   process.exit(cancellation.signal.aborted ? 0 : 1);
 }));
 async function main(config) {
+  if (config.operation === "debug-server") {
+    input.on("line", (line) => {
+      try {
+        const message = JSON.parse(line);
+        if (message.type !== "debug-result" || typeof message.id !== "string") return;
+        const settle = debugPending.get(message.id);
+        if (!settle || typeof message.text !== "string" || typeof message.isError !== "boolean") return;
+        debugPending.delete(message.id);
+        settle({ text: message.text, isError: message.isError });
+      } catch {
+      }
+    });
+    debugServer = await startDebugMcpServer({ token: config.token, tools: config.tools, execute: (name, args2) => new Promise((resolve6) => {
+      const id = (0, import_node_crypto12.randomUUID)();
+      const timer = setTimeout(() => {
+        debugPending.delete(id);
+        resolve6({ text: "Debugger operation timed out", isError: true });
+      }, 5e4);
+      debugPending.set(id, (result) => {
+        clearTimeout(timer);
+        resolve6(result);
+      });
+      emit("debug-call", { id, name, args: args2 });
+    }) });
+    emit("debug-ready", { url: debugServer.url });
+    return;
+  }
   const ledger = new RecoveryLedgerStore(config.storage);
   const diagnostics = new RecoveryDiagnostics(config.storage);
   const fixes = new FixExecutor(ledger, { appendLine: log });
   recovery = new RecoverySession({ ledger, fixes, oracle: new HealthOracle(new SandboxManager(), { diagnostics, onOutput: log }), maxBoots: 8, allowBundleIsolation: () => config.isolate, onStatus: (value) => emit("recovery", value), onLog: log });
-  if (config.operation === "orphan") {
-    const snapshot = await readRuntimeLock(config.lockPath);
-    const identity = snapshot && await inspectLegacyRuntime(snapshot);
-    if (!snapshot || !identity) {
-      emit("orphan-result", { stopped: false });
-      process.exit(0);
-    }
-    const approved = await prompt(`Restart abandoned DSH Runtime at ${identity.baseUrl} (PID ${identity.pid})?`, ["Restart", "Cancel"], "Its editor has exited. The identified Runtime will be stopped, forcibly if necessary, before starting a compatible version. Session files are preserved.");
-    if (approved === "Restart") {
-      await stopLegacyRuntime(snapshot, identity, config.sharedLockPath, cancellation.signal);
-      emit("orphan-result", { stopped: true });
-    } else
-      emit("orphan-result", { stopped: false });
-    process.exit(0);
-  }
   if (config.operation === "upgrade") {
     const probe = async () => {
       try {
@@ -2867,7 +3029,7 @@ async function main(config) {
           command = process.execPath;
           args2 = [(0, import_node_path9.join)(root, bin), "--version"];
         }
-        const { stdout } = await exec2(command, args2, { timeout: 15e3 });
+        const { stdout } = await exec(command, args2, { timeout: 15e3 });
         return stdout.trim().replace(/^(?:dsh\s+)?v/, "");
       } catch {
         return void 0;
@@ -2878,7 +3040,7 @@ async function main(config) {
       const npm = config.npm || "npm";
       const command = process.platform === "win32" ? process.execPath : npm;
       const args2 = process.platform === "win32" ? [(0, import_node_path9.join)((0, import_node_path9.dirname)(npm), "node_modules", "npm", "bin", "npm-cli.js"), "prefix", "-g"] : ["prefix", "-g"];
-      prefix2 = (await exec2(command, args2, { timeout: 15e3 })).stdout.trim();
+      prefix2 = (await exec(command, args2, { timeout: 15e3 })).stdout.trim();
     } catch {
     }
     const version = await offerLocalRuntimeUpgrade({ command: config.command, actual: config.actual, target: config.target, npm: config.npm || "npm", node: process.execPath, prefix: prefix2, registry: config.registry, timeout: 12e4, signal: cancellation.signal, probe, log });
@@ -2958,9 +3120,19 @@ async function main(config) {
     };
     current.stdout.on("data", collect);
     current.stderr.on("data", collect);
+    let stdoutEnded = false;
+    let stderrEnded = false;
+    current.stdout.once("end", () => {
+      stdoutEnded = true;
+    });
+    current.stderr.once("end", () => {
+      stderrEnded = true;
+    });
     let ready = false;
-    for (let tries = 0; tries < 600 && !exit && !launchError; tries++) {
+    let healthy;
+    for (let tries = 0; tries < 600 && !launchError; tries++) {
       cancellation.signal.throwIfAborted();
+      if (exit && stdoutEnded && stderrEnded) break;
       const launch = output.match(/http:\/\/(?:127\.0\.0\.1|localhost|\[::1\]):\d+\/\?token=[A-Za-z0-9_-]+/)?.[0];
       if (launch) {
         try {
@@ -2969,6 +3141,14 @@ async function main(config) {
           const base = new URL(launch).origin;
           const unary = new RemoteUnaryClient({ baseUrl: base, requestHeaders: () => cookie ? { Cookie: cookie } : {}, timeoutMs: 1500 });
           await unary.call("session/list", { _request: {} });
+          healthy = async () => {
+            try {
+              await unary.call("session/list", { _request: {} });
+              return true;
+            } catch {
+              return false;
+            }
+          };
           cancellation.signal.throwIfAborted();
           emit("ready", { url: base, launchUrl: launch });
           ready = true;
@@ -2984,6 +3164,17 @@ async function main(config) {
     }
     if (ready)
       await completion;
+    if (ready && exit && healthy && await healthy()) {
+      child = void 0;
+      emit("detached", { serving: true });
+      let failures2 = 0;
+      while (!cancellation.signal.aborted && failures2 < 3) {
+        await pause3(1e3);
+        failures2 = await healthy() ? 0 : failures2 + 1;
+      }
+      cancellation.signal.throwIfAborted();
+      throw new Error("Detached Runtime endpoint no longer responds; restart explicitly.");
+    }
     if (!exit && !launchError)
       await terminateOwnedRuntime(current);
     await terminateOwnedRuntime(current);
