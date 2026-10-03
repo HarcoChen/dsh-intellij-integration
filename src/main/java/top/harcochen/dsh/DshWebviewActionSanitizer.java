@@ -202,6 +202,22 @@ final class DshWebviewActionSanitizer {
                     ? input
                     : null;
         }
+        if ("setPluginEnabled".equals(type) || "setBundleEnabled".equals(type)) {
+            String key = "setPluginEnabled".equals(type) ? "entryId" : "name";
+            return hasOnly(input, "type", key, "enabled")
+                            && boundedId(strictString(input, key))
+                            && input.has("enabled")
+                            && input.get("enabled").isJsonPrimitive()
+                            && input.getAsJsonPrimitive("enabled").isBoolean()
+                    ? input
+                    : null;
+        }
+        if ("killJob".equals(type) || "openTeamMember".equals(type)) {
+            String key = "killJob".equals(type) ? "jobId" : "memberId";
+            return hasOnly(input, "type", key) && boundedId(strictString(input, key))
+                    ? input
+                    : null;
+        }
         if ("declineDynamicPlugin".equals(type)) {
             String requestId = strictString(input, "requestId");
             String pluginId = strictString(input, "pluginId");
@@ -464,6 +480,8 @@ final class DshWebviewActionSanitizer {
         }
         if (java.util.Set.of("cancelRecovery", "restoreRecovery", "exportRecoveryDiagnostics")
                 .contains(type)) return hasOnly(input, "type") ? input : null;
+        if (Set.of("browseRuntimeFiles", "showWhatsNew", "restartRuntime").contains(type))
+            return hasOnly(input, "type") ? input : null;
         if (type.startsWith("switch")
                 || type.startsWith("open")
                 || type.startsWith("remove")

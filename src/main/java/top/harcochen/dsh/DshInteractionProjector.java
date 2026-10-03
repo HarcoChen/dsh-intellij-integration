@@ -8,11 +8,54 @@ import com.google.gson.JsonObject;
 final class DshInteractionProjector {
     private DshInteractionProjector() {}
 
-    static JsonArray present(JsonArray interactions) {
+    static boolean answersMatch(JsonArray questions, JsonArray answers) {
+        if (questions == null || answers == null || questions.size() != answers.size())
+            return false;
+        java.util.Map<String, JsonObject> byId = new java.util.HashMap<>();
+        for (JsonElement value : questions) {
+            if (!value.isJsonObject()) return false;
+            JsonObject q = value.getAsJsonObject();
+            String id = DshJson.strictString(q, "id");
+            if (id == null || byId.put(id, q) != null) return false;
+        }
+        java.util.Set<String> seen = new java.util.HashSet<>();
+        for (JsonElement value : answers) {
+            if (!value.isJsonObject()) return false;
+            JsonObject answer = value.getAsJsonObject();
+            String id = DshJson.strictString(answer, "id");
+            JsonObject q = byId.get(id);
+            if (q == null
+                    || !seen.add(id)
+                    || !answer.has("selected")
+                    || !answer.get("selected").isJsonArray()) return false;
+            JsonArray selected = answer.getAsJsonArray("selected");
+            if (!DshJson.bool(q, "multiSelect", false) && selected.size() > 1) return false;
+            java.util.Set<String> allowed = new java.util.HashSet<>();
+            if (q.has("options") && q.get("options").isJsonArray())
+                for (JsonElement option : q.getAsJsonArray("options")) {
+                    if (!option.isJsonObject()) return false;
+                    allowed.add(DshJson.strictString(option.getAsJsonObject(), "label"));
+                }
+            for (JsonElement selection : selected)
+                if (!selection.isJsonPrimitive()
+                        || !selection.getAsJsonPrimitive().isString()
+                        || !allowed.contains(selection.getAsString())) return false;
+        }
+        return true;
+    }
+
+    static JsonArray present(JsonArray interactions, String sessionId) {
         JsonArray result = interactions.deepCopy();
         for (JsonElement candidate : result) {
             if (!candidate.isJsonObject()) continue;
             JsonObject item = candidate.getAsJsonObject();
+            item.addProperty("draftKey", sessionId + ":" + string(item, "key"));
+            if (item.has("waitConnected")) {
+                JsonObject wait = new JsonObject();
+                wait.add("connected", item.get("waitConnected"));
+                if (item.has("waitDeadline")) wait.add("deadline", item.get("waitDeadline"));
+                item.add("questionWait", wait);
+            }
             if (!"question".equals(string(item, "kind"))) continue;
             JsonObject review = planReview(item.get("questions"));
             if (review == null) continue;

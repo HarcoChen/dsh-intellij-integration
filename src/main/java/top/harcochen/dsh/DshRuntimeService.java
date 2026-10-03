@@ -8,6 +8,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -37,12 +38,11 @@ import top.harcochen.dsh.remote.DshRemoteUnaryClient;
  * project closes. All blocking process and HTTP work runs off the Swing event dispatch thread.
  * Protocol work (unary RPC, streams, authentication state) lives in {@code
  * top.harcochen.dsh.remote}; this service only manages the process, the launch/base URLs, the
- * credential injection, the shared start lock, and the reachability probe.
+ * credential injection, private process ownership, discovery advertisements and reachability.
  */
 public final class DshRuntimeService implements Disposable {
     private static final Logger LOG = Logger.getInstance(DshRuntimeService.class);
     private static final int DEFAULT_PORT = 3080;
-    private static final String MANAGED_LAUNCHER = "__dsh_managed_runtime__";
 
     /** The npm package the Runtime ships as; see {@link #pinRuntimeVersion}. */
     private static final String RUNTIME_PACKAGE = "@deepseek-ai/dsh";
@@ -54,8 +54,10 @@ public final class DshRuntimeService implements Disposable {
     private final StringBuilder output = new StringBuilder();
     private final Object lifecycleLock = new Object();
 
-    /** Machine-wide start lock, shared with the VS Code extension. */
-    private final DshRuntimeLock runtimeLock = new DshRuntimeLock();
+    /** Only children spawned by this editor can be stopped. */
+    private final DshRuntimeOwner owner = new DshRuntimeOwner();
+
+    private final DshRuntimeAdvertisements advertisements = new DshRuntimeAdvertisements();
 
     /** Authority-bound session cookie exchange for the RC Remote API. */
     private final DshRemoteAuth auth = new DshRemoteAuth(this::getUrl, this::getLaunchUrl);
@@ -70,6 +72,8 @@ public final class DshRuntimeService implements Disposable {
     private volatile String launchedVersion;
     private volatile Process probingProcess;
     private volatile Process managedHelper;
+    private volatile DshDebugBridge debugBridge;
+    private volatile boolean detachedRuntime;
     private volatile com.google.gson.JsonObject recoveryStatus;
 
     public DshRuntimeService(@NotNull Project project) {
@@ -113,12 +117,7 @@ public final class DshRuntimeService implements Disposable {
     /** Reachability probe for the RC Remote API (no side effects; authenticates first). */
     boolean isRemoteHealthy(String url) {
         if (DshRuntimeEndpoint.normalizeUrl(url) == null) return false;
-        DshRemoteUnaryClient probe =
-                new DshRemoteUnaryClient(
-                        () -> url,
-                        () -> DshSettingsState.getInstance(project).requestTimeoutMs,
-                        auth,
-                        null);
+        DshRemoteUnaryClient probe = new DshRemoteUnaryClient(() -> url, () -> 1500, auth, null);
         return probe.probe();
     }
 
@@ -198,6 +197,11 @@ public final class DshRuntimeService implements Disposable {
 
     /** Called by the settings page after applying a new command or URL. */
     public void settingsChanged() {
+        if (!DshSettingsState.getInstance(project).autonomousDebugging && debugBridge != null) {
+            DshDebugBridge bridge = debugBridge;
+            debugBridge = null;
+            executor.execute(bridge::close);
+        }
         // A changed server URL should not silently discard an active process.
         // The next explicit Start/Restart uses the new settings; the panel is
         // refreshed so its status and error message remain truthful.
@@ -233,7 +237,8 @@ public final class DshRuntimeService implements Disposable {
         }
 
         int configuredPort = settings.serverPort;
-        DshRuntimeEndpoint existing = findExistingRuntime(configuredPort);
+        DshRuntimeEndpoint existing =
+                settings.autonomousDebugging ? null : findExistingRuntime(configuredPort);
         if (existing != null) {
             setRuntimeEndpoint(existing);
             setStatus(
@@ -244,14 +249,10 @@ public final class DshRuntimeService implements Disposable {
             return existing.baseUrl;
         }
 
-        // The start lock is shared with the VS Code extension, so at most one
-        // editor on this machine spawns a Runtime. Losing the race is the
-        // normal path when both start together: wait for the winner's URL
-        // rather than racing it to a second Runtime.
-        boolean acquired = runtimeLock.acquire();
-        if (!acquired && recoverOrphan()) acquired = runtimeLock.acquire();
-        if (!acquired) {
-            DshRuntimeEndpoint peer = awaitPeerRuntime(configuredPort, settings.startupTimeoutMs);
+        AutoCloseable startupGate = DshRuntimeStartupMutex.acquire();
+        try {
+            DshRuntimeEndpoint peer =
+                    settings.autonomousDebugging ? null : findExistingRuntime(configuredPort);
             if (peer != null) {
                 setRuntimeEndpoint(peer);
                 setStatus(
@@ -261,46 +262,50 @@ public final class DshRuntimeService implements Disposable {
                                 DshBundle.message("dsh.runtime.connected.peer")));
                 return peer.baseUrl;
             }
-            throw new IllegalStateException(DshBundle.message("dsh.runtime.peer.start.failed"));
-        }
-
-        Process child;
-        DshRuntimeEndpoint detected;
-        try {
-            child = launch(settings);
-            process = child;
-            streamOutput(child);
+            Process child;
+            DshRuntimeEndpoint detected;
             try {
-                detected = waitForServer(child, settings);
-            } catch (RuntimeException | Error error) {
+                child = launch(settings);
+                process = child;
+                streamOutput(child);
                 try {
-                    stopBlocking();
-                } catch (RuntimeException cleanup) {
-                    error.addSuppressed(cleanup);
+                    detected = waitForServer(child, settings);
+                } catch (RuntimeException | Error error) {
+                    try {
+                        stopBlocking();
+                    } catch (RuntimeException cleanup) {
+                        error.addSuppressed(cleanup);
+                    }
+                    throw error;
+                }
+            } catch (RuntimeException | Error error) {
+                // Never leave the lock behind on a failed start: a peer would wait
+                // out its whole startup timeout for a Runtime that will never come.
+                if (owner.exited()) {
+                    owner.clear();
+                    advertisements.withdraw();
                 }
                 throw error;
             }
-        } catch (RuntimeException | Error error) {
-            // Never leave the lock behind on a failed start: a peer would wait
-            // out its whole startup timeout for a Runtime that will never come.
-            runtimeLock.release();
-            throw error;
+            // Publish only after the server answers, so the advertised URL is
+            // always one a peer can attach to immediately.
+            advertisements.publish(detected, launchedVersion, owner.pid());
+            setRuntimeEndpoint(detected);
+            setStatus(
+                    new RuntimeStatus(
+                            RuntimeState.RUNNING,
+                            detected.baseUrl,
+                            DshBundle.message("dsh.runtime.running")));
+            return detected.baseUrl;
+        } finally {
+            try {
+                startupGate.close();
+            } catch (Exception ignored) {
+            }
         }
-        // Publish only after the server answers, so the advertised URL is
-        // always one a peer can attach to immediately.
-        runtimeLock.publishUrl(detected.baseUrl, detected.launchUrl);
-        setRuntimeEndpoint(detected);
-        setStatus(
-                new RuntimeStatus(
-                        RuntimeState.RUNNING,
-                        detected.baseUrl,
-                        DshBundle.message("dsh.runtime.running")));
-        return detected.baseUrl;
     }
 
-    /**
-     * Only the shared lock can advertise a compatible, editor-owned Runtime for automatic reuse.
-     */
+    /** Reuse compatible advertised Runtime endpoints; records never authorize stopping a peer. */
     private DshRuntimeEndpoint findExistingRuntime(int configuredPort) {
         // Probing has to publish each candidate first: the probe authenticates, and the
         // launch-token exchange reads the endpoint fields. So the endpoint is dirty for the whole
@@ -309,13 +314,14 @@ public final class DshRuntimeService implements Disposable {
         String entryBase = baseUrl;
         String entryLaunch = launchUrl;
         boolean settled = false;
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2);
         try {
-            DshRuntimeEndpoint advertised = runtimeLock.readAdvertisedEndpoint();
-            if (advertised != null) {
-                setRuntimeEndpoint(advertised);
-                if (isRemoteHealthy(advertised.baseUrl)) {
+            for (DshRuntimeEndpoint candidate : advertisements.read()) {
+                if (stopping || System.nanoTime() >= deadline) break;
+                setRuntimeEndpoint(candidate);
+                if (isRemoteHealthy(candidate.baseUrl)) {
                     settled = true;
-                    return advertised;
+                    return candidate;
                 }
             }
             // Unversioned ports cannot establish compatibility or cross-editor ownership.
@@ -324,24 +330,6 @@ public final class DshRuntimeService implements Disposable {
         } finally {
             if (!settled) restoreRuntimeEndpoint(entryBase, entryLaunch);
         }
-    }
-
-    /** Wait for the editor that won the start lock to advertise its Runtime. */
-    private DshRuntimeEndpoint awaitPeerRuntime(int configuredPort, int startupTimeoutMs) {
-        long deadline =
-                System.nanoTime()
-                        + TimeUnit.MILLISECONDS.toNanos(Math.max(1_000, startupTimeoutMs));
-        while (System.nanoTime() < deadline && !stopping) {
-            DshRuntimeEndpoint endpoint = findExistingRuntime(configuredPort);
-            if (endpoint != null) return endpoint;
-            try {
-                Thread.sleep(250);
-            } catch (InterruptedException interrupted) {
-                Thread.currentThread().interrupt();
-                return null;
-            }
-        }
-        return null;
     }
 
     private Process launch(DshSettingsState settings) {
@@ -374,21 +362,37 @@ public final class DshRuntimeService implements Disposable {
             }
         }
         Map<String, String> environment = executionEnvironment();
+        if (settings.autonomousDebugging) {
+            try {
+                DshDebugBridge previousBridge = debugBridge;
+                debugBridge = null;
+                if (previousBridge != null) previousBridge.close();
+                debugBridge =
+                        new DshDebugBridge(
+                                project,
+                                prepareCommand(
+                                        List.of(
+                                                resolveExecutable(
+                                                        platformCommand("node"), environment),
+                                                DshRuntimeHelper.executable().toString()),
+                                        environment),
+                                environment);
+                String debugPatch = debugBridge.patch().toString();
+                overlays.add(debugPatch);
+                for (List<String> candidate : candidates)
+                    if (webProfileIndex(candidate) >= 0)
+                        insertWebLauncherPatch(candidate, debugPatch);
+                environment.putAll(debugBridge.environment());
+            } catch (Exception unavailable) {
+                throw new IllegalStateException("Debugger bridge could not start", unavailable);
+            }
+        }
         if (settings.npmRegistry != null && !settings.npmRegistry.isBlank())
             environment.putIfAbsent("npm_config_registry", settings.npmRegistry.trim());
         Throwable last = null;
         for (List<String> command : candidates) {
             try {
                 List<String> candidateCommand = command;
-                if (MANAGED_LAUNCHER.equals(command.get(0))) {
-                    Path managed =
-                            DshManagedRuntime.ensure(settings.runtimeVersion, this::appendLog);
-                    if (managed == null) {
-                        throw new IOException(DshBundle.message("dsh.runtime.managed.unavailable"));
-                    }
-                    candidateCommand = new ArrayList<>(command);
-                    candidateCommand.set(0, managed.toString());
-                }
                 List<String> resolvedCommand = new ArrayList<>(candidateCommand);
                 resolvedCommand.set(0, resolveExecutable(candidateCommand.get(0), environment));
                 if (isWindows()) resolvedCommand = prepareCommand(resolvedCommand, environment);
@@ -443,6 +447,7 @@ public final class DshRuntimeService implements Disposable {
                                         DshRuntimeHelper.executable().toString()),
                                 environment));
                 Process child = builder.start();
+                detachedRuntime = false;
                 managedHelper = child;
                 DshRuntimeHelper.send(
                         child,
@@ -452,8 +457,7 @@ public final class DshRuntimeService implements Disposable {
                                 launchedVersion,
                                 settings,
                                 overlays));
-                runtimeLock.publishProcess(
-                        child, launchedVersion, isNodePackageManager(candidateCommand.get(0)));
+                owner.record(child.pid(), null);
                 appendLog(DshBundle.message("dsh.runtime.log.started.pid", child.pid()));
                 return child;
             } catch (IOException error) {
@@ -466,6 +470,34 @@ public final class DshRuntimeService implements Disposable {
             }
         }
         String message = DshBundle.message("dsh.runtime.launch.failed");
+        DshDebugBridge failedBridge = debugBridge;
+        debugBridge = null;
+        if (failedBridge != null) failedBridge.close();
+        if (settings.command == null
+                || settings.command.isBlank()
+                || "auto".equals(settings.command)) {
+            message = DshBundle.message("dsh.runtime.desktop.required");
+            com.intellij.openapi.application.ApplicationManager.getApplication()
+                    .invokeLater(
+                            () -> {
+                                if (project.isDisposed()) return;
+                                com.intellij.notification.NotificationGroupManager.getInstance()
+                                        .getNotificationGroup("DeepSeek Harness")
+                                        .createNotification(
+                                                DshBundle.message("dsh.runtime.desktop.required"),
+                                                com.intellij.notification.NotificationType.WARNING)
+                                        .addAction(
+                                                com.intellij.notification.NotificationAction
+                                                        .createSimple(
+                                                                DshBundle.message(
+                                                                        "dsh.runtime.desktop.download"),
+                                                                () ->
+                                                                        com.intellij.ide.BrowserUtil
+                                                                                .browse(
+                                                                                        "https://www.deepseek.com/en/download/")))
+                                        .notify(project);
+                            });
+        }
         if (last != null && last.getMessage() != null) message += "\n" + last.getMessage();
         throw new IllegalStateException(message, last);
     }
@@ -483,49 +515,22 @@ public final class DshRuntimeService implements Disposable {
         List<List<String>> result = new ArrayList<>();
         boolean auto = "auto".equals(command);
         if ("managed".equalsIgnoreCase(command)) {
-            Path managed = DshManagedRuntime.ensure(version, this::appendLog);
-            if (managed == null) {
-                throw new IllegalStateException(
-                        DshBundle.message("dsh.runtime.managed.unavailable"));
-            }
-            result.add(
-                    launchCommand(
-                            managed.toString(),
-                            args.isEmpty() ? List.of("web", "--no-open") : args,
-                            settings.serverPort));
-            return result;
+            throw new IllegalStateException(DshBundle.message("dsh.runtime.desktop.required"));
         }
         if (auto) {
             int packageIndex = -1;
             for (int i = 0; i < args.size(); i++)
                 if (args.get(i).startsWith(RUNTIME_PACKAGE)) packageIndex = i;
-            if (packageIndex < 0)
-                result.add(
-                        launchCommand(
-                                platformCommand("dsh"),
-                                args.isEmpty() ? List.of("web", "--no-open") : args,
-                                settings.serverPort));
-            if (settings.installWhenMissing) {
-                List<String> app =
-                        packageIndex < 0 ? args : args.subList(packageIndex + 1, args.size());
-                if (app.isEmpty()) app = List.of("web", "--no-open");
-                String spec =
-                        packageIndex < 0 ? RUNTIME_PACKAGE + "@" + version : args.get(packageIndex);
-                List<String> pnpm = new ArrayList<>(List.of("dlx", spec));
-                pnpm.addAll(app);
-                List<String> npx = new ArrayList<>(List.of("--yes", spec));
-                npx.addAll(app);
-                result.add(launchCommand(platformCommand("pnpm"), pnpm, settings.serverPort));
-                result.add(launchCommand(platformCommand("npx"), npx, settings.serverPort));
-            }
-            if (settings.installWhenMissing && settings.useManagedRuntime) {
-                List<String> app =
-                        packageIndex < 0
-                                ? (args.isEmpty() ? List.of("web", "--no-open") : args)
-                                : new ArrayList<>(args.subList(packageIndex + 1, args.size()));
-                if (app.isEmpty()) app = List.of("web", "--no-open");
-                result.add(launchCommand(MANAGED_LAUNCHER, app, settings.serverPort));
-            }
+            List<String> raw = splitArguments(settings.commandArgs);
+            if (packageIndex >= 0 && !raw.contains(RUNTIME_PACKAGE))
+                throw new IllegalStateException(
+                        DshBundle.message("dsh.runtime.auto.explicit.package"));
+            List<String> app =
+                    packageIndex < 0 ? args : args.subList(packageIndex + 1, args.size());
+            if (app.isEmpty()) app = List.of("web", "--no-open");
+            result.add(launchCommand(platformCommand("dsh"), app, settings.serverPort));
+            String npmCommand = npmGlobalDsh();
+            if (npmCommand != null) result.add(launchCommand(npmCommand, app, settings.serverPort));
         } else {
             if (args.isEmpty()) {
                 args =
@@ -541,28 +546,50 @@ public final class DshRuntimeService implements Disposable {
                                 : List.of("web", "--no-open");
             }
             result.add(launchCommand(command, args, settings.serverPort));
-            if (settings.installWhenMissing && executableBaseName(command).equals("dsh")) {
-                for (String manager : List.of("pnpm", "npx")) {
-                    List<String> alternative =
-                            new ArrayList<>(
-                                    List.of(
-                                            manager.equals("pnpm") ? "dlx" : "--yes",
-                                            RUNTIME_PACKAGE + "@" + version));
-                    alternative.addAll(args);
-                    result.add(
-                            launchCommand(
-                                    platformCommand(manager), alternative, settings.serverPort));
-                }
-            }
-            if (settings.installWhenMissing
-                    && executableBaseName(command).equals("pnpm")
-                    && args.get(0).equals("dlx")) {
+            if (executableBaseName(command).equals("pnpm") && args.get(0).equals("dlx")) {
                 List<String> alternative = new ArrayList<>(List.of("--yes"));
                 alternative.addAll(args.subList(1, args.size()));
                 result.add(launchCommand(platformCommand("npx"), alternative, settings.serverPort));
             }
         }
         return result;
+    }
+
+    private String npmGlobalDsh() {
+        Process probe = null;
+        try {
+            Map<String, String> environment = executionEnvironment();
+            ProcessBuilder builder =
+                    new ProcessBuilder(
+                            prepareCommand(
+                                    List.of(
+                                            resolveExecutable(platformCommand("npm"), environment),
+                                            "prefix",
+                                            "-g"),
+                                    environment));
+            builder.environment().putAll(environment);
+            builder.redirectError(ProcessBuilder.Redirect.DISCARD);
+            probe = builder.start();
+            if (!probe.waitFor(5, TimeUnit.SECONDS) || probe.exitValue() != 0) return null;
+            String prefix =
+                    new String(probe.getInputStream().readNBytes(8192), StandardCharsets.UTF_8)
+                            .trim();
+            Path root = Path.of(prefix);
+            if (prefix.isBlank() || !root.isAbsolute()) return null;
+            Path bin = isWindows() ? root : root.resolve("bin");
+            for (String name :
+                    isWindows() ? List.of("dsh.cmd", "dsh.exe", "dsh") : List.of("dsh")) {
+                Path file = bin.resolve(name);
+                if (Files.isRegularFile(file)) return file.toString();
+            }
+        } catch (InterruptedException cancelled) {
+            Thread.currentThread().interrupt();
+        } catch (Exception unavailable) {
+            appendLog("[dsh] npm global command discovery unavailable");
+        } finally {
+            if (probe != null && probe.isAlive()) probe.destroyForcibly();
+        }
+        return null;
     }
 
     private static List<String> launchCommand(String command, List<String> args, int port) {
@@ -681,25 +708,6 @@ public final class DshRuntimeService implements Disposable {
         return DshJson.string(helperOperation(config), "version");
     }
 
-    private boolean recoverOrphan() {
-        for (Path path :
-                List.of(
-                        runtimeLock.getPath(),
-                        runtimeLock.getPath().resolveSibling("dsh-vscode-runtime.lock"))) {
-            if (!java.nio.file.Files.exists(path)) continue;
-            com.google.gson.JsonObject config = new com.google.gson.JsonObject();
-            config.addProperty("operation", "orphan");
-            config.addProperty("lockPath", path.toString());
-            config.addProperty("sharedLockPath", runtimeLock.getPath().toString());
-            try {
-                if (DshJson.bool(helperOperation(config), "stopped", false)) return true;
-            } catch (IOException error) {
-                appendLog(error.getMessage());
-            }
-        }
-        return false;
-    }
-
     private String probeVersion(List<String> command, Map<String, String> environment)
             throws IOException {
         int packageIndex = -1;
@@ -756,10 +764,13 @@ public final class DshRuntimeService implements Disposable {
                             .getAsJsonObject();
             var value = message.getAsJsonObject("value");
             switch (DshJson.stringOr(message, "event", "")) {
+                case "detached" -> {
+                    detachedRuntime = true;
+                    owner.clear();
+                }
                 case "process" ->
-                        runtimeLock.publishHelperProcess(
+                        owner.record(
                                 DshJson.longValue(value.get("pid"), -1),
-                                DshJson.string(value, "version"),
                                 value.has("group")
                                         ? DshJson.longValue(value.get("group"), -1)
                                         : null);
@@ -785,7 +796,7 @@ public final class DshRuntimeService implements Disposable {
                             DshRuntimeEndpoint.parse(DshJson.string(value, "launchUrl"), true);
                     if (endpoint != null) {
                         setRuntimeEndpoint(endpoint);
-                        runtimeLock.publishUrl(endpoint.baseUrl, endpoint.launchUrl);
+                        advertisements.publish(endpoint, launchedVersion, owner.pid());
                         setStatus(
                                 new RuntimeStatus(
                                         RuntimeState.RUNNING,
@@ -909,6 +920,21 @@ public final class DshRuntimeService implements Disposable {
                                 && process == child
                                 && (status.state == RuntimeState.RUNNING
                                         || status.state == RuntimeState.RECOVERING)) {
+                            DshRuntimeEndpoint endpoint = currentEndpoint();
+                            if (detachedRuntime
+                                    && endpoint != null
+                                    && isRemoteHealthy(endpoint.baseUrl)) {
+                                // Only an explicitly detached Runtime relinquishes ownership.
+                                owner.clear();
+                                process = null;
+                                managedHelper = null;
+                                setStatus(
+                                        new RuntimeStatus(
+                                                RuntimeState.RUNNING,
+                                                endpoint.baseUrl,
+                                                DshBundle.message("dsh.runtime.running")));
+                                return;
+                            }
                             setStatus(
                                     new RuntimeStatus(
                                             RuntimeState.ERROR,
@@ -990,14 +1016,19 @@ public final class DshRuntimeService implements Disposable {
                 Thread.currentThread().interrupt();
                 throw new CompletionException(error);
             }
-            if (child.isAlive() || !runtimeLock.runtimeExited())
+            if (child.isAlive() || !owner.exited())
                 throw new IllegalStateException(
-                        "DSH Runtime shutdown could not be verified; shared lock retained.");
+                        "DSH Runtime shutdown could not be verified; ownership and advertisement retained.");
         }
         process = null;
         managedHelper = null;
+        DshDebugBridge ownedDebug = debugBridge;
+        debugBridge = null;
+        if (ownedDebug != null) ownedDebug.close();
         clearRuntimeEndpoint();
-        runtimeLock.release();
+        owner.clear();
+        if (!detachedRuntime) advertisements.withdraw();
+        detachedRuntime = false;
         setStatus(
                 new RuntimeStatus(
                         RuntimeState.STOPPED, null, DshBundle.message("dsh.runtime.stopped")));
@@ -1052,16 +1083,9 @@ public final class DshRuntimeService implements Disposable {
             report.append("Remote health: ")
                     .append(isRemoteHealthy(baseUrl) ? "healthy" : "unreachable")
                     .append('\n');
-        // The shared lock is the first thing to look at whenever two editors
-        // each spawned their own Runtime: a path mismatch is the usual cause.
-        report.append("Shared runtime lock: ").append(runtimeLock.getPath()).append('\n');
-        report.append("Shared runtime lock held by this IDE: ")
-                .append(runtimeLock.isHeld() ? "yes" : "no")
-                .append('\n');
-        String advertised = runtimeLock.readAdvertisedUrl();
-        report.append("Shared runtime lock advertises: ")
-                .append(advertised == null ? "<nothing>" : advertised)
-                .append('\n');
+        report.append(
+                "Runtime discovery: per-owner advertisements; legacy records are read-only hints\n");
+        report.append("Owned Runtime PID: ").append(owner.pid()).append('\n');
         return report.toString();
     }
 
@@ -1111,7 +1135,7 @@ public final class DshRuntimeService implements Disposable {
                 && previous.baseUrl.equals(discovered.baseUrl)
                 && Objects.equals(previous.launchUrl, discovered.launchUrl)) return;
         setRuntimeEndpoint(discovered);
-        if (runtimeLock.isHeld()) runtimeLock.publishUrl(discovered.baseUrl, discovered.launchUrl);
+        if (owner.pid() > 0) advertisements.publish(discovered, launchedVersion, owner.pid());
     }
 
     /** Replace the active endpoint and invalidate a cookie bound to the old endpoint. */
@@ -1130,8 +1154,11 @@ public final class DshRuntimeService implements Disposable {
         }
     }
 
-    private static String redactRuntimeOutput(String value) {
-        return value == null ? "" : value.replaceAll("([?&]token=)[A-Za-z0-9_-]+", "$1<redacted>");
+    private String redactRuntimeOutput(String value) {
+        String safe =
+                value == null ? "" : value.replaceAll("([?&]token=)[A-Za-z0-9_-]+", "$1<redacted>");
+        DshDebugBridge bridge = debugBridge;
+        return bridge == null ? safe : bridge.redact(safe);
     }
 
     private void setStatus(RuntimeStatus next) {
@@ -1215,7 +1242,7 @@ public final class DshRuntimeService implements Disposable {
                     || (argument.equals("--profile")
                             && index + 1 < args.size()
                             && args.get(index + 1).equals("web"))) {
-                return index;
+                return argument.equals("--profile") ? index + 1 : index;
             }
         }
         return -1;

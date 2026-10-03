@@ -33,6 +33,17 @@ final class DshScheduleController {
             String session, JsonArray schedules, DshRemoteState.ProjectionCell cell) {}
 
     private volatile ScheduleSnapshot currentSchedules;
+    private volatile String unavailableSession;
+    private final java.util.concurrent.atomic.AtomicLong refreshGeneration =
+            new java.util.concurrent.atomic.AtomicLong();
+
+    JsonObject availability(String selected) {
+        if (selected == null || !selected.equals(unavailableSession)) return null;
+        JsonObject value = new JsonObject();
+        value.addProperty("status", "unavailable");
+        value.add("records", new JsonArray());
+        return value;
+    }
 
     DshScheduleController(
             Project project,
@@ -57,6 +68,8 @@ final class DshScheduleController {
 
     void refreshCurrent(String selected) {
         if (selected == null || selected.isBlank()) return;
+        long token = refreshGeneration.incrementAndGet();
+        unavailableSession = null;
         DshRemoteState.ProjectionCell cell = scheduleCell.apply(selected);
         DshRemoteState.ProjectionCell snapshot =
                 cell == null
@@ -66,14 +79,19 @@ final class DshScheduleController {
                 () -> {
                     try {
                         JsonElement value = remote.listSchedules(selected);
-                        if (!value.isJsonArray() || !selected.equals(sessionId.get())) return;
+                        if (!value.isJsonArray()
+                                || !selected.equals(sessionId.get())
+                                || token != refreshGeneration.get()) return;
                         currentSchedules =
                                 new ScheduleSnapshot(
                                         selected, value.getAsJsonArray().deepCopy(), snapshot);
                         stateChanged.run();
                     } catch (DshRemoteException missing) {
-                        if (!"http-404".equals(missing.code()))
-                            errorSink.accept(DshJson.message(missing));
+                        if (missing.isCapabilityMissing() && token == refreshGeneration.get()) {
+                            unavailableSession = selected;
+                            currentSchedules = null;
+                            stateChanged.run();
+                        } else errorSink.accept(DshJson.message(missing));
                     } catch (Exception error) {
                         errorSink.accept(DshJson.message(error));
                     }

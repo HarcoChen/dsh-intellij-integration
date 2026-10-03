@@ -1,7 +1,8 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { readRuntimeLock } from './upstream/runtimeLock';
-import { inspectLegacyRuntime, stopLegacyRuntime } from './upstream/runtimeMigration';
+import { randomUUID } from 'node:crypto';
+import { startDebugMcpServer, type DebugMcpServerHandle } from './upstream/debugMcpServer';
+import type { DebugToolOutcome } from './upstream/debugProtocol';
 import { offerLocalRuntimeUpgrade } from './upstream/localRuntimeUpgrade';
 import { acceptReply, prompt } from './upstream/localUi';
 const exec = promisify(execFile);
@@ -27,6 +28,8 @@ catch { } });
 const cancellation = new AbortController();
 let child: ReturnType<typeof spawnOwnedRuntime> | undefined;
 let recovery: RecoverySession | undefined;
+let debugServer: DebugMcpServerHandle | undefined;
+const debugPending = new Map<string, (value: DebugToolOutcome) => void>();
 let closing = false;
 const emit = (event: string, value: unknown) => process.stdout.write('\nDSH_INTELLIJ_HELPER ' + JSON.stringify({ event, value }) + '\n');
 const log = (message: string) => process.stdout.write(redactRecoveryText(message) + '\n');
@@ -42,6 +45,9 @@ async function shutdown() {
     closing = true;
     cancellation.abort(new Error('Runtime stopped'));
     recovery?.cancel();
+    await debugServer?.stop();
+    for (const settle of debugPending.values()) settle({ text: 'Debugger connection closed', isError: true });
+    debugPending.clear();
     if (child)
         await terminateOwnedRuntime(child);
     if (recovery?.getSessionId())
@@ -56,26 +62,28 @@ input.once('line', line => void main(JSON.parse(line)).catch(async (error) => { 
     await terminateOwnedRuntime(child).catch(() => { }); if (recovery?.getSessionId())
     await recovery.fail(String(error)).catch(() => { }); emit('error', { message: redactRecoveryText(String(error)) }); process.exit(cancellation.signal.aborted ? 0 : 1); }));
 async function main(config: Record<string, any>) {
+    if (config.operation === 'debug-server') {
+        input.on('line', line => {
+            try {
+                const message = JSON.parse(line);
+                if (message.type !== 'debug-result' || typeof message.id !== 'string') return;
+                const settle = debugPending.get(message.id);
+                if (!settle || typeof message.text !== 'string' || typeof message.isError !== 'boolean') return;
+                debugPending.delete(message.id); settle({text: message.text, isError: message.isError});
+            } catch { }
+        });
+        debugServer = await startDebugMcpServer({ token: config.token, tools: config.tools, execute: (name, args) => new Promise(resolve => {
+            const id = randomUUID();
+            const timer = setTimeout(() => { debugPending.delete(id); resolve({text: 'Debugger operation timed out', isError: true}); }, 50000);
+            debugPending.set(id, result => { clearTimeout(timer); resolve(result); });
+            emit('debug-call', { id, name, args });
+        }) });
+        emit('debug-ready', { url: debugServer.url }); return;
+    }
     const ledger = new RecoveryLedgerStore(config.storage);
     const diagnostics = new RecoveryDiagnostics(config.storage);
     const fixes = new FixExecutor(ledger, { appendLine: log });
     recovery = new RecoverySession({ ledger, fixes, oracle: new HealthOracle(new SandboxManager(), { diagnostics, onOutput: log }), maxBoots: 8, allowBundleIsolation: () => config.isolate, onStatus: value => emit('recovery', value), onLog: log });
-    if (config.operation === 'orphan') {
-        const snapshot = await readRuntimeLock(config.lockPath);
-        const identity = snapshot && await inspectLegacyRuntime(snapshot);
-        if (!snapshot || !identity) {
-            emit('orphan-result', { stopped: false });
-            process.exit(0);
-        }
-        const approved = await prompt(`Restart abandoned DSH Runtime at ${identity.baseUrl} (PID ${identity.pid})?`, ['Restart', 'Cancel'], 'Its editor has exited. The identified Runtime will be stopped, forcibly if necessary, before starting a compatible version. Session files are preserved.');
-        if (approved === 'Restart') {
-            await stopLegacyRuntime(snapshot, identity, config.sharedLockPath, cancellation.signal);
-            emit('orphan-result', { stopped: true });
-        }
-        else
-            emit('orphan-result', { stopped: false });
-        process.exit(0);
-    }
     if (config.operation === 'upgrade') {
         const probe = async () => {
             try {
@@ -173,9 +181,15 @@ async function main(config: Record<string, any>) {
         const collect = (data: Buffer) => { output = (output + data.toString('utf8')).slice(-100000); process.stdout.write(data); };
         current.stdout!.on('data', collect);
         current.stderr!.on('data', collect);
+        let stdoutEnded = false;
+        let stderrEnded = false;
+        current.stdout!.once('end', () => { stdoutEnded = true; });
+        current.stderr!.once('end', () => { stderrEnded = true; });
         let ready = false;
-        for (let tries = 0; tries < 600 && !exit && !launchError; tries++) {
+        let healthy: (() => Promise<boolean>) | undefined;
+        for (let tries = 0; tries < 600 && !launchError; tries++) {
             cancellation.signal.throwIfAborted();
+            if (exit && stdoutEnded && stderrEnded) break;
             const launch = output.match(/http:\/\/(?:127\.0\.0\.1|localhost|\[::1\]):\d+\/\?token=[A-Za-z0-9_-]+/)?.[0];
             if (launch) {
                 try {
@@ -184,6 +198,7 @@ async function main(config: Record<string, any>) {
                     const base = new URL(launch).origin;
                     const unary = new RemoteUnaryClient({ baseUrl: base, requestHeaders: (): Record<string, string> => cookie ? { Cookie: cookie } : {}, timeoutMs: 1500 });
                     await unary.call('session/list', { _request: {} });
+                    healthy = async () => { try { await unary.call('session/list', { _request: {} }); return true; } catch { return false; } };
                     cancellation.signal.throwIfAborted();
                     emit('ready', { url: base, launchUrl: launch });
                     ready = true;
@@ -200,6 +215,19 @@ async function main(config: Record<string, any>) {
         }
         if (ready)
             await completion;
+        if (ready && exit && healthy && await healthy()) {
+            // Wrapper completion does not prove that the Runtime endpoint is gone.
+            // Relinquish process ownership, retain discovery, and never retry into a second server.
+            child = undefined;
+            emit('detached', { serving: true });
+            let failures = 0;
+            while (!cancellation.signal.aborted && failures < 3) {
+                await pause(1000);
+                failures = await healthy() ? 0 : failures + 1;
+            }
+            cancellation.signal.throwIfAborted();
+            throw new Error('Detached Runtime endpoint no longer responds; restart explicitly.');
+        }
         if (!exit && !launchError)
             await terminateOwnedRuntime(current);
         await terminateOwnedRuntime(current);

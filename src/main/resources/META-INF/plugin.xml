@@ -18,8 +18,8 @@
             <li><b>Balance at a glance:</b> view your DeepSeek balance and pricing
             information in the status bar when available.</li>
             <li><b>Local Runtime management:</b> start, stop, restart, or connect
-            to a compatible existing Harness Runtime across editor windows. A pinned,
-            integrity-checked managed distribution is available as the final local fallback.</li>
+            to a compatible existing Harness Runtime across editor windows. Automatic discovery
+            uses a local or official Desktop-registered dsh command.</li>
             <li><b>Provider and conversation controls:</b> configure provider endpoints,
             credentials, and models; navigate conversation turns; and submit optional
             message or session feedback when the Runtime advertises those capabilities.</li>
@@ -30,8 +30,8 @@
         and ask a question or right-click a code selection. Runtime settings
         are under Settings &gt; Tools &gt; DeepSeek Harness.</p>
         <p><b>Requirements:</b> IntelliJ Platform 2024.3 or later with JCEF.
-        Local Runtime startup uses the verified managed distribution when enabled and
-        falls back to Node.js with pnpm or npm/npx, or an installed dsh command. The
+        Local Runtime startup discovers an installed dsh command; explicit pnpm/npx
+        launch commands remain available. The
         bundled lifecycle helper requires Node.js 24+. You can also connect to an existing Runtime.</p>
         <p><a href="https://github.com/HarcoChen/dsh-intellij-integration#readme">Getting started and configuration</a>
         | <a href="https://github.com/HarcoChen/dsh-intellij-integration/blob/main/README.zh-CN.md">简体中文指南</a>
@@ -58,6 +58,8 @@
         <projectService serviceImplementation="top.harcochen.dsh.DshRuntimeService"/>
         <projectService serviceImplementation="top.harcochen.dsh.remote.DshRemoteService"/>
         <projectService serviceImplementation="top.harcochen.dsh.DshSettingsState"/>
+        <projectService serviceImplementation="top.harcochen.dsh.DshChatDraftState"/>
+        <fileEditorProvider implementation="top.harcochen.dsh.DshChatEditorProvider"/>
         <projectConfigurable parentId="tools" id="top.harcochen.dsh.settings"
                              displayName="DeepSeek Harness"
                              instance="top.harcochen.dsh.DshSettingsConfigurable"/>
@@ -82,6 +84,10 @@
         <action id="Dsh.ManageProviders" class="top.harcochen.dsh.action.DshCommandAction" />
         <action id="Dsh.ManageAgentPresets" class="top.harcochen.dsh.action.DshCommandAction" />
         <action id="Dsh.ConversationOutline" class="top.harcochen.dsh.action.DshCommandAction" />
+        <action id="Dsh.BrowseRuntimeFiles" class="top.harcochen.dsh.action.DshCommandAction" />
+        <action id="Dsh.RefreshRuntimeFile" class="top.harcochen.dsh.action.DshCommandAction" />
+        <action id="Dsh.ShowWhatsNew" class="top.harcochen.dsh.action.DshCommandAction" />
+        <action id="Dsh.OpenInEditor" class="top.harcochen.dsh.action.DshCommandAction" />
         <action id="Dsh.Diagnose" class="top.harcochen.dsh.action.DshCommandAction" />
         <action id="Dsh.AskAboutSelection" class="top.harcochen.dsh.action.DshAskAboutSelectionAction">
             <add-to-group group-id="EditorPopupMenu" anchor="last" />
@@ -92,14 +98,14 @@
         </action>
         <action id="Dsh.InsertEditorReference" class="top.harcochen.dsh.action.DshInsertEditorReferenceAction" />
         <action id="Dsh.ExplainDebugState" class="top.harcochen.dsh.action.DshExplainDebugStateAction">
-            <add-to-group group-id="XDebugger.ToolBar" anchor="last" />
+            <add-to-group group-id="XDebugger.ToolWindow.TopToolbar" anchor="last" />
         </action>
         <action id="Dsh.ExplainDiff" class="top.harcochen.dsh.action.DshGitDiffTaskAction" />
         <action id="Dsh.FixDiff" class="top.harcochen.dsh.action.DshGitDiffTaskAction" />
         <action id="Dsh.ReviewDiff" class="top.harcochen.dsh.action.DshGitDiffTaskAction" />
         <action id="Dsh.DocsDiff" class="top.harcochen.dsh.action.DshGitDiffTaskAction" />
         <group id="Dsh.GitDiffTasks" popup="true">
-            <add-to-group group-id="Vcs.ContextMenu" anchor="last" />
+            <add-to-group group-id="Vcs.Operations.Popup" anchor="last" />
             <reference ref="Dsh.ExplainDiff" />
             <reference ref="Dsh.FixDiff" />
             <reference ref="Dsh.ReviewDiff" />

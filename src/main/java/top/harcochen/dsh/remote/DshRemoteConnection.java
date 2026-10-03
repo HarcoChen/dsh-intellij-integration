@@ -69,9 +69,11 @@ public final class DshRemoteConnection implements AutoCloseable {
     private final Map<String, Long> goalActivationEpochs = new HashMap<>();
     private long generation;
     private Opening opening;
-    private DshRemoteEventClient events;
+    private volatile DshRemoteEventClient events;
     private final Map<String, StreamLease> coreStreams = new HashMap<>();
     private final Map<String, FollowLease> follows = new HashMap<>();
+    private final Map<String, ExtraStream> extraStreams = new HashMap<>();
+    private final Map<String, QuestionWait> questionWaits = new HashMap<>();
     private int backoffAttempt;
 
     DshRemoteConnection(
@@ -113,7 +115,8 @@ public final class DshRemoteConnection implements AutoCloseable {
     void start() {
         execute(
                 () -> {
-                    if (stopped || started) return;
+                    if (started || executor.isShutdown()) return;
+                    stopped = false;
                     started = true;
                     connectNow();
                 });
@@ -346,6 +349,7 @@ public final class DshRemoteConnection implements AutoCloseable {
         Opening settled = opening;
         opening = null;
         generationConnected = true;
+        for (ExtraStream stream : extraStreams.values()) openExtra(stream);
         publish();
         backoffAttempt = 0;
         Objects.requireNonNull(settled);
@@ -457,7 +461,18 @@ public final class DshRemoteConnection implements AutoCloseable {
             opening = null;
         }
         generationConnected = false;
+        for (QuestionWait wait : questionWaits.values()) wait.close();
+        questionWaits.clear();
+        if (events != null) events.close();
         events = null;
+        for (ExtraStream stream : extraStreams.values()) {
+            if (stream.handle != null) stream.handle.cancel();
+            stream.handle = null;
+            JsonObject error = new JsonObject();
+            error.addProperty("code", "carrier/disconnected");
+            error.addProperty("message", reason);
+            stream.terminal.accept(error);
+        }
         for (StreamLease lease : coreStreams.values()) lease.handle.cancel();
         coreStreams.clear();
         for (FollowLease lease : follows.values()) lease.stream = null;
@@ -485,6 +500,10 @@ public final class DshRemoteConnection implements AutoCloseable {
         }
     }
 
+    void republish() {
+        execute(this::publish);
+    }
+
     /**
      * Run on the connection executor, ignoring tasks submitted after dispose. Callbacks racing
      * {@link #close()} must never surface a {@link
@@ -503,9 +522,9 @@ public final class DshRemoteConnection implements AutoCloseable {
     // ---------------------------------------------------------------------------
 
     /** Answer one pending waterfall; may block on HTTP. Returns null on success. */
-    DshRemoteException answer(String eventId, JsonObject outcome) {
+    DshRemoteException answer(String eventId, JsonObject outcome, long expectedGeneration) {
         DshRemoteEventClient current = events;
-        if (current == null) {
+        if (current == null || expectedGeneration != pendingGeneration.get()) {
             return DshRemoteException.carrier(
                     DshRemoteContracts.EVENT_RESULT_ENDPOINT,
                     "The Remote event stream is not ready; the answer was not sent",
@@ -531,6 +550,7 @@ public final class DshRemoteConnection implements AutoCloseable {
                     () -> {
                         if (gen != generation) return;
                         if ("settings/document-updated".equals(event)
+                                || "commands/change".equals(event)
                                 || "agent-preset/selected".equals(event)) {
                             settingsEpoch++;
                             publish();
@@ -538,6 +558,10 @@ public final class DshRemoteConnection implements AutoCloseable {
                         }
                         if ("schedule/changed".equals(event)
                                 || "credentials/record-updated".equals(event)
+                                || "credentials/reference-updated".equals(event)
+                                || "llm/adapters-updated".equals(event)
+                                || "permission-presets/catalog-changed".equals(event)
+                                || "plugin-manager/changed".equals(event)
                                 || "deepseek-account/session-expired".equals(event)
                                 || "deepseek-account/model-sign-in-required".equals(event)) {
                             if (event.startsWith("deepseek-account/"))
@@ -591,8 +615,10 @@ public final class DshRemoteConnection implements AutoCloseable {
                         switch (event) {
                             case "approval/request" ->
                                     state.requestApproval(agentId, eventId, request);
-                            case "user-questions/request" ->
-                                    state.requestQuestion(agentId, eventId, request);
+                            case "user-questions/request" -> {
+                                state.requestQuestion(agentId, eventId, request);
+                                attachQuestionWait(agentId, eventId, request);
+                            }
                             default -> {
                                 callbacks.onDropped("Ignoring unknown waterfall event: " + event);
                                 return;
@@ -608,6 +634,8 @@ public final class DshRemoteConnection implements AutoCloseable {
                     () -> {
                         if (gen != generation) return;
                         state.cancelInteraction(eventId);
+                        QuestionWait wait = questionWaits.remove(eventId);
+                        if (wait != null) wait.close();
                         publish();
                     });
         }
@@ -737,6 +765,211 @@ public final class DshRemoteConnection implements AutoCloseable {
         return executor;
     }
 
+    JsonObject claimInteraction(String sessionId, String key) {
+        try {
+            return executor.submit(
+                            () -> {
+                                JsonObject item = state.claimInteraction(sessionId, key);
+                                if (item != null) {
+                                    item.addProperty("connectionGeneration", generation);
+                                    QuestionWait wait =
+                                            questionWaits.remove(string(item, "eventId"));
+                                    if (wait != null) wait.close();
+                                    publish();
+                                }
+                                return item;
+                            })
+                    .get(5, TimeUnit.SECONDS);
+        } catch (Exception error) {
+            return null;
+        }
+    }
+
+    void completeQuestion(
+            String sessionId, String key, JsonElement answers, long expectedGeneration) {
+        execute(
+                () -> {
+                    if (expectedGeneration != generation) return;
+                    state.completeQuestion(sessionId, key, answers);
+                    publish();
+                });
+    }
+
+    private void attachQuestionWait(String sessionId, String eventId, JsonObject request) {
+        JsonObject config =
+                request.has("wait") && request.get("wait").isJsonObject()
+                        ? request.getAsJsonObject("wait")
+                        : null;
+        String callId = string(config, "callId");
+        if (callId == null || !top.harcochen.dsh.DshJson.bool(config, "timed", false)) return;
+        QuestionWait previous = questionWaits.remove(eventId);
+        if (previous != null) previous.close();
+        QuestionWait wait = new QuestionWait();
+        questionWaits.put(eventId, wait);
+        long gen = generation;
+        JsonObject args = new JsonObject();
+        args.addProperty("agentId", sessionId);
+        args.addProperty("callId", callId);
+        wait.handle =
+                mux.open(
+                        "userQuestions/attachWait",
+                        args,
+                        new DshRemoteMuxClient.StreamHandler() {
+                            @Override
+                            public void onItem(JsonObject value) {
+                                if (gen != generation || questionWaits.get(eventId) != wait) return;
+                                long remaining =
+                                        top.harcochen.dsh.DshJson.longValue(
+                                                value.get("remainingMs"), -1);
+                                if (remaining < 0 || remaining > Integer.MAX_VALUE) {
+                                    wait.close();
+                                    return;
+                                }
+                                if (wait.timeout != null) wait.timeout.cancel(false);
+                                state.questionWait(
+                                        sessionId,
+                                        "u:" + callId,
+                                        System.currentTimeMillis() + remaining,
+                                        true);
+                                publish();
+                                wait.timeout =
+                                        timer.schedule(
+                                                () ->
+                                                        execute(
+                                                                () ->
+                                                                        expireQuestion(
+                                                                                sessionId, callId,
+                                                                                eventId, wait,
+                                                                                gen)),
+                                                remaining,
+                                                TimeUnit.MILLISECONDS);
+                            }
+
+                            @Override
+                            public void onTerminal(JsonObject error) {
+                                if (gen != generation || questionWaits.get(eventId) != wait) return;
+                                wait.close();
+                                questionWaits.remove(eventId);
+                                state.questionWait(sessionId, "u:" + callId, null, error == null);
+                                publish();
+                            }
+                        });
+    }
+
+    private static final class QuestionWait {
+        DshRemoteMuxClient.StreamHandle handle;
+        java.util.concurrent.ScheduledFuture<?> timeout;
+
+        void close() {
+            if (handle != null) handle.cancel();
+            if (timeout != null) timeout.cancel(false);
+        }
+    }
+
+    private void expireQuestion(
+            String sessionId, String callId, String eventId, QuestionWait wait, long gen) {
+        if (gen != generation || questionWaits.get(eventId) != wait) return;
+        JsonObject item = state.peekInteraction(sessionId, "u:" + callId);
+        if (item == null || !"open".equals(string(item, "questionState"))) return;
+        item = state.claimInteraction(sessionId, "u:" + callId);
+        if (item == null) return;
+        questionWaits.remove(eventId);
+        wait.close();
+        publish();
+        JsonObject outcome = new JsonObject();
+        outcome.addProperty("kind", "rejected");
+        JsonObject error = new JsonObject();
+        error.addProperty("name", "UserQuestionError");
+        error.addProperty("code", "ASK_TIMED_OUT");
+        error.addProperty("message", "ask_user_question timed out before the user answered");
+        outcome.add("error", error);
+        DshRemoteEventClient source = events;
+        java.util.concurrent.CompletableFuture.runAsync(
+                () -> {
+                    try {
+                        if (source != null) source.answer(eventId, outcome);
+                    } catch (DshRemoteException failure) {
+                        interactionStatus(
+                                sessionId, "u:" + callId, "failed", failure.display(), false, gen);
+                    }
+                });
+    }
+
+    /** Feature streams share the physical mux and are recreated after its next baseline. */
+    AutoCloseable watchStream(
+            String endpoint,
+            java.util.function.Supplier<JsonObject> args,
+            Consumer<JsonObject> items,
+            Consumer<JsonObject> terminal) {
+        String id = java.util.UUID.randomUUID().toString();
+        ExtraStream stream = new ExtraStream(endpoint, args, items, terminal);
+        execute(
+                () -> {
+                    extraStreams.put(id, stream);
+                    if (generationConnected) openExtra(stream);
+                });
+        return () ->
+                execute(
+                        () -> {
+                            stream.closed = true;
+                            extraStreams.remove(id);
+                            if (stream.handle != null) stream.handle.cancel();
+                        });
+    }
+
+    private void openExtra(ExtraStream stream) {
+        if (stream.closed) return;
+        JsonObject args;
+        try {
+            args = stream.args.get();
+        } catch (RuntimeException unavailable) {
+            stream.closed = true;
+            JsonObject error = new JsonObject();
+            error.addProperty("code", "feature/unavailable");
+            error.addProperty("message", "Feature subscription is no longer available");
+            stream.terminal.accept(error);
+            return;
+        }
+        long gen = generation;
+        stream.handle =
+                mux.open(
+                        stream.endpoint,
+                        args,
+                        new DshRemoteMuxClient.StreamHandler() {
+                            @Override
+                            public void onItem(JsonObject value) {
+                                if (!stream.closed && gen == generation && generationConnected)
+                                    stream.items.accept(value);
+                            }
+
+                            @Override
+                            public void onTerminal(JsonObject error) {
+                                if (!stream.closed && gen == generation)
+                                    stream.terminal.accept(error);
+                            }
+                        });
+    }
+
+    private static final class ExtraStream {
+        final String endpoint;
+        final java.util.function.Supplier<JsonObject> args;
+        final Consumer<JsonObject> items;
+        final Consumer<JsonObject> terminal;
+        DshRemoteMuxClient.StreamHandle handle;
+        boolean closed;
+
+        ExtraStream(
+                String endpoint,
+                java.util.function.Supplier<JsonObject> args,
+                Consumer<JsonObject> items,
+                Consumer<JsonObject> terminal) {
+            this.endpoint = endpoint;
+            this.args = args;
+            this.items = items;
+            this.terminal = terminal;
+        }
+    }
+
     /**
      * Open one untracked stream for a one-shot read (snapshot plus cancel). The open is sequenced
      * behind pending frames on the connection executor; items and the terminal arrive on it too.
@@ -764,9 +997,15 @@ public final class DshRemoteConnection implements AutoCloseable {
 
     /** Update one interaction's submission status and republish. */
     void interactionStatus(
-            String sessionId, String key, String status, String error, boolean resolved) {
+            String sessionId,
+            String key,
+            String status,
+            String error,
+            boolean resolved,
+            long expectedGeneration) {
         execute(
                 () -> {
+                    if (expectedGeneration != generation) return;
                     if (resolved) state.resolveInteraction(sessionId, key);
                     else state.setInteractionStatus(sessionId, key, status, error);
                     publish();

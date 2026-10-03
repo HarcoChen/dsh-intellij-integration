@@ -93,8 +93,61 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
     private final DshPromptController prompts;
     private final DshChangeReviewStore changeReviews;
     private final DshFeedbackController feedback;
+    private final DshJobsController jobs;
+    private final DshRuntimeWorkspaceBrowser runtimeFiles;
 
     private DshBridge bridge;
+    private final Set<ChatMirror> mirrors = new HashSet<>();
+
+    ChatMirror createMirror() {
+        ChatMirror mirror = new ChatMirror();
+        mirrors.add(mirror);
+        postStateLater();
+        return mirror;
+    }
+
+    final class ChatMirror extends JPanel implements com.intellij.openapi.Disposable {
+        private DshBridge view;
+        private boolean ready;
+        private boolean closed;
+
+        ChatMirror() {
+            super(new BorderLayout());
+            if (!DshBridge.isAvailable()) {
+                add(new JBLabel(DshBundle.message("dsh.fallback.jcef.unavailable")));
+                return;
+            }
+            view =
+                    new DshBridge(
+                            action -> {
+                                if (closed || disposed) return;
+                                if (action.isJsonObject()
+                                        && "ready"
+                                                .equals(string(action.getAsJsonObject(), "type"))) {
+                                    ready = true;
+                                    postStateLater();
+                                    return;
+                                }
+                                receiveAction(action);
+                            },
+                            remote::webviewDrafts,
+                            remote::saveWebviewDrafts);
+            view.load();
+            add(view.getComponent(), BorderLayout.CENTER);
+        }
+
+        void post(JsonElement message) {
+            if (!closed && ready && view != null) view.postMessage(message);
+        }
+
+        @Override
+        public void dispose() {
+            closed = true;
+            mirrors.remove(this);
+            if (view != null) view.dispose();
+        }
+    }
+
     private JPanel fallbackPanel;
     private JLabel fallbackLabel;
     private volatile boolean disposed;
@@ -106,6 +159,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
     private volatile String followedSession;
     private volatile String lastScheduleSession;
     private volatile long lastScheduleEpoch = Long.MIN_VALUE;
+    private volatile String featureCatalogEpoch;
     private volatile long projectedCursor = Long.MIN_VALUE;
     private volatile JsonArray projectedEvents;
     private volatile JsonObject projectedAssistantStream;
@@ -134,6 +188,9 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
                             return thread;
                         });
         this.sessionState = new DshSessionStateStore(markdownRenderCache);
+        this.jobs = new DshJobsController(remote, this::postStateLater);
+        this.runtimeFiles =
+                new DshRuntimeWorkspaceBrowser(project, runtime, remote, operations, this::notify);
         this.changeReviews = new DshChangeReviewStore(operations, this::postStateLater);
         this.ideContext =
                 new DshIdeContextController(
@@ -287,6 +344,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
         remote.addListener(snapshotListener);
         setBorder(BorderFactory.createEmptyBorder());
         createWebview();
+        DshWhatsNew.show(project, false);
         if (DshSettingsState.getInstance(project).autoStart && project.getBasePath() != null) {
             operations.execute(
                     () -> runtime.startAsync().whenComplete((ignored, error) -> postStateLater()));
@@ -304,8 +362,12 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
         if (reprojectInFlight.compareAndSet(false, true)) {
             operations.execute(
                     () -> {
+                        DshRemoteState.Snapshot observed;
                         try {
-                            reproject();
+                            do {
+                                observed = snapshot;
+                                reproject();
+                            } while (!disposed && observed != snapshot);
                         } finally {
                             reprojectInFlight.set(false);
                         }
@@ -324,6 +386,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
         DshRemoteState.Snapshot current = snapshot;
         if (current == null) return;
         if (DshRemoteService.PHASE_STOPPED.equals(current.phase)) {
+            jobs.close();
             releaseFollowedSession();
             messages = new JsonArray();
             projection = null;
@@ -332,6 +395,15 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
         }
         chooseSessionIfNecessary(current);
         String selected = sessionId;
+        if (DshRemoteService.PHASE_CONNECTED.equals(current.phase)) {
+            String epoch = current.generation + ":" + remote.settingsEpoch();
+            if (!epoch.equals(featureCatalogEpoch)) {
+                featureCatalogEpoch = epoch;
+                prompts.invalidateCatalogs();
+            }
+            prompts.refreshCatalogs(selected);
+        }
+        jobs.select(selected);
         if (selected != null && !selected.isBlank()) {
             persistSelectedSession();
         }
@@ -354,6 +426,10 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
         feedback.prune(live);
 
         if (selected != null) {
+            JsonObject team =
+                    top.harcochen.dsh.remote.DshTeamProjection.normalize(
+                            cellValue(selected, "agentTeam"));
+            if (team != null) subagents.observeTeam(selected, team);
             long scheduleEpoch = remote.settingsEpoch();
             if (!selected.equals(lastScheduleSession) || scheduleEpoch != lastScheduleEpoch) {
                 lastScheduleSession = selected;
@@ -439,6 +515,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
     /** Move the live history subscription when the user switches sessions. */
     private void switchFollowedSession() {
         String target = sessionId;
+        jobs.select(target);
         String previous = followedSession;
         if (target != null && target.equals(previous)) return;
         releaseFollowedSession();
@@ -479,7 +556,9 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
         }
         DshBridge candidate = null;
         try {
-            candidate = new DshBridge(this::receiveAction);
+            candidate =
+                    new DshBridge(
+                            this::receiveAction, remote::webviewDrafts, remote::saveWebviewDrafts);
             candidate.load();
             if (fallbackPanel != null) {
                 remove(fallbackPanel);
@@ -566,7 +645,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
         switch (type) {
             case "start" -> runAction("start", runtime::startAsync);
             case "stop" -> runAction("stop", runtime::stopAsync);
-            case "restart" -> runAction("restart", runtime::restartAsync);
+            case "restart", "restartRuntime" -> runAction("restart", runtime::restartAsync);
             case "sendPrompt" -> prompts.send(action);
             case "cancel" -> prompts.cancel();
             case "updateQueue" -> prompts.updateQueue(action);
@@ -577,6 +656,8 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
                 lastError = null;
                 DshSettingsState.getInstance(project).lastSessionId = "";
                 subagents.reset();
+                jobs.select(null);
+                releaseFollowedSession();
                 postStateLater();
             }
             case "switchSession" -> {
@@ -615,6 +696,10 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
             case "openTrace" -> openTrace(action);
             case "openConversationOutline" -> openConversationOutline();
             case "openPromptTemplatePicker" -> openPromptTemplatePicker();
+            case "browseRuntimeFiles" -> runtimeFiles.browse(sessionId);
+            case "refreshRuntimeFile" -> runtimeFiles.refresh();
+            case "showWhatsNew" -> DshWhatsNew.show(project, true);
+            case "openInEditor" -> DshChatEditorProvider.open(project);
             case "openTerminalCommandPicker" ->
                     notify(DshBundle.message("dsh.terminal.context.unavailable"));
             case "openBrowser" -> openBrowser();
@@ -668,6 +753,15 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
                                     });
             case "manageSettings" -> runtimeSettings.togglePanel();
             case "refreshPluginInventory" -> runtimeSettings.refreshPluginInventory();
+            case "setPluginEnabled" ->
+                    runtimeSettings.setPluginEnabled(
+                            string(action, "entryId"), bool(action, "enabled", false), false);
+            case "setBundleEnabled" ->
+                    runtimeSettings.setPluginEnabled(
+                            string(action, "name"), bool(action, "enabled", false), true);
+            case "killJob" ->
+                    jobs.kill(sessionId, string(action, "jobId"), operations, this::notify);
+            case "openTeamMember" -> subagents.open(string(action, "memberId"));
             case "mutateSettings" -> runtimeSettings.mutate(action);
             case "configureApiKey" -> runtimeSettings.configureApiKey();
             case "configureJevApiKey" -> runtimeSettings.configureJevApiKey();
@@ -1189,12 +1283,13 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
             postStateLater();
             return;
         }
-        if (disposed || bridge == null || !webviewReady) return;
+        if (disposed || ((bridge == null || !webviewReady) && mirrors.isEmpty())) return;
         JsonObject envelope = new JsonObject();
         envelope.addProperty("type", "state");
         envelope.addProperty("protocol", WEBVIEW_PROTOCOL_VERSION);
         envelope.add("state", ReadAction.compute(this::buildState));
-        bridge.postMessage(envelope);
+        if (bridge != null && webviewReady) bridge.postMessage(envelope);
+        for (ChatMirror mirror : List.copyOf(mirrors)) mirror.post(envelope);
     }
 
     private JsonObject buildState() {
@@ -1281,15 +1376,22 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
         DshRemoteState.ProjectionCell permissionsCell = projectionCell(sessionId, "permissions");
         JsonObject permissions =
                 DshSessionStateStore.permissions(
-                        permissionsCell == null ? null : permissionsCell.value());
+                        permissionsCell == null ? null : permissionsCell.value(),
+                        remote.permissionOptions());
         if (permissions != null) state.add("permissions", permissions);
         DshRemoteState.SessionView view = sessionView(sessionId);
         state.add(
                 "interactions",
                 DshInteractionProjector.present(
-                        view == null ? new JsonArray() : view.interactions));
+                        view == null ? new JsonArray() : view.interactions, sessionId));
         state.add("queue", view == null ? new JsonArray() : view.queue);
-        state.add("jobs", view == null ? new JsonArray() : view.jobs);
+        JsonArray liveJobs = jobs.view(sessionId);
+        state.add(
+                "jobs", liveJobs == null ? (view == null ? new JsonArray() : view.jobs) : liveJobs);
+        JsonObject team =
+                top.harcochen.dsh.remote.DshTeamProjection.normalize(
+                        cellValue(sessionId, "agentTeam"));
+        if (team != null) state.add("team", team);
         state.add("changeReviews", changeReviews.view(sessionId));
         state.add("skills", sessionState.skillCatalog(sessionId));
         state.add("commands", sessionState.commandCatalog(sessionId));
@@ -1301,6 +1403,8 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
         JsonArray liveSchedule = schedules.current(sessionId, scheduleCell);
         if (liveSchedule != null) schedule = liveSchedule;
         if (schedule != null) state.add("schedule", schedule);
+        JsonObject scheduleAvailability = schedules.availability(sessionId);
+        if (scheduleAvailability != null) state.add("scheduleCatalog", scheduleAvailability);
         JsonObject imageLimits =
                 DshSessionStateStore.imageLimits(cellValue(sessionId, "imageLimits"));
         if (imageLimits != null) state.add("imageLimits", imageLimits);
@@ -1393,8 +1497,9 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
     private void postToWebview(JsonObject envelope) {
         SwingUtilities.invokeLater(
                 () -> {
-                    if (disposed || bridge == null || !webviewReady) return;
-                    bridge.postMessage(envelope);
+                    if (disposed) return;
+                    if (bridge != null && webviewReady) bridge.postMessage(envelope);
+                    for (ChatMirror mirror : List.copyOf(mirrors)) mirror.post(envelope);
                 });
     }
 
@@ -1436,6 +1541,13 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
                     if (!pending) {
                         lastError = DshBundle.message("dsh.interaction.unavailable");
                         postStateLater();
+                        return;
+                    }
+                    if (!action.has("outcome")
+                            && !DshInteractionProjector.answersMatch(
+                                    pendingItem.getAsJsonArray("questions"),
+                                    action.getAsJsonArray("answers"))) {
+                        notify(DshBundle.message("dsh.question.answers.invalid"));
                         return;
                     }
                     if ("allowed-once".equals(string(action, "outcome"))) {
@@ -1768,6 +1880,9 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
     @Override
     public void dispose() {
         disposed = true;
+        for (ChatMirror mirror : List.copyOf(mirrors)) mirror.dispose();
+        jobs.close();
+        runtimeFiles.close();
         runtime.removeStatusListener(runtimeStatusListener);
         remote.removeListener(snapshotListener);
         releaseFollowedSession();

@@ -5,6 +5,88 @@ An item is complete only after the host action, runtime protocol, projected stat
 
 Status: `[x]` implemented, `[-]` usable but not yet at VS Code parity, `[ ]` not implemented.
 
+## Current parity — dsh-ide v0.10.2（2026-10-03）
+
+Target: companion `deb8d8f882586c42a20abfbb5609cb0643fac309` and Harness
+`dsh-v0.2.0-rc.2`. The callable product features below are aligned; platform
+limits are explicit exceptions, rather than silently successful placeholders.
+Historical validation sections below retain their original coverage boundaries.
+
+### Completed differences
+
+- [x] Agent Preset list/read/select and Make default. Removed obsolete copy,
+  delete and directory-opening RPCs and misleading trust labels. Default selection
+  uses the available `agent-preset-registry` / legacy `agent-presets` settings namespace.
+- [x] Optional autonomous debugger: existing Run/Debug configurations, source
+  breakpoints and conditions/log expressions, continue/pause/step, paused threads,
+  wait, frame selection and bounded context through local authenticated MCP.
+  Disabled by default; local owned Runtime only. No arbitrary launch configuration
+  creation or debugger expression-evaluation endpoint.
+- [x] Editor Tab chat shares the tool-window controller, selected Session, Remote
+  service, messages, controls and IDE actions. Closing the tab releases only its view.
+- [x] Runtime ownership is in-process. Per-owner advertisements coexist; legacy
+  lock files are read-only hints. A companion-compatible loopback startup mutex
+  waits at most 250 ms and holds at most 500 ms. A wrapper may exit while its
+  endpoint serves: relinquish ownership and retain discovery instead of relaunching.
+- [x] Question drafts persist in project-local IDE settings across IDE
+  restarts. Per-view deltas prevent an idle mirror from overwriting another view;
+  accepted-but-queued answers retain drafts until durable settlement.
+- [x] Command/skill catalogs invalidate on connection/configuration changes;
+  plugin outcomes expose the restart action; question answers validate against
+  the actual requested identifiers and options; native toolbar/menu groups use
+  the available IntelliJ action ids.
+
+### Platform exceptions — deliberately not implemented
+
+- [ ] **IDE terminal command/output context on the 2024.3 baseline.** The recommended
+  public Reworked Terminal API, including shell command listeners and output models,
+  is available since **2025.3** and is still experimental. It cannot be compiled or
+  depended upon as a common capability for the supported IC/PC 2024.3.6 baseline.
+  Do not cast to private Classic/Experimental Terminal implementations or scrape
+  their buffers. A future optional 2025.3+ integration would need a separate API
+  version/dependency and acceptance matrix. Evidence:
+  [JetBrains Embedded Terminal SDK](https://plugins.jetbrains.com/docs/intellij/embedded-terminal.html).
+- [ ] **Product-neutral debugger options absent from XDebugger's public contract.**
+  Generic `XDebugSession` has step/resume/pause and current-frame APIs, but no
+  DAP-style instruction/statement granularity or single-thread resume flag.
+  Generic `XBreakpoint`/`XLineBreakpoint` exposes conditions and log expressions,
+  but no hit-condition or `{expression}` log-template API. Verification has setters
+  on `XDebugSession`, but no public generic getter; a structured stop reason and
+  running-thread enumeration are likewise not exposed. Do not guess properties
+  or report an invented verified state. Current tools reject unsupported arguments,
+  expose paused execution stacks, and label verification unavailable. Evidence:
+  the bundled IC 243.26574.91 / PC 243.26574.90 API signatures for `XDebugSession`,
+  `XDebugProcess`, `XSuspendContext`, `XBreakpoint` and `XLineBreakpoint`; inspected
+  with `javap`, and implemented against the same baseline.
+- [ ] **VS Code Chat Participant/proposed provider APIs.** These are VS Code extension
+  contracts, not IntelliJ extension points. JetBrains uses the tool window and editor
+  FileEditor entry points above instead of duplicating VS Code-specific providers.
+
+### Shared upstream roadmap — not a difference from dsh-ide
+
+- [ ] Runtime Terminal retention, output restoration and input.
+- [ ] Plugin/Bundle installation and removal. Both integrations currently expose
+  inventory and enablement; the companion has no installation/removal product flow.
+  These are future feature work, not platform prohibitions.
+
+Harness Web/Desktop-only model search, Desktop command management and telemetry
+remain owned by those products.
+
+### Validation coverage
+
+- [x] Existing Gradle lint/build and IC/PyCharm Plugin Verifier.
+- [x] Real RC.2 Remote/Java regression with a loopback model and isolated DSH_HOME.
+- [x] Isolated IntelliJ IDEA 2024.3.6: real Java configuration, breakpoint/pause,
+  frame/variable/source context, stepping, MCP transport and real Harness MCP call,
+  editor Tab registration and Runtime/helper/debug-server shutdown.
+- [x] Advertisement coexistence, bounded contention and legacy records unchanged.
+- [x] Wrapper exits before readiness while its Runtime continues serving: no
+  duplicate launch; helper shutdown does not stop the relinquished endpoint.
+- [ ] Remaining manual acceptance: full PyCharm interaction, Windows/Linux process
+  execution, cross-machine deployments, real account sign-in, Schedule delivery,
+  Jev/Laya and third-party plugin HMR. These are unverified environments/flows,
+  not missing implemented feature paths. No unit tests were added.
+
 ## P0 — everyday chat workflow
 
 - [x] Render fenced code blocks with host-owned `renderId` / `codeBlockId` payloads.
@@ -54,7 +136,7 @@ Status: `[x]` implemented, `[-]` usable but not yet at VS Code parity, `[ ]` not
 - [x] Call `settings.openDocument` for `openSettingsDocument`, falling back to the browser root.
 - [x] Project `settings.describe` and implement validated `settings.mutate` mutations.
 - [x] Replace raw JSON provider output with a native provider/status view.
-- [x] Replace raw Agent Preset text output with native list/detail/copy/edit flows.
+- [x] Native Agent Preset list/detail/select and Make default follow the RC.2 contract.
 - [x] Preserve runtime session metadata such as attention, archived state, workspace identity, and model label.
 
 ## P0 — Runtime authentication compatibility
@@ -63,7 +145,7 @@ Status: `[x]` implemented, `[-]` usable but not yet at VS Code parity, `[ ]` not
 - [x] Exchange the launch token for a session cookie and send that cookie on RPC, response, health,
       and Mux WebSocket requests.
 - [x] Share the authenticated launch URL between IDE integrations without exposing the token in
-      Runtime logs or diagnostics; retain the pre-0.1.2 no-auth compatibility path.
+      Runtime logs or diagnostics; obsolete ApiProxy/auth protocols are rejected.
 
 ## Cross-IDE parity — migrated from dsh-ide
 
@@ -85,16 +167,32 @@ action validation, and the user-visible failure path are wired together.
 - [x] Subagent timing: consume `subagentTiming` and show settled/active duration in the tree and preview.
   - [x] Use live control projections, including children outside the session catalog, and compare timing watermarks.
   - [x] Refresh duration and activity in both views; reject malformed, fractional, or unsafe integer durations.
-- [x] Managed Runtime distribution: cache and integrity-check the platform Runtime instead of relying only on pnpm/npx.
+- [x] Historical managed Runtime distribution implementation; automatic download is deprecated
+  as of the 0.10.2 batch in favor of local/Desktop dsh discovery.
 - [x] Conversation outline: provide a native session message navigator.
 - [x] Agent status candidates: support a validated list of status labels instead of one fixed label.
-- [-] Terminal context: deferred until IntelliJ exposes a stable shell-execution event API; do not depend on terminal plugin internals.
+- [-] Terminal context: see the explicit 2024.3 API restriction above; no private terminal APIs.
 - [x] Message feedback: optional `messageFeedback` CAS mutations and `sessionFeedback/record`, with graceful fallback on older Runtimes.
 - [x] Read-only plugin inventory: consume `pluginInventory/list`, validate bounded Loader and Agent preset rows, and expose refresh/error state in the native settings bridge.
 - [x] Dynamic Cordis plugin panel: consume optional inventory, expose stop/remove/decline actions with stale-state checks, and never execute untrusted Client-half code in the IDE.
 - [x] Schedule projection: validate active reminders and render the read-only schedule tab in the Activity Dock.
 
 ## Quality gates for each batch
+
+### dsh-ide 0.10.2 / Runtime 0.2.0-rc.2（2026-10-03）
+
+- [x] Timed user-question claim、倒计时、前台/延迟回答、Session/call 草稿和 durable 结算。
+- [x] Jobs 实时 roster、非消费输出、游标重连续读和取消。
+- [x] Team 投影、任务与成员导航，移除过期 Team RPC。
+- [x] 权限 catalog 缓存、插件/Bundle 开关与只读/应用结果。
+- [x] Host Workspace 文件浏览、multipart UTF-8 预览、版本/大小校验和 watcher。
+- [x] 官方 Desktop 启动引导、Runtime 广告互通、Laya loopback HTTP 与更新通知。
+- [x] 现有 Gradle 门禁、真实 RC.2 Java/companion 联调和 Webview Chrome smoke。
+- [ ] 真实 IC/PyCharm 安装 ZIP 后的原生 UI 人工验收。
+
+迁移范围、pin 与验证边界见 [RC.2 迁移报告](RPC_0.2.0_RC2_ADAPTATION.md)。
+
+上游仍计划后续实现的 Runtime Terminal、插件安装/卸载不在本次 0.10.2 UI 迁移中。
 
 Latest parity batch verified on 2026-09-14 against the pinned `0.1.2-rc.1` Runtime:
 

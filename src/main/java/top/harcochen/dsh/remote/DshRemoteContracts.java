@@ -9,7 +9,7 @@ import java.util.UUID;
 
 /**
  * Wire contracts for the RC Remote API, fixed against {@code deepseek-harness} tag {@code
- * dsh-v0.1.7-rc.2}, commit {@code 477b4f420553e8a52c2fbccc464d7561b239c443}.
+ * dsh-v0.2.0-rc.2}, commit {@code 639ed015397290b3745d163aafe02ffee4aa3f84}.
  *
  * <p>Every endpoint's {@code args} field names were taken from the Host method parameters (the
  * descriptor {@code wire} names), not from flattened DTOs. Zero-argument endpoints send an {@code
@@ -19,10 +19,10 @@ import java.util.UUID;
  */
 public final class DshRemoteContracts {
     /** Harness tag this contract was audited against. */
-    public static final String TARGET_TAG = "dsh-v0.1.7-rc.2";
+    public static final String TARGET_TAG = "dsh-v0.2.0-rc.2";
 
     /** Harness commit this contract was audited against. */
-    public static final String TARGET_COMMIT = "477b4f420553e8a52c2fbccc464d7561b239c443";
+    public static final String TARGET_COMMIT = "639ed015397290b3745d163aafe02ffee4aa3f84";
 
     public static final String MUX_PATH = "/api/remote.mux";
     public static final String EVENT_STREAM_ENDPOINT = "$events";
@@ -71,13 +71,10 @@ public final class DshRemoteContracts {
     public static final String AGENT_PRESETS_LIST = "agentPresets/list";
     public static final String AGENT_PRESETS_SELECT = "agentPresets/select";
     public static final String AGENT_PRESETS_READ = "agentPresets/read";
-    public static final String AGENT_PRESETS_COPY = "agentPresets/copy";
-    public static final String AGENT_PRESETS_DELETE = "agentPresets/deletePreset";
     public static final String SETTINGS_DESCRIBE = "settings/describe";
     public static final String SETTINGS_MUTATE = "settings/mutate";
     public static final String SETTINGS_UPDATE = "settings/update";
     public static final String SETTINGS_OPEN_DOCUMENT = "settings/openSettingsDocument";
-    public static final String SETTINGS_OPEN_PRESET_DIRECTORY = "settings/openAgentPresetDirectory";
     public static final String GOALS_CREATE = "goals/create";
     public static final String GOALS_EDIT = "goals/edit";
     public static final String GOALS_PAUSE = "goals/pause";
@@ -544,29 +541,6 @@ public final class DshRemoteContracts {
         return args;
     }
 
-    /** `agentPresets/copy(from, id, name?)`. */
-    public static JsonObject argsAgentPresetCopy(String from, String id, String name) {
-        JsonObject args = new JsonObject();
-        args.addProperty("from", from);
-        args.addProperty("id", id);
-        if (name != null && !name.isBlank()) args.addProperty("name", name);
-        return args;
-    }
-
-    /** `agentPresets/deletePreset(id)`. */
-    public static JsonObject argsAgentPresetDelete(String id) {
-        JsonObject args = new JsonObject();
-        args.addProperty("id", id);
-        return args;
-    }
-
-    /** `settings/openAgentPresetDirectory(agentPreset)`. */
-    public static JsonObject argsSettingsOpenPresetDirectory(String agentPreset) {
-        JsonObject args = new JsonObject();
-        args.addProperty("agentPreset", agentPreset);
-        return args;
-    }
-
     /** `settings/update(ns, patch)`; the patch object is applied wholesale to the namespace. */
     public static JsonObject argsSettingsUpdate(String ns, JsonObject patch) {
         JsonObject args = new JsonObject();
@@ -808,7 +782,7 @@ public final class DshRemoteContracts {
         return args;
     }
 
-    private static JsonObject withRequest(JsonObject request) {
+    public static JsonObject withRequest(JsonObject request) {
         JsonObject args = new JsonObject();
         args.add("request", request);
         return args;

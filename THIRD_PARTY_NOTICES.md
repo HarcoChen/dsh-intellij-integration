@@ -20,8 +20,10 @@ Copyright (c) 2026 HanaAyane. Licensed under the MIT License.
 ## dsh-ide Webview bundle
 
 `src/main/resources/webview/main.js` and `main.css` are built artifacts from
-the MIT-licensed [deepseek-harness-vscode](https://github.com/HarcoChen/deepseek-harness-vscode)
-repository, with selected component updates and IntelliJ-specific corrections.
+the MIT-licensed [dsh-ide](https://github.com/HarcoChen/dsh-vsc-integration)
+repository, version 0.10.2, commit `deb8d8f882586c42a20abfbb5609cb0643fac309`,
+with IntelliJ-specific menu and Schedule adapters. `scripts/sync-webview.mjs`
+rebuilds the artifacts from that pin and the companion checkout's npm dependencies.
 They are adapted at runtime through the JCEF bridge documented in `DshBridge.java`.
 
 ## dsh-ide Runtime recovery engine
@@ -37,6 +39,12 @@ stdin/stdout bridge. `runtime-helper/main.ts` supplies lifecycle orchestration;
 `src/main/resources/runtime/helper.cjs` is the bundled artifact. Build instructions
 and local adaptations are documented in `runtime-helper/README.md`.
 
+The Remote contract and default-version pin follow Harness `dsh-v0.2.0-rc.2`,
+commit `639ed015397290b3745d163aafe02ffee4aa3f84`. The local-upgrade UI has been
+adapted to the companion's official Desktop guidance; the recovery algorithms
+remain on the vendor baseline above. Runtime advertisement interoperability
+follows the companion's `src/runtimeAdvertisement.ts` schema.
+
 ## dsh-jev-integration Runtime package
 
 `src/main/resources/jev/` contains the built IDE-neutral
@@ -45,3 +53,12 @@ version 0.1.0 (`795907cbdf3347f97b27c473f4f6194f5877a74d`) from the companion
 dsh-ide checkout. Its MIT license and own
 third-party notices are retained alongside the distribution. The integration
 calls a separately operated System One endpoint only when enabled.
+
+
+## dsh-ide loopback debugger MCP transport
+
+`runtime-helper/upstream/debugMcpServer.ts` is vendored from dsh-ide commit
+`deb8d8f882586c42a20abfbb5609cb0643fac309` under its retained MIT license.
+`debugProtocol.ts` supplies IDE-neutral type definitions; `runtime-helper/main.ts`
+connects this transport to IntelliJ's public debugger APIs through private stdin/stdout.
+The generated helper retains the license alongside the existing vendor distribution.

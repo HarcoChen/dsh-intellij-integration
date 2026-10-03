@@ -87,6 +87,25 @@ final class DshDebugContextController {
                         });
     }
 
+    /** MCP shares the same bounded/redacted snapshot rather than duplicating debugger readers. */
+    java.util.concurrent.CompletableFuture<String> capture(XDebugSession session) {
+        java.util.concurrent.CompletableFuture<Capture> started =
+                new java.util.concurrent.CompletableFuture<>();
+        ApplicationManager.getApplication()
+                .invokeLater(
+                        () -> {
+                            if (project.isDisposed() || !session.isSuspended()) {
+                                started.completeExceptionally(
+                                        new IllegalStateException("Debug session is not paused"));
+                                return;
+                            }
+                            Capture capture = new Capture(session);
+                            capture.start();
+                            started.complete(capture);
+                        });
+        return started.thenApplyAsync(Capture::awaitContent);
+    }
+
     private void attach(String content) {
         JsonObject item = new JsonObject();
         item.addProperty("id", java.util.UUID.randomUUID().toString());
@@ -304,6 +323,13 @@ final class DshDebugContextController {
                             builder.append(index == line ? "> " : "  ");
                             builder.append(index + 1).append("  ").append(text).append('\n');
                         }
+                        List<String> diagnostics =
+                                DshIdeContextController.diagnostics(project, file);
+                        builder.append("\nSource diagnostics (existing IDE highlights):\n");
+                        if (diagnostics.isEmpty()) builder.append("(none available)\n");
+                        else
+                            for (String diagnostic : diagnostics)
+                                builder.append(diagnostic).append('\n');
                         return builder.toString();
                     });
         }

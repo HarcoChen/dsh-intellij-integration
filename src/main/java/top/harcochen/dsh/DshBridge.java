@@ -35,6 +35,8 @@ public final class DshBridge implements Disposable {
     private final JBCefBrowser browser;
     private final JBCefJSQuery actionQuery;
     private final Consumer<JsonElement> actionConsumer;
+    private final java.util.function.Supplier<JsonElement> savedState;
+    private final Consumer<JsonElement> saveState;
     private final PropertyChangeListener lookAndFeelListener;
     private volatile JsonElement lastState;
     private volatile boolean disposed;
@@ -53,11 +55,16 @@ public final class DshBridge implements Disposable {
         }
     }
 
-    public DshBridge(@NotNull Consumer<JsonElement> actionConsumer) {
+    public DshBridge(
+            @NotNull Consumer<JsonElement> actionConsumer,
+            java.util.function.Supplier<JsonElement> savedState,
+            Consumer<JsonElement> saveState) {
         if (!isAvailable()) {
             throw new IllegalStateException(DshBundle.message("dsh.jcef.not.available"));
         }
         this.actionConsumer = actionConsumer;
+        this.savedState = savedState;
+        this.saveState = saveState;
         this.browser = new JBCefBrowser();
         this.actionQuery = JBCefJSQuery.create((JBCefBrowserBase) browser);
         this.lookAndFeelListener = ignored -> updateThemeLater();
@@ -66,6 +73,12 @@ public final class DshBridge implements Disposable {
                 request -> {
                     try {
                         JsonElement action = JsonParser.parseString(request);
+                        if (action.isJsonObject()
+                                && "__dshSavedState"
+                                        .equals(DshJson.string(action.getAsJsonObject(), "type"))) {
+                            saveState.accept(action.getAsJsonObject());
+                            return null;
+                        }
                         ApplicationManager.getApplication()
                                 .invokeLater(
                                         () -> {
@@ -105,13 +118,28 @@ public final class DshBridge implements Disposable {
                         + themeCss()
                         + "</style>"
                         + "</head><body><div id=\"root\"></div><script>"
-                        + "window.__dshState=undefined;"
+                        + "window.__dshState="
+                        + savedState
+                                .get()
+                                .toString()
+                                .replace("<", "\\u003c")
+                                .replace("\u2028", "\\u2028")
+                                .replace("\u2029", "\\u2029")
+                        + ";"
                         + "window.acquireVsCodeApi=function(){return {"
                         + "postMessage:function(message){"
                         + injectedPost
                         + "},"
                         + "getState:function(){return window.__dshState;},"
-                        + "setState:function(state){window.__dshState=state;}"
+                        + "setState:function(state){"
+                        + "var before=(window.__dshState||{}).questionDrafts||{};"
+                        + "var after=state.questionDrafts||{};var changes={};"
+                        + "Object.keys(before).concat(Object.keys(after)).forEach(function(key){"
+                        + "if(JSON.stringify(before[key])!==JSON.stringify(after[key]))"
+                        + "changes[key]=Object.prototype.hasOwnProperty.call(after,key)?after[key]:null;});"
+                        + "window.__dshState=state;"
+                        + "if(Object.keys(changes).length)this.postMessage({"
+                        + "type:'__dshSavedState',changes:changes});}"
                         + "};};"
                         + "</script><script>"
                         + script
@@ -129,7 +157,7 @@ public final class DshBridge implements Disposable {
                 "(function(){var value=JSON.parse('"
                         + escaped
                         + "');"
-                        + "window.__dshState=value.state||value;window.postMessage(value,'*');})();";
+                        + "window.postMessage(value,'*');})();";
         browser.getCefBrowser().executeJavaScript(script, browser.getCefBrowser().getURL(), 0);
     }
 

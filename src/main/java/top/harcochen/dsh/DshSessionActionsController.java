@@ -572,6 +572,22 @@ final class DshSessionActionsController {
         operations.execute(
                 () -> {
                     try {
+                        DshRemoteState.SessionView view = remote.snapshot().sessions.get(current);
+                        DshRemoteState.ProjectionCell cell =
+                                view == null ? null : view.projections.get("permissions");
+                        JsonObject permissions =
+                                DshSessionStateStore.permissions(
+                                        cell == null ? null : cell.value(),
+                                        remote.permissionOptions());
+                        boolean found = false;
+                        if (permissions != null)
+                            for (JsonElement option : permissions.getAsJsonArray("options")) {
+                                if (preset.equals(DshJson.string(option.getAsJsonObject(), "value"))
+                                        && !"custom".equals(preset)) found = true;
+                            }
+                        if (!found)
+                            throw new IllegalArgumentException(
+                                    DshBundle.message("dsh.permission.unavailable"));
                         JsonElement execution =
                                 remote.executeCommand(current, "/permission " + preset);
                         showCommandResult(execution);
