@@ -34,6 +34,7 @@ final class DshSettingsController {
     private final AtomicLong pluginInventoryGeneration = new AtomicLong();
 
     private volatile JsonObject panel;
+    private volatile JsonObject pluginMutation;
 
     DshSettingsController(
             Project project,
@@ -55,7 +56,62 @@ final class DshSettingsController {
     }
 
     JsonObject panel() {
-        return panel;
+        JsonObject current = panel;
+        if (current == null || pluginMutation == null || !current.has("pluginInventory"))
+            return current;
+        current = current.deepCopy();
+        current.getAsJsonObject("pluginInventory").add("mutation", pluginMutation.deepCopy());
+        return current;
+    }
+
+    synchronized void setPluginEnabled(String target, boolean enabled, boolean bundle) {
+        if (panel == null
+                || !DshJson.bool(panel, "open", false)
+                || !panel.has("pluginInventory")
+                || (pluginMutation != null && DshJson.bool(pluginMutation, "pending", false)))
+            return;
+        JsonObject inventory = panel.getAsJsonObject("pluginInventory");
+        String key = bundle ? "bundles" : "managedPlugins";
+        if (!inventory.has(key) || !inventory.get(key).isJsonArray()) return;
+        JsonObject row = null;
+        for (JsonElement candidate : inventory.getAsJsonArray(key))
+            if (candidate.isJsonObject()
+                    && target.equals(
+                            DshJson.string(
+                                    candidate.getAsJsonObject(), bundle ? "name" : "entryId")))
+                row = candidate.getAsJsonObject();
+        if (row == null || row.has("readOnlyReason") || (bundle && enabled && row.has("errorCode")))
+            return;
+        long token = generation.get();
+        pluginMutation = new JsonObject();
+        pluginMutation.addProperty("target", target);
+        pluginMutation.addProperty("kind", bundle ? "bundle" : "plugin");
+        pluginMutation.addProperty("pending", true);
+        stateChanged.run();
+        operations.execute(
+                () -> {
+                    JsonObject mutation = new JsonObject();
+                    mutation.addProperty("target", target);
+                    mutation.addProperty("kind", bundle ? "bundle" : "plugin");
+                    mutation.addProperty("pending", false);
+                    try {
+                        JsonObject result = remote.setPluginEnabled(target, enabled, bundle);
+                        mutation.add("result", result);
+                        mutation.addProperty(
+                                "message",
+                                DshBundle.message(
+                                        "dsh.plugin.change."
+                                                + DshJson.string(result, "application")));
+                    } catch (Exception error) {
+                        mutation.addProperty("message", DshJson.message(error));
+                    }
+                    synchronized (this) {
+                        if (token != generation.get() || panel == null) return;
+                        pluginMutation = mutation;
+                    }
+                    refreshPluginInventory();
+                    stateChanged.run();
+                });
     }
 
     void configureApiKey() {
@@ -91,6 +147,7 @@ final class DshSettingsController {
     }
 
     synchronized void togglePanel() {
+        pluginMutation = null;
         if (panel != null) {
             generation.incrementAndGet();
             pluginInventoryGeneration.incrementAndGet();

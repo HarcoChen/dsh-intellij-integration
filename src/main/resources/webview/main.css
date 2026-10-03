@@ -795,9 +795,7 @@ button {
   flex: none;
   color: var(--vscode-descriptionForeground);
 }
-.dsh-dynamic-plugin-row.awaiting-approval .dsh-dynamic-plugin-status {
-  color: var(--dsh-status-warning);
-}
+.dsh-dynamic-plugin-row.awaiting-approval .dsh-dynamic-plugin-status,
 .dsh-dynamic-plugin-row.failed .dsh-dynamic-plugin-status {
   color: var(--vscode-errorForeground);
 }
@@ -1516,6 +1514,20 @@ button {
   display: flex;
   align-items: center;
   gap: var(--dsh-space-2);
+  list-style: none;
+  cursor: pointer;
+}
+.dsh-compaction-head::-webkit-details-marker {
+  display: none;
+}
+.dsh-compaction-head::before {
+  content: "\203a";
+  flex: none;
+  color: var(--vscode-descriptionForeground);
+  transition: transform 120ms ease;
+}
+.dsh-compaction-card[open] > .dsh-compaction-head::before {
+  transform: rotate(90deg);
 }
 .dsh-compaction-status {
   width: 9px;
@@ -1984,6 +1996,37 @@ button {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+.dsh-job-output {
+  max-height: 240px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-family: var(--vscode-editor-font-family);
+  font-size: var(--dsh-font-xs);
+  padding: var(--dsh-space-2);
+  background: var(--vscode-textCodeBlock-background);
+}
+.dsh-team-members,
+.dsh-team-tasks {
+  list-style: none;
+  padding: 0;
+}
+.dsh-team-members li,
+.dsh-team-task {
+  display: flex;
+  flex-direction: column;
+  gap: var(--dsh-space-1);
+  padding: var(--dsh-space-2) 0;
+  border-bottom: 1px solid var(--dsh-border);
+  overflow-wrap: anywhere;
+}
+.dsh-team-task span,
+.dsh-team-task small:not(.dsh-card-error) {
+  color: var(--vscode-descriptionForeground);
+}
+.dsh-team-task-completed {
+  opacity: .7;
+}
 .dsh-goal-error-detail pre:focus-visible,
 .dsh-subagent-transcript:focus-visible,
 .dsh-schedule-items:focus-visible,
@@ -2004,6 +2047,11 @@ button {
   padding: var(--dsh-space-2) 0;
   border-top: 1px solid var(--dsh-border);
 }
+.dsh-schedule-title {
+  margin-bottom: var(--dsh-space-1);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
 .dsh-schedule-prompt {
   overflow-wrap: anywhere;
   white-space: pre-wrap;
@@ -2017,6 +2065,81 @@ button {
 .dsh-schedule-id {
   margin-top: var(--dsh-space-1);
   font-family: var(--vscode-editor-font-family);
+}
+.dsh-schedule-scope {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--dsh-space-2);
+  margin-bottom: var(--dsh-space-2);
+}
+.dsh-schedule [hidden] {
+  display: none !important;
+}
+.dsh-schedule-actions,
+.dsh-schedule-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--dsh-space-2);
+  margin-top: var(--dsh-space-2);
+}
+.dsh-schedule-form {
+  width: 100%;
+  align-items: stretch;
+}
+.dsh-schedule-form label {
+  display: grid;
+  width: 100%;
+  gap: var(--dsh-space-1);
+  color: var(--vscode-descriptionForeground);
+  font-size: var(--dsh-font-xs);
+}
+.dsh-schedule-form input,
+.dsh-schedule-form select,
+.dsh-schedule-form textarea {
+  width: 100%;
+  padding: var(--dsh-space-2);
+  color: var(--vscode-input-foreground);
+  background: var(--vscode-input-background);
+  border: 1px solid var(--vscode-input-border);
+  border-radius: var(--dsh-radius-sm);
+  font: inherit;
+}
+.dsh-schedule-form textarea {
+  resize: vertical;
+}
+.dsh-schedule-weekdays {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--dsh-space-2);
+  width: 100%;
+}
+.dsh-schedule-form .dsh-schedule-weekday {
+  display: inline-flex;
+  width: auto;
+  align-items: center;
+  gap: var(--dsh-space-1);
+}
+.dsh-schedule-form .dsh-schedule-weekday input {
+  width: auto;
+  margin: 0;
+  padding: 0;
+}
+.dsh-schedule-confirm {
+  color: var(--vscode-errorForeground);
+  font-size: var(--dsh-font-xs);
+}
+.dsh-schedule-history {
+  display: grid;
+  gap: var(--dsh-space-2);
+  margin-top: var(--dsh-space-2);
+  padding-left: var(--dsh-space-3);
+  border-left: 2px solid var(--dsh-border);
+}
+.dsh-schedule-delivery {
+  padding: var(--dsh-space-2) 0;
+  border-top: 1px solid var(--dsh-border);
+  overflow-wrap: anywhere;
 }
 button.dsh-permission-option {
   width: 100%;
@@ -2445,7 +2568,7 @@ button.dsh-permission-option:hover {
   align-items: center;
   gap: 10px;
   box-sizing: border-box;
-  width: min(240px, 100%);
+  width: 240px;
   height: 64px;
   padding: 0 12px;
   border: 1px solid var(--vscode-widget-border, var(--dsh-border));
@@ -3039,4 +3162,3 @@ button.dsh-permission-chip-danger:hover {
   white-space: nowrap;
   text-overflow: ellipsis;
 }
-/*# sourceMappingURL=main.css.map */

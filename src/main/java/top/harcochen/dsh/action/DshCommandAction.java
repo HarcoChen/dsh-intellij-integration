@@ -26,6 +26,9 @@ public final class DshCommandAction extends DumbAwareAction {
                     case "Dsh.ManageProviders" -> "manageProviders";
                     case "Dsh.ManageAgentPresets" -> "manageAgentPresets";
                     case "Dsh.ConversationOutline" -> "openConversationOutline";
+                    case "Dsh.BrowseRuntimeFiles" -> "browseRuntimeFiles";
+                    case "Dsh.RefreshRuntimeFile" -> "refreshRuntimeFile";
+                    case "Dsh.ShowWhatsNew" -> "showWhatsNew";
                     case "Dsh.Diagnose" -> "diagnoseEnvironment";
                     default -> "openBrowser";
                 };

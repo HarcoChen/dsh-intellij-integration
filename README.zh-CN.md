@@ -27,7 +27,7 @@
 ## 快速上手
 
 1. **安装插件** — 打开 **Settings → Plugins → Marketplace**，搜索 **DeepSeek Harness Integration**，也可以前往 [插件商店](https://plugins.jetbrains.com/plugin/33924-deepseek-harness-integration)。按提示重启 IDE。
-2. **连接 Runtime** — 打开项目和 **DSH** 工具窗口。插件会先尝试已安装的 `dsh`，再尝试包管理器，最后使用已校验的托管 Runtime 缓存；随插件提供的生命周期助手仍需要 Node.js 24+。插件默认自动启动 Runtime。启动命令或已有 Runtime 的 **Server URL** 可在 **Settings → Tools → DeepSeek Harness** 中配置。
+2. **连接 Runtime** — 打开项目和 **DSH** 工具窗口。插件会发现兼容的本机 `dsh`，包括[官方 DeepSeek Desktop](https://www.deepseek.com/en/download/) 注册的命令；随插件提供的生命周期助手仍需要 Node.js 24+。插件默认自动启动 Runtime。启动命令或已有 Runtime 的 **Server URL** 可在 **Settings → Tools → DeepSeek Harness** 中配置。
 3. **配置凭据** — 通过 **Find Action** 找到 **DSH: Configure API Key**。修改密钥后重启本地 Runtime，让新值生效；外部已运行的 Runtime 使用自身配置的凭据。
 4. **试一次** — 选中一个函数，右键选择 **DSH → Explain Selection**，或直接在聊天窗口提问。出现审批请求时，查看工具卡片和待执行改动的 Diff。
 
@@ -73,21 +73,25 @@ Client half 插件代码。
 
 ### 在 IDE 内管理 Runtime
 
-插件管理本地 Runtime 的启动、停止和重启。仅当本机和包管理器启动方式不可用时，才会从固定的 CNB 发布清单下载托管分发包，校验精确大小和 SHA-256，使用按版本锁并原子缓存；包管理器使用配置的 Runtime 版本。也可以连接已有 Runtime，或在浏览器中打开 Web UI。
+插件管理本地 Runtime 的启动、停止和重启。自动启动会发现兼容的本机 `dsh`；没有可用命令时，提供官方 DeepSeek Desktop 下载入口。高级配置仍可明确使用 pnpm/npx 启动，并按设置固定 Runtime 版本。也可以连接已有 Runtime，或在浏览器中打开 Web UI。
 
 Runtime 0.1.5 适配包括断线后恢复临时流式回答、V3 历史与压缩记录、附件提交、子代理排队提示，以及重连后显式恢复 Goal。模式选择遵循 Runtime 策略，技能菜单悬停显示来源路径。上下文环形条悬停查看统计，点击模型名称切换模型。
 
-默认 Runtime 已更新到 `0.1.7-rc.2`。聊天菜单增加原生“管理会话”“管理 DeepSeek 账户”“管理日程”对话框。会话可固定、恢复归档；账户管理使用 Runtime 的浏览器登录流程，并显示资料、余额和赠金提醒；日程可跨会话查看，当前会话的提醒可编辑、删除或查看投递历史。没有项目目录时，首次显式创建会话可初始化 Runtime 默认 Workspace。
+默认 Runtime 已更新到 `0.2.0-rc.2`。聊天菜单增加原生“管理会话”“管理 DeepSeek 账户”“管理日程”对话框。会话可固定、恢复归档；账户管理使用 Runtime 的浏览器登录流程，并显示资料、余额和赠金提醒；日程可跨会话查看，当前会话的提醒可编辑、删除或查看投递历史。没有项目目录时，首次显式创建会话可初始化 Runtime 默认 Workspace。
 
-插件还内置共享的 Laya/Jev Runtime 集成，并装载到本插件启动的本地 Runtime 中；默认关闭。可在 **Settings → Tools → DeepSeek Harness** 中开启集成及所需功能，从聊天菜单配置 System One API Key，再重启 Runtime。密钥保存在 IntelliJ Password Safe；服务地址必须使用 HTTPS。插件不会修改外部管理的 Runtime。
+插件还内置共享的 Laya/Jev Runtime 集成，并装载到本插件启动的本地 Runtime 中；默认关闭。可在 **Settings → Tools → DeepSeek Harness** 中开启集成及所需功能，从聊天菜单配置 System One API Key，再重启 Runtime。密钥保存在 IntelliJ Password Safe；服务地址支持 HTTPS，也支持本机 Laya 的 localhost/127.0.0.1 HTTP。插件不会修改外部管理的 Runtime。
 
 插件启动的本地 Runtime 崩溃后会重试，并通过隔离验证、有限次数修复与可撤销的 bundle 隔离尝试恢复。状态栏提供取消恢复、还原修改和导出脱敏诊断。设置中可分别关闭自动恢复和持久化 bundle 隔离。恢复助手随插件打包在本地运行，即使使用独立安装的 `dsh`，仍需要 Node.js 24+。
 
-自动复用仅针对共享编辑器锁中登记的兼容 Runtime。升级经过身份核验的本机 npm 安装，或停止已确认归属的孤儿 Runtime，均通过原生对话框确认。手动填写的外部服务地址由外部管理；旧 Runtime 请先升级，0.1.5 的历史迁移不支持通过降级回退。
+自动复用仅针对编辑器发布的兼容 Runtime。插件读取 dsh-ide Runtime 广告，并只发布自己的发现记录；旧编辑器锁仍可读取。升级经过身份核验的本机 npm 安装，或停止已确认归属的孤儿 Runtime，均通过原生对话框确认。手动填写的外部服务地址由外部管理；旧 Runtime 请先升级，0.1.5 的历史迁移不支持通过降级回退。
 
-Agent Team 实验能力已提供内部类型化客户端，支持查看、创建和更新任务、取消请求、版本检查及结构化业务错误；不会自动安装可选服务，也未新增 Team 界面。
+可选 Agent Team 会在 Activity Dock 显示成员、任务、依赖和写入范围冲突提示，并复用子代理的历史预览、跟进和中断操作。需要在 Runtime 中启用官方 Team profile bundle；插件读取其 Session 投影。
 
 API Key 保存在 IntelliJ **Password Safe** 中，传递给新启动的本地 Runtime。界面提供英文和简体中文资源。
+
+限时问题会显示 Host 倒计时，并在重连和视图重建后保留回答草稿；超时后仍可提交延迟回答。Jobs 提供实时输出、取消和按游标重连续读。插件设置提供 Bundle 选择、插件启停、只读原因，以及保存、生效或需重启等结果。Schedule 提醒需要启用可选的 Schedule bundle。
+
+通过 Find Action 的 **DSH：浏览 Runtime 工作区文件**，或 `/ide` 入口，浏览当前会话在 Host 上的文件。原生预览只读，支持最大 1 MiB 的 UTF-8 文本、文件变更刷新和手动刷新，并绑定打开时的 Runtime。
 
 ## 配置
 
@@ -96,12 +100,11 @@ API Key 保存在 IntelliJ **Password Safe** 中，传递给新启动的本地 R
 
 | 设置项 | 默认值 | 说明 |
 | --- | --- | --- |
-| 命令 / 参数 | `auto` / 空 | 优先使用兼容的本机 `dsh`，然后在开启自动安装时回退到固定版本的 pnpm/npx，最后使用已校验的托管分发包；填写 `managed` 可强制使用托管分发包，也支持显式指定命令。 |
+| 命令 / 参数 | `auto` / 空 | 发现兼容的本机或 Desktop 注册的 `dsh`；也支持明确配置 pnpm/npx。自动下载独立 Runtime 已弃用。 |
 | 服务地址 / 端口 | `""` / `0` | 优先连接已运行的 DSH Runtime；本地启动时端口 `0` 表示自动选择可用端口。 |
 | 自动启动 | `true` | 项目打开时自动启动或连接 Runtime。 |
-| Runtime 版本 | `0.1.7-rc.2` | 包管理器回退版本；本机 Runtime 最低支持 `0.1.5-rc.1`。 |
+| Runtime 版本 | `0.2.0-rc.2` | 明确配置 pnpm/npx 启动时使用的版本；本机 Runtime 最低支持 `0.1.5-rc.1`。 |
 | Laya/Jev 集成 | 关闭 | 本地启动 Runtime 随附 System One 集成，可配置地址、模型和可选能力。 |
-| 托管 Runtime | `true` | 开启通过固定清单校验的平台分发包，作为自动启动的最终后备。 |
 | npm 镜像 | `https://registry.npmmirror.com` | 下载后备重试的 Registry 镜像。 |
 | 超时 | 启动 `30s`，请求 `600s` | 等待启动和单次 RPC 调用的超时时间。 |
 | 上下文字节数 | `120000` | 单次请求中 `<ide_context>` 的最大 UTF-8 字节数。 |

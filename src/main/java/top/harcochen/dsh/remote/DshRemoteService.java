@@ -72,6 +72,71 @@ public final class DshRemoteService implements Disposable {
     private final ExecutorService operations;
     private final List<Consumer<DshRemoteState.Snapshot>> listeners = new ArrayList<>();
     private final Object listenerLock = new Object();
+    private volatile JsonArray permissionOptions;
+    private volatile String permissionEpoch;
+    private volatile JsonElement webviewDrafts = new JsonObject();
+
+    public JsonElement webviewDrafts() {
+        return webviewDrafts.deepCopy();
+    }
+
+    public void saveWebviewDrafts(JsonElement state) {
+        if (state == null || !state.isJsonObject()) return;
+        JsonElement drafts = state.getAsJsonObject().get("questionDrafts");
+        if (drafts == null
+                || !drafts.isJsonObject()
+                || drafts.toString().length() > 512_000
+                || drafts.getAsJsonObject().size() > 100) return;
+        JsonObject saved = new JsonObject();
+        saved.add("questionDrafts", drafts.deepCopy());
+        webviewDrafts = saved;
+    }
+
+    public JsonArray permissionOptions() {
+        return permissionOptions;
+    }
+
+    private void refreshPermissions(DshRemoteState.Snapshot next) {
+        if (!PHASE_CONNECTED.equals(next.phase)) return;
+        String key = next.generation + ":" + connection.settingsEpoch();
+        if (key.equals(permissionEpoch)) return;
+        permissionEpoch = key;
+        operations.execute(
+                () -> {
+                    JsonArray options = new JsonArray();
+                    try {
+                        JsonElement value =
+                                unary.call("permissionPresets/catalog", new JsonObject());
+                        if (!value.isJsonObject())
+                            throw new IllegalArgumentException("Invalid permission catalog");
+                        JsonObject catalog = value.getAsJsonObject();
+                        if (!catalog.has("options")
+                                || !catalog.get("options").isJsonArray()
+                                || !catalog.has("defaultOptions")
+                                || !catalog.get("defaultOptions").isJsonArray()
+                                || stringOf(catalog, "defaultPreset") == null)
+                            throw new IllegalArgumentException("Invalid permission catalog");
+                        java.util.Set<String> seen = new java.util.HashSet<>();
+                        for (JsonElement item : catalog.getAsJsonArray("options")) {
+                            if (!item.isJsonObject()
+                                    || stringOf(item.getAsJsonObject(), "value") == null
+                                    || stringOf(item.getAsJsonObject(), "name") == null
+                                    || !seen.add(stringOf(item.getAsJsonObject(), "value")))
+                                throw new IllegalArgumentException("Invalid permission option");
+                            options.add(item.deepCopy());
+                        }
+                    } catch (DshRemoteException missing) {
+                        if (!missing.isCapabilityMissing())
+                            LOG.debug("Permission catalog unavailable", missing);
+                    } catch (RuntimeException invalid) {
+                        LOG.warn("Invalid permission catalog", invalid);
+                    }
+                    if (!key.equals(permissionEpoch) || snapshot.generation != next.generation)
+                        return;
+                    permissionOptions = options;
+                    connection.republish();
+                });
+    }
 
     private volatile DshRemoteState.Snapshot snapshot =
             new DshRemoteState.Snapshot(
@@ -90,7 +155,7 @@ public final class DshRemoteService implements Disposable {
         this.runtime = DshRuntimeService.getInstance(project);
         this.operations =
                 AppExecutorUtil.createBoundedApplicationPoolExecutor(
-                        "dsh-remote-ops",
+                        "DshRemoteOps",
                         Math.max(2, Runtime.getRuntime().availableProcessors() / 2));
         this.auth = runtime.auth();
         this.unary =
@@ -213,21 +278,46 @@ public final class DshRemoteService implements Disposable {
      * otherwise; the returned message is null when the answer reached the Runtime.
      */
     public String answerInteraction(String sessionId, String key, JsonElement outcomeValue) {
-        String eventId =
-                key != null && key.length() > 2 && (key.startsWith("a:") || key.startsWith("q:"))
-                        ? key.substring(2)
-                        : key;
-        if (eventId == null || eventId.isBlank() || sessionId == null || sessionId.isBlank()) {
+        JsonObject item = connection.claimInteraction(sessionId, key);
+        if (item == null) {
             return DshBundle.message("dsh.interaction.unavailable");
         }
-        connection.interactionStatus(sessionId, key, "submitting", null, false);
+        long gen = item.get("connectionGeneration").getAsLong();
+        if ("continued".equals(stringOf(item, "questionState"))) {
+            JsonObject args = new JsonObject();
+            args.addProperty("agentId", sessionId);
+            args.addProperty("callId", stringOf(item, "continuedCallId"));
+            args.add("answer", outcomeValue.deepCopy());
+            try {
+                JsonElement result = unary.call("userQuestions/answer", args);
+                if (!result.isJsonPrimitive() || !result.getAsJsonPrimitive().isBoolean())
+                    throw DshRemoteException.protocol(
+                            "userQuestions/answer", "Invalid question answer result", null);
+                if (!result.getAsBoolean()) {
+                    connection.interactionStatus(sessionId, key, "unavailable", null, false, gen);
+                    return DshBundle.message("dsh.interaction.unavailable");
+                }
+                // Accepted means queued; retain the draft until the durable projection settles.
+                return null;
+            } catch (DshRemoteException failure) {
+                if ("REPLY_QUEUED".equals(failure.code())) return null;
+                connection.interactionStatus(
+                        sessionId, key, "failed", failure.display(), false, gen);
+                return failure.display();
+            }
+        }
+        String eventId = stringOf(item, "eventId");
+        if (eventId == null) eventId = key.substring(2);
         JsonObject outcome = DshRemoteEventClient.resultOutcome(outcomeValue);
-        DshRemoteException failure = connection.answer(eventId, outcome);
+        DshRemoteException failure = connection.answer(eventId, outcome, gen);
         if (failure == null) {
-            connection.interactionStatus(sessionId, key, "resolved", null, true);
+            if (key.startsWith("u:"))
+                connection.completeQuestion(
+                        sessionId, key, outcomeValue.getAsJsonObject().get("answers"), gen);
+            else connection.interactionStatus(sessionId, key, "resolved", null, true, gen);
             return null;
         }
-        connection.interactionStatus(sessionId, key, "failed", failure.display(), false);
+        connection.interactionStatus(sessionId, key, "failed", failure.display(), false, gen);
         return failure.display();
     }
 
@@ -242,8 +332,40 @@ public final class DshRemoteService implements Disposable {
     // unary domain API (blocking; only call from background executors)
     // ---------------------------------------------------------------------------
 
-    public DshAgentTeamClient agentTeams() {
-        return new DshAgentTeamClient(unary);
+    public JsonElement callFeature(String endpoint, JsonObject args) throws DshRemoteException {
+        return unary.call(endpoint, args);
+    }
+
+    public JsonObject agentTeam(String sessionId) {
+        DshRemoteState.SessionView view = snapshot.sessions.get(sessionId);
+        DshRemoteState.ProjectionCell cell =
+                view == null ? null : view.projections.get("agentTeam");
+        if (cell != null) return DshTeamProjection.normalize(cell.value());
+        JsonObject request = new JsonObject();
+        request.addProperty("sessionId", sessionId);
+        JsonElement result =
+                unary.call("session/projections", DshRemoteContracts.withRequest(request));
+        if (result == null || result.isJsonNull()) return null;
+        JsonObject block = objectValue(result);
+        JsonObject values = objectValue(block, "values");
+        if (!values.has("agentTeam")) return null;
+        JsonObject team = DshTeamProjection.normalize(values.get("agentTeam"));
+        if (team == null)
+            throw DshRemoteException.protocol(
+                    "session/projections", "Invalid Team projection", null);
+        return team;
+    }
+
+    public AutoCloseable watchFeature(
+            String endpoint,
+            java.util.function.Supplier<JsonObject> args,
+            Consumer<JsonObject> items,
+            Consumer<JsonObject> terminal) {
+        return connection.watchStream(endpoint, args, items, terminal);
+    }
+
+    public DshWorkspaceFiles workspaceFiles() {
+        return new DshWorkspaceFiles(unary);
     }
 
     public JsonObject createSession(String cwd, String workspaceId, String agentPreset)
@@ -844,7 +966,32 @@ public final class DshRemoteService implements Disposable {
                     "Remote plugin inventory has an invalid shape",
                     null);
         }
+        try {
+            value.add(
+                    "bundles",
+                    DshPluginManager.rows(
+                            unary.call("pluginManager/listBundles", new JsonObject()), true));
+            value.add(
+                    "managedPlugins",
+                    DshPluginManager.rows(
+                            unary.call("pluginManager/listPlugins", new JsonObject()), false));
+        } catch (DshRemoteException missing) {
+            if (!missing.isCapabilityMissing()) throw missing;
+        }
         return value;
+    }
+
+    public JsonObject setPluginEnabled(String id, boolean enabled, boolean bundle) {
+        JsonObject args = new JsonObject();
+        args.addProperty(bundle ? "name" : "id", id);
+        args.addProperty("enabled", enabled);
+        return DshPluginManager.change(
+                unary.call(
+                        bundle
+                                ? "pluginManager/setBundleEnabled"
+                                : "pluginManager/setPluginEnabled",
+                        args),
+                id);
     }
 
     /** Read the optional frame-wide dynamic Cordis plugin registry. */
@@ -1104,6 +1251,8 @@ public final class DshRemoteService implements Disposable {
             connection.start();
         } else if (status.state == DshRuntimeService.RuntimeState.STOPPED
                 || status.state == DshRuntimeService.RuntimeState.ERROR) {
+            permissionOptions = null;
+            permissionEpoch = null;
             connection.stop();
         }
         // STARTING keeps the current Remote phase; the connection reconnects
@@ -1114,6 +1263,7 @@ public final class DshRemoteService implements Disposable {
         @Override
         public void onSnapshot(DshRemoteState.Snapshot next) {
             snapshot = next;
+            refreshPermissions(next);
             List<Consumer<DshRemoteState.Snapshot>> current;
             synchronized (listenerLock) {
                 current = new ArrayList<>(listeners);

@@ -35,6 +35,8 @@ public final class DshBridge implements Disposable {
     private final JBCefBrowser browser;
     private final JBCefJSQuery actionQuery;
     private final Consumer<JsonElement> actionConsumer;
+    private final java.util.function.Supplier<JsonElement> savedState;
+    private final Consumer<JsonElement> saveState;
     private final PropertyChangeListener lookAndFeelListener;
     private volatile JsonElement lastState;
     private volatile boolean disposed;
@@ -53,11 +55,16 @@ public final class DshBridge implements Disposable {
         }
     }
 
-    public DshBridge(@NotNull Consumer<JsonElement> actionConsumer) {
+    public DshBridge(
+            @NotNull Consumer<JsonElement> actionConsumer,
+            java.util.function.Supplier<JsonElement> savedState,
+            Consumer<JsonElement> saveState) {
         if (!isAvailable()) {
             throw new IllegalStateException(DshBundle.message("dsh.jcef.not.available"));
         }
         this.actionConsumer = actionConsumer;
+        this.savedState = savedState;
+        this.saveState = saveState;
         this.browser = new JBCefBrowser();
         this.actionQuery = JBCefJSQuery.create((JBCefBrowserBase) browser);
         this.lookAndFeelListener = ignored -> updateThemeLater();
@@ -66,6 +73,12 @@ public final class DshBridge implements Disposable {
                 request -> {
                     try {
                         JsonElement action = JsonParser.parseString(request);
+                        if (action.isJsonObject()
+                                && "__dshSavedState"
+                                        .equals(DshJson.string(action.getAsJsonObject(), "type"))) {
+                            saveState.accept(action.getAsJsonObject().get("state"));
+                            return null;
+                        }
                         ApplicationManager.getApplication()
                                 .invokeLater(
                                         () -> {
@@ -105,13 +118,22 @@ public final class DshBridge implements Disposable {
                         + themeCss()
                         + "</style>"
                         + "</head><body><div id=\"root\"></div><script>"
-                        + "window.__dshState=undefined;"
+                        + "window.__dshState="
+                        + savedState
+                                .get()
+                                .toString()
+                                .replace("<", "\\u003c")
+                                .replace("\u2028", "\\u2028")
+                                .replace("\u2029", "\\u2029")
+                        + ";"
                         + "window.acquireVsCodeApi=function(){return {"
                         + "postMessage:function(message){"
                         + injectedPost
                         + "},"
                         + "getState:function(){return window.__dshState;},"
-                        + "setState:function(state){window.__dshState=state;}"
+                        + "setState:function(state){window.__dshState=state;"
+                        + "this.postMessage({type:'__dshSavedState',"
+                        + "state:{questionDrafts:state.questionDrafts}});}"
                         + "};};"
                         + "</script><script>"
                         + script

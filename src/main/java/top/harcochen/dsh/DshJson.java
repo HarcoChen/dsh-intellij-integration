@@ -18,6 +18,13 @@ public final class DshJson {
         return value == null ? fallback : value;
     }
 
+    public static String strictString(JsonObject object, String key) {
+        JsonElement value = object == null ? null : object.get(key);
+        return value != null && value.isJsonPrimitive() && value.getAsJsonPrimitive().isString()
+                ? value.getAsString()
+                : null;
+    }
+
     public static boolean bool(JsonObject object, String key, boolean fallback) {
         try {
             return object != null && object.has(key) ? object.get(key).getAsBoolean() : fallback;

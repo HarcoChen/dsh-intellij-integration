@@ -96,6 +96,21 @@ action validation, and the user-visible failure path are wired together.
 
 ## Quality gates for each batch
 
+### dsh-ide 0.10.2 / Runtime 0.2.0-rc.2（2026-10-03）
+
+- [x] Timed user-question claim、倒计时、前台/延迟回答、Session/call 草稿和 durable 结算。
+- [x] Jobs 实时 roster、非消费输出、游标重连续读和取消。
+- [x] Team 投影、任务与成员导航，移除过期 Team RPC。
+- [x] 权限 catalog 缓存、插件/Bundle 开关与只读/应用结果。
+- [x] Host Workspace 文件浏览、multipart UTF-8 预览、版本/大小校验和 watcher。
+- [x] 官方 Desktop 启动引导、Runtime 广告互通、Laya loopback HTTP 与更新通知。
+- [x] 现有 Gradle 门禁、真实 RC.2 Java/companion 联调和 Webview Chrome smoke。
+- [ ] 真实 IC/PyCharm 安装 ZIP 后的原生 UI 人工验收。
+
+迁移范围、pin 与验证边界见 [RC.2 迁移报告](RPC_0.2.0_RC2_ADAPTATION.md)。
+
+上游仍计划后续实现的 Runtime Terminal、插件安装/卸载不在本次 0.10.2 UI 迁移中。
+
 Latest parity batch verified on 2026-09-14 against the pinned `0.1.2-rc.1` Runtime:
 
 - `clean buildPlugin`, formatting, lint, and Plugin Verifier for IC / PC 2024.3.6 passed.

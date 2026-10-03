@@ -51,6 +51,25 @@ final class DshSubagentController {
         preview = null;
     }
 
+    void observeTeam(String root, JsonObject team) {
+        JsonArray nodes = top.harcochen.dsh.remote.DshTeamProjection.members(team, root);
+        for (JsonElement value : nodes) {
+            JsonObject node = value.getAsJsonObject();
+            JsonObject timing = timingFor(DshJson.string(node, "id"));
+            if (timing != null) {
+                node.add("timing", timing);
+                if (timing.has("active")) node.addProperty("activity", "running");
+            }
+        }
+        SubagentTree current = tree;
+        if (current == null || !root.equals(current.rootSessionId)) {
+            current = new SubagentTree(root, generation.incrementAndGet());
+            tree = current;
+        }
+        current.nodes = nodes;
+        current.state = "ready";
+    }
+
     void clearPreview() {
         preview = null;
         stateChanged.run();
@@ -87,6 +106,9 @@ final class DshSubagentController {
 
     /** Walks durable direct-child catalogs breadth-first with depth and cycle guards. */
     private JsonArray loadTree(String rootSessionId) throws Exception {
+        JsonObject team = remote.agentTeam(rootSessionId);
+        if (team != null)
+            return top.harcochen.dsh.remote.DshTeamProjection.members(team, rootSessionId);
         JsonArray nodes = new JsonArray();
         Set<String> visited = new HashSet<>();
         Deque<TreeLevel> frontier = new ArrayDeque<>();

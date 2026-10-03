@@ -88,7 +88,7 @@ final class DshPluginInventory {
         String trust = text(source, "trust");
         JsonArray rawRows = array(source, "rows");
         if (!bounded(id)
-                || !("system".equals(trust) || "user".equals(trust))
+                || (source.has("trust") && !("system".equals(trust) || "user".equals(trust)))
                 || !isBoolean(source.get("isDefault"))
                 || rawRows == null
                 || rawRows.size() > MAX_ROWS) return null;
@@ -102,7 +102,7 @@ final class DshPluginInventory {
         }
         JsonObject result = new JsonObject();
         result.addProperty("id", id);
-        result.addProperty("trust", trust);
+        if (trust != null) result.addProperty("trust", trust);
         result.addProperty("isDefault", source.get("isDefault").getAsBoolean());
         String name = text(source, "name");
         if (name != null) {

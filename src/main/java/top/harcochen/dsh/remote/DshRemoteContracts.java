@@ -9,7 +9,7 @@ import java.util.UUID;
 
 /**
  * Wire contracts for the RC Remote API, fixed against {@code deepseek-harness} tag {@code
- * dsh-v0.1.7-rc.2}, commit {@code 477b4f420553e8a52c2fbccc464d7561b239c443}.
+ * dsh-v0.2.0-rc.2}, commit {@code 639ed015397290b3745d163aafe02ffee4aa3f84}.
  *
  * <p>Every endpoint's {@code args} field names were taken from the Host method parameters (the
  * descriptor {@code wire} names), not from flattened DTOs. Zero-argument endpoints send an {@code
@@ -19,10 +19,10 @@ import java.util.UUID;
  */
 public final class DshRemoteContracts {
     /** Harness tag this contract was audited against. */
-    public static final String TARGET_TAG = "dsh-v0.1.7-rc.2";
+    public static final String TARGET_TAG = "dsh-v0.2.0-rc.2";
 
     /** Harness commit this contract was audited against. */
-    public static final String TARGET_COMMIT = "477b4f420553e8a52c2fbccc464d7561b239c443";
+    public static final String TARGET_COMMIT = "639ed015397290b3745d163aafe02ffee4aa3f84";
 
     public static final String MUX_PATH = "/api/remote.mux";
     public static final String EVENT_STREAM_ENDPOINT = "$events";
@@ -808,7 +808,7 @@ public final class DshRemoteContracts {
         return args;
     }
 
-    private static JsonObject withRequest(JsonObject request) {
+    public static JsonObject withRequest(JsonObject request) {
         JsonObject args = new JsonObject();
         args.add("request", request);
         return args;

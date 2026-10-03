@@ -313,13 +313,16 @@ public final class DshRemoteState {
                     value.has("projections") && value.get("projections").isJsonObject()
                             ? value.getAsJsonObject("projections")
                             : new JsonObject();
-            controlBySession.clear();
             if (!sessionListBaselineReceived) {
                 // The catalog baseline has not arrived yet; hold the baseline and
                 // apply it when session/list lands (applySessionList).
                 pendingControlBaseline = frame.deepCopy();
                 return;
             }
+            Map<String, JsonArray> liveInteractions = new HashMap<>();
+            controlBySession.forEach(
+                    (id, control) -> liveInteractions.put(id, control.interactionRows()));
+            controlBySession.clear();
             pendingControlBaseline = null;
             Set<String> sessionIds = new HashSet<>(catalogBySession.keySet());
             sessionIds.addAll(queues.keySet());
@@ -327,6 +330,9 @@ public final class DshRemoteState {
             sessionIds.addAll(projections.keySet());
             for (String sessionId : sessionIds) {
                 SessionControl control = controlFor(sessionId);
+                for (JsonElement item : liveInteractions.getOrDefault(sessionId, new JsonArray())) {
+                    control.putInteraction(item.getAsJsonObject().deepCopy());
+                }
                 control.replaceQueue(asArray(queues.get(sessionId)));
                 control.replaceJobs(asArray(jobs.get(sessionId)));
                 JsonElement block = projections.get(sessionId);
@@ -539,13 +545,56 @@ public final class DshRemoteState {
 
     /** Create one pending question from a `user-questions/request` waterfall. */
     void requestQuestion(String sessionId, String eventId, JsonObject request) {
-        if (!request.has("questions") || !request.get("questions").isJsonArray()) return;
+        if (!DshUserQuestions.questions(request.get("questions"))) return;
         SessionControl control = controlFor(sessionId);
         JsonObject item = new JsonObject();
-        item.addProperty("key", "q:" + eventId);
+        JsonObject wait =
+                request.has("wait") && request.get("wait").isJsonObject()
+                        ? request.getAsJsonObject("wait")
+                        : null;
+        String callId = string(wait, "callId");
+        item.addProperty("key", callId == null ? "q:" + eventId : "u:" + callId);
+        item.addProperty("eventId", eventId);
+        if (callId != null) {
+            item.addProperty("continuedCallId", callId);
+            item.addProperty("questionState", "open");
+            item.addProperty("timed", bool(wait, "timed", false));
+        }
         item.addProperty("kind", "question");
         item.addProperty("status", "pending");
         item.add("questions", request.getAsJsonArray("questions").deepCopy());
+        control.putInteraction(item);
+    }
+
+    void questionWait(String sessionId, String key, Long deadline, boolean connected) {
+        SessionControl control = controlBySession.get(sessionId);
+        JsonObject known = control == null ? null : control.interactions.get(key);
+        if (known == null) return;
+        JsonObject item = known.deepCopy();
+        item.addProperty("waitConnected", connected);
+        if (deadline == null) item.remove("waitDeadline");
+        else item.addProperty("waitDeadline", deadline);
+        control.putInteraction(item);
+    }
+
+    JsonObject claimInteraction(String sessionId, String key) {
+        SessionControl control = controlBySession.get(sessionId);
+        JsonObject item = control == null ? null : control.interactions.get(key);
+        if (item == null || !"pending".equals(string(item, "status"))) return null;
+        control.setInteractionStatus(key, "submitting", null);
+        return item.deepCopy();
+    }
+
+    void completeQuestion(String sessionId, String key, JsonElement answers) {
+        SessionControl control = controlBySession.get(sessionId);
+        JsonObject known = control == null ? null : control.interactions.get(key);
+        if (known == null) return;
+        JsonObject item = known.deepCopy();
+        item.addProperty("status", "resolved");
+        item.addProperty("outcome", "answered");
+        item.add("answers", answers.deepCopy());
+        item.remove("error");
+        item.remove("waitDeadline");
         control.putInteraction(item);
     }
 
@@ -673,6 +722,11 @@ public final class DshRemoteState {
         }
 
         Map<String, SessionView> sessions = new HashMap<>();
+        for (Follow follow : follows.values()) {
+            String id = sessionIdOf(follow.address);
+            SessionControl control = controlBySession.get(id);
+            if (control != null) control.recoverSettledQuestions(follow.events);
+        }
         for (Map.Entry<String, JsonObject> entry : catalogBySession.entrySet()) {
             String sessionId = entry.getKey();
             JsonObject raw = entry.getValue();
@@ -847,6 +901,7 @@ public final class DshRemoteState {
                     new ProjectionCell(value == null ? JsonNull.INSTANCE : value.deepCopy(), seq));
             projections.clear();
             projections.putAll(updated);
+            reconcileQuestions();
         }
 
         void seed(long asOfSeq, JsonObject values) {
@@ -867,6 +922,88 @@ public final class DshRemoteState {
             }
             projections.clear();
             projections.putAll(updated);
+            reconcileQuestions();
+        }
+
+        void reconcileQuestions() {
+            ProjectionCell cell = projections.get("userQuestions");
+            JsonObject projection = cell == null ? null : DshUserQuestions.normalize(cell.value());
+            if (projection == null) return;
+            for (JsonElement candidate : projection.getAsJsonArray("active")) {
+                JsonObject q = candidate.getAsJsonObject();
+                String call = string(q, "callId");
+                String key = "u:" + call;
+                JsonObject old = interactions.get(key);
+                JsonObject item = old == null ? new JsonObject() : old.deepCopy();
+                boolean continued = "continued".equals(string(q, "state"));
+                if (continued
+                        && (old == null || !"continued".equals(string(old, "questionState")))) {
+                    item.addProperty("status", "pending");
+                    item.remove("error");
+                    item.remove("waitDeadline");
+                    item.remove("eventId");
+                } else if (old == null) item.addProperty("status", "unavailable");
+                item.addProperty("key", key);
+                item.addProperty("kind", "question");
+                item.addProperty("continuedCallId", call);
+                item.addProperty("questionState", string(q, "state"));
+                item.addProperty("timed", true);
+                item.add("questions", q.get("questions").deepCopy());
+                putInteraction(item);
+            }
+            for (JsonElement candidate : projection.getAsJsonArray("settled")) {
+                JsonObject q = candidate.getAsJsonObject();
+                String key = "u:" + string(q, "callId");
+                JsonObject old = interactions.get(key);
+                if (old == null) continue;
+                JsonObject item = old.deepCopy();
+                item.addProperty("status", "resolved");
+                item.addProperty("outcome", "answered");
+                item.add("answers", q.get("answers").deepCopy());
+                item.remove("error");
+                item.remove("waitDeadline");
+                putInteraction(item);
+            }
+        }
+
+        void recoverSettledQuestions(JsonArray events) {
+            ProjectionCell cell = projections.get("userQuestions");
+            JsonObject projection = cell == null ? null : DshUserQuestions.normalize(cell.value());
+            if (projection == null) return;
+            Map<String, JsonElement> calls = new HashMap<>();
+            for (JsonElement value : events) {
+                JsonObject event = value.getAsJsonObject();
+                if (!"tool/call".equals(string(event, "type"))
+                        || !event.has("data")
+                        || !event.get("data").isJsonObject()) continue;
+                JsonObject data = event.getAsJsonObject("data");
+                JsonElement args = data.get("arguments");
+                if (args != null && args.isJsonPrimitive())
+                    try {
+                        args = com.google.gson.JsonParser.parseString(args.getAsString());
+                    } catch (RuntimeException ignored) {
+                        continue;
+                    }
+                if (args != null
+                        && args.isJsonObject()
+                        && DshUserQuestions.questions(args.getAsJsonObject().get("questions")))
+                    calls.put(string(data, "callId"), args.getAsJsonObject().get("questions"));
+            }
+            for (JsonElement value : projection.getAsJsonArray("settled")) {
+                JsonObject settled = value.getAsJsonObject();
+                String call = string(settled, "callId");
+                String key = "u:" + call;
+                if (interactions.containsKey(key) || !calls.containsKey(call)) continue;
+                JsonObject item = new JsonObject();
+                item.addProperty("key", key);
+                item.addProperty("kind", "question");
+                item.addProperty("continuedCallId", call);
+                item.addProperty("status", "resolved");
+                item.addProperty("outcome", "answered");
+                item.add("questions", calls.get(call).deepCopy());
+                item.add("answers", settled.get("answers").deepCopy());
+                putInteraction(item);
+            }
         }
 
         void putInteraction(JsonObject item) {
@@ -902,6 +1039,7 @@ public final class DshRemoteState {
             List<String> hits = new ArrayList<>();
             for (Map.Entry<String, JsonObject> entry : interactions.entrySet()) {
                 if (eventId.equals(string(entry.getValue(), "approvalId"))
+                        || eventId.equals(string(entry.getValue(), "eventId"))
                         || entry.getKey().equals("q:" + eventId)
                         || entry.getKey().equals("a:" + eventId)) {
                     hits.add(entry.getKey());
@@ -911,6 +1049,7 @@ public final class DshRemoteState {
             Map<String, JsonObject> updated = new LinkedHashMap<>(interactions);
             for (String key : hits) {
                 JsonObject item = updated.get(key).deepCopy();
+                if ("continued".equals(string(item, "questionState"))) continue;
                 item.addProperty("status", "unavailable");
                 item.addProperty("error", "The request is no longer waiting for an answer.");
                 updated.put(key, item);

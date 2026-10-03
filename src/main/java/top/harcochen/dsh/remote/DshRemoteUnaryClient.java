@@ -60,6 +60,104 @@ public final class DshRemoteUnaryClient {
         }
     }
 
+    DshRemoteBinaryResponse.FileBytes callFileBytes(JsonObject args) {
+        String endpoint = "workspaceFiles/readBytes";
+        auth.cookie();
+        JsonObject envelope = DshRemoteContracts.requestEnvelope(endpoint, args);
+        HttpRequest.Builder builder =
+                HttpRequest.newBuilder(
+                                URI.create(
+                                        baseUrl.get().replaceAll("/+$", "") + "/api/" + endpoint))
+                        .timeout(Duration.ofMillis(clampedTimeout()))
+                        .header("content-type", "application/json")
+                        .POST(HttpRequest.BodyPublishers.ofString(envelope.toString()));
+        auth.headers().forEach(builder::header);
+        CompletableFuture<HttpResponse<byte[]>> transport =
+                HTTP_CLIENT.sendAsync(builder.build(), ignored -> new PreviewBody());
+        try {
+            HttpResponse<byte[]> response =
+                    transport.get(clampedTimeout(), java.util.concurrent.TimeUnit.MILLISECONDS);
+            byte[] bytes = response.body();
+            return DshRemoteBinaryResponse.parse(
+                    response.headers().firstValue("content-type").orElse(null),
+                    bytes,
+                    endpoint,
+                    envelope.get("rpcId").getAsString(),
+                    response.statusCode());
+        } catch (InterruptedException cancelled) {
+            transport.cancel(true);
+            Thread.currentThread().interrupt();
+            throw DshRemoteException.carrier(endpoint, "Workspace file read cancelled", cancelled);
+        } catch (java.util.concurrent.TimeoutException timeout) {
+            transport.cancel(true);
+            throw DshRemoteException.carrier(endpoint, "Workspace file read timed out", timeout);
+        } catch (java.util.concurrent.ExecutionException error) {
+            if (error.getCause() instanceof DshRemoteException remote) throw remote;
+            throw DshRemoteException.carrier(endpoint, "Workspace file read failed", error);
+        } catch (DshRemoteException error) {
+            if (error.isAuth()) {
+                auth.invalidate();
+                if (authFailureListener != null) authFailureListener.accept(error);
+            }
+            throw error;
+        }
+    }
+
+    /** Bound memory while still receiving the body; the outer future bounds total read time. */
+    private static final class PreviewBody implements HttpResponse.BodySubscriber<byte[]> {
+        private final HttpResponse.BodySubscriber<byte[]> delegate =
+                HttpResponse.BodySubscribers.ofByteArray();
+        private java.util.concurrent.Flow.Subscription subscription;
+        private int received;
+        private boolean done;
+
+        @Override
+        public java.util.concurrent.CompletionStage<byte[]> getBody() {
+            return delegate.getBody();
+        }
+
+        @Override
+        public void onSubscribe(java.util.concurrent.Flow.Subscription value) {
+            subscription = value;
+            delegate.onSubscribe(value);
+        }
+
+        @Override
+        public void onNext(java.util.List<java.nio.ByteBuffer> buffers) {
+            if (done) return;
+            for (java.nio.ByteBuffer buffer : buffers) {
+                if (buffer.remaining() > 2 * 1024 * 1024 - received) {
+                    done = true;
+                    subscription.cancel();
+                    delegate.onError(
+                            DshRemoteException.protocol(
+                                    "workspaceFiles/readBytes",
+                                    "Workspace file response exceeded the preview budget",
+                                    null));
+                    return;
+                }
+                received += buffer.remaining();
+            }
+            delegate.onNext(buffers);
+        }
+
+        @Override
+        public void onError(Throwable error) {
+            if (!done) {
+                done = true;
+                delegate.onError(error);
+            }
+        }
+
+        @Override
+        public void onComplete() {
+            if (!done) {
+                done = true;
+                delegate.onComplete();
+            }
+        }
+    }
+
     /**
      * Execute one Remote RPC asynchronously. The returned future completes with the endpoint value,
      * or exceptionally with a {@link DshRemoteException}. The launch-token exchange (when one is

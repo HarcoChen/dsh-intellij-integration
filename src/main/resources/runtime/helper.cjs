@@ -586,7 +586,7 @@ async function offerLocalRuntimeUpgrade(options) {
     const copy = t("Copy target version");
     const selected2 = await choose(window.showWarningMessage(
       t("Local dsh reports {actual} and is not compatible. Install the supported version {target} with its original installer: {path}", { actual: actual ?? t("unknown"), target, path: command }),
-      { modal: true, detail: t("Automatic upgrade requires an older, verified npm global installation. Unknown versions are not overwritten. Skip to use the plugin Runtime, or copy the target version and restart DSH after upgrading manually.") },
+      { modal: true, detail: t("Automatic upgrade requires an older, verified npm global installation. Unknown versions are not overwritten. Skip to install the official DeepSeek Desktop app, or copy the target version and restart DSH after upgrading manually.") },
       copy,
       skip
     ), signal);
@@ -636,9 +636,9 @@ async function offerLocalRuntimeUpgrade(options) {
     signal.throwIfAborted();
     const reason = error instanceof Error ? error.message : String(error);
     options.log(`[dsh:upgrade] ${reason}`);
-    const fallback = t("Use plugin Runtime");
+    const fallback = t("Download DeepSeek Desktop");
     const selected2 = await choose(window.showWarningMessage(
-      t("Local dsh upgrade did not complete: {reason}. Use the plugin Runtime instead?", { reason }),
+      t("Local dsh upgrade did not complete: {reason}. Download the official DeepSeek Desktop app instead?", { reason }),
       { modal: true },
       fallback,
       t("Cancel startup")

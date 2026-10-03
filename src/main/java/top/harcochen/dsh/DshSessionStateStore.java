@@ -291,12 +291,48 @@ final class DshSessionStateStore {
                 row.addProperty("kind", kind);
                 row.addProperty("afterSeconds", seconds);
             } else if ("every".equals(kind)) {
-                Long seconds = safeInteger(source.get("everySeconds"), 300);
+                Long seconds = safeInteger(source.get("everySeconds"), 60);
                 if (seconds == null) return null;
                 row.addProperty("kind", kind);
                 row.addProperty("everySeconds", seconds);
             } else if ("at".equals(kind)) {
                 row.addProperty("kind", kind);
+            } else if (Set.of("daily", "weekly", "cron").contains(kind == null ? "" : kind)) {
+                String zone = DshJson.strictString(source, "timeZone");
+                if (zone == null || zone.length() > 128) return null;
+                try {
+                    java.time.ZoneId.of(zone);
+                } catch (RuntimeException invalid) {
+                    return null;
+                }
+                row.addProperty("kind", kind);
+                row.addProperty("timeZone", zone);
+                if ("cron".equals(kind)) {
+                    String expression = DshJson.strictString(source, "expression");
+                    if (expression == null || expression.isBlank() || expression.length() > 256)
+                        return null;
+                    row.addProperty("expression", expression);
+                } else {
+                    String time = DshJson.strictString(source, "time");
+                    if (time == null
+                            || !time.matches(
+                                    "(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]\\.[0-9]{3}"))
+                        return null;
+                    row.addProperty("time", time);
+                    if ("weekly".equals(kind)) {
+                        if (!source.has("weekdays") || !source.get("weekdays").isJsonArray())
+                            return null;
+                        JsonArray days = source.getAsJsonArray("weekdays");
+                        if (days.isEmpty() || days.size() > 7) return null;
+                        long previous = 0;
+                        for (JsonElement day : days) {
+                            Long parsed = safeInteger(day, 1);
+                            if (parsed == null || parsed > 7 || parsed <= previous) return null;
+                            previous = parsed;
+                        }
+                        row.add("weekdays", days.deepCopy());
+                    }
+                }
             } else {
                 return null;
             }
@@ -507,19 +543,25 @@ final class DshSessionStateStore {
     }
 
     static JsonObject permissions(JsonElement value) {
+        return permissions(value, null);
+    }
+
+    static JsonObject permissions(JsonElement value, JsonArray catalog) {
         if (value == null || !value.isJsonObject()) {
             return null;
         }
         JsonObject source = value.getAsJsonObject();
         String currentValue = DshJson.string(source, "currentValue");
-        if (currentValue == null
-                || !source.has("options")
-                || !source.get("options").isJsonArray()) {
+        JsonArray rawOptions =
+                source.has("options") && source.get("options").isJsonArray()
+                        ? source.getAsJsonArray("options")
+                        : catalog;
+        if (currentValue == null || rawOptions == null) {
             return null;
         }
         JsonArray options = new JsonArray();
         String currentLabel = null;
-        for (JsonElement candidate : source.getAsJsonArray("options")) {
+        for (JsonElement candidate : rawOptions) {
             if (!candidate.isJsonObject()) {
                 continue;
             }
@@ -544,9 +586,7 @@ final class DshSessionStateStore {
                 currentLabel = optionName;
             }
         }
-        if (currentLabel == null) {
-            return null;
-        }
+        if (currentLabel == null) currentLabel = currentValue;
         JsonObject result = new JsonObject();
         result.addProperty("currentValue", currentValue);
         result.addProperty("currentLabel", currentLabel);

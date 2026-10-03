@@ -20,8 +20,10 @@ Copyright (c) 2026 HanaAyane. Licensed under the MIT License.
 ## dsh-ide Webview bundle
 
 `src/main/resources/webview/main.js` and `main.css` are built artifacts from
-the MIT-licensed [deepseek-harness-vscode](https://github.com/HarcoChen/deepseek-harness-vscode)
-repository, with selected component updates and IntelliJ-specific corrections.
+the MIT-licensed [dsh-ide](https://github.com/HarcoChen/dsh-vsc-integration)
+repository, version 0.10.2, commit `deb8d8f882586c42a20abfbb5609cb0643fac309`,
+with IntelliJ-specific menu and Schedule adapters. `scripts/sync-webview.mjs`
+rebuilds the artifacts from that pin and the companion checkout's npm dependencies.
 They are adapted at runtime through the JCEF bridge documented in `DshBridge.java`.
 
 ## dsh-ide Runtime recovery engine
@@ -36,6 +38,12 @@ The IntelliJ adapter replaces editor UI and localization dependencies with a pri
 stdin/stdout bridge. `runtime-helper/main.ts` supplies lifecycle orchestration;
 `src/main/resources/runtime/helper.cjs` is the bundled artifact. Build instructions
 and local adaptations are documented in `runtime-helper/README.md`.
+
+The Remote contract and default-version pin follow Harness `dsh-v0.2.0-rc.2`,
+commit `639ed015397290b3745d163aafe02ffee4aa3f84`. The local-upgrade UI has been
+adapted to the companion's official Desktop guidance; the recovery algorithms
+remain on the vendor baseline above. Runtime advertisement interoperability
+follows the companion's `src/runtimeAdvertisement.ts` schema.
 
 ## dsh-jev-integration Runtime package
 

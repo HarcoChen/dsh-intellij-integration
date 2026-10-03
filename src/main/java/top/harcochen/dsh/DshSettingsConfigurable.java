@@ -158,8 +158,6 @@ public final class DshSettingsConfigurable implements Configurable {
         panel.add(agentStatusLabels, labelsField);
         addCheckbox(autoStart);
         addCheckbox(persistSession);
-        addCheckbox(installWhenMissing);
-        addCheckbox(useManagedRuntime);
         addCheckbox(enableCompaction);
         addCheckbox(jevEnabled);
         addRow(
@@ -304,7 +302,11 @@ public final class DshSettingsConfigurable implements Configurable {
         String jevEndpoint = safe(jevBaseUrl.getText()).trim();
         try {
             java.net.URI uri = java.net.URI.create(jevEndpoint);
-            if (!"https".equals(uri.getScheme())
+            boolean localHttp =
+                    "http".equals(uri.getScheme())
+                            && ("localhost".equals(uri.getHost())
+                                    || "127.0.0.1".equals(uri.getHost()));
+            if (!("https".equals(uri.getScheme()) || localHttp)
                     || uri.getHost() == null
                     || uri.getUserInfo() != null) {
                 throw new IllegalArgumentException("Invalid Jev endpoint");

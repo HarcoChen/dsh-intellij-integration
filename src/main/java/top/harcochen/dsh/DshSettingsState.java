@@ -28,10 +28,11 @@ public final class DshSettingsState implements PersistentStateComponent<DshSetti
     /** Last selected session for this project; empty when nothing is pinned. */
     public String lastSessionId = "";
 
-    public boolean installWhenMissing = true;
+    /** Retained for persisted settings; automatic package installation is no longer used. */
+    public boolean installWhenMissing = false;
 
-    /** Prefer the signed, cached platform Runtime before package-manager fallbacks. */
-    public boolean useManagedRuntime = true;
+    /** Retained for old saved settings; automatic standalone Runtime downloads are deprecated. */
+    public boolean useManagedRuntime = false;
 
     public boolean recoveryEnabled = true;
     public boolean recoveryAutoPersistBundleIsolation = true;

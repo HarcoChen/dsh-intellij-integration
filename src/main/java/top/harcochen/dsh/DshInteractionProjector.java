@@ -8,11 +8,18 @@ import com.google.gson.JsonObject;
 final class DshInteractionProjector {
     private DshInteractionProjector() {}
 
-    static JsonArray present(JsonArray interactions) {
+    static JsonArray present(JsonArray interactions, String sessionId) {
         JsonArray result = interactions.deepCopy();
         for (JsonElement candidate : result) {
             if (!candidate.isJsonObject()) continue;
             JsonObject item = candidate.getAsJsonObject();
+            item.addProperty("draftKey", sessionId + ":" + string(item, "key"));
+            if (item.has("waitConnected")) {
+                JsonObject wait = new JsonObject();
+                wait.add("connected", item.get("waitConnected"));
+                if (item.has("waitDeadline")) wait.add("deadline", item.get("waitDeadline"));
+                item.add("questionWait", wait);
+            }
             if (!"question".equals(string(item, "kind"))) continue;
             JsonObject review = planReview(item.get("questions"));
             if (review == null) continue;
