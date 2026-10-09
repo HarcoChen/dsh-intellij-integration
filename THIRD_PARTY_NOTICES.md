@@ -60,11 +60,11 @@ follows the companion's `src/runtimeAdvertisement.ts` schema.
 
 ## dsh-jev-integration Runtime package
 
-`src/main/resources/jev/` contains the built IDE-neutral
+`vendor/dsh-jev-integration` is a Git submodule of the IDE-neutral
 [dsh-jev-integration](https://github.com/HarcoChen/dsh-jev-integration) package,
-version 0.1.0 (`e5d74c5d9153c5cac0d0373345afe6ce0622247c`) from the companion
-dsh-ide checkout. Its MIT license and own
-third-party notices are retained alongside the distribution. The integration
+version 0.1.0, pinned to `e5d74c5d9153c5cac0d0373345afe6ce0622247c`.
+Gradle generates `jev/` plugin resources from its committed distribution and
+retains its MIT license and own third-party notices alongside the package. The integration
 calls a separately operated System One endpoint only when enabled.
 
 

@@ -20,6 +20,7 @@ jobs:
           # This job runs ./gradlew from the pull request's own tree. Keep GITHUB_TOKEN out of
           # the local git config so submitted build logic cannot read it back.
           persist-credentials: false
+          submodules: recursive
 
       - name: Set up JDK
         uses: actions/setup-java@v4
