@@ -88,6 +88,82 @@ tasks.register("format") {
     dependsOn("spotlessApply")
 }
 
+val jevSubmodule = layout.projectDirectory.dir("vendor/dsh-jev-integration")
+val requiredJevFiles = listOf(
+    "package.json", "LICENSE", "THIRD_PARTY_NOTICES.md",
+    "dist/runtime/src/index.js", "dist/protocol/src/index.js",
+    "dist/protocol/schema/jev-integration.schema.json", "dist/runtime/cordis.patch.yml",
+    "protocol/schema/jev-integration.schema.json", "runtime/cordis.patch.yml",
+)
+
+val verifyJevSubmodule = tasks.register("verifyJevSubmodule") {
+    group = "verification"
+    description = "Checks that the pinned Jev submodule has its compiled distribution."
+    inputs.files(requiredJevFiles.map { jevSubmodule.file(it) }).optional()
+    doLast {
+        val missing = requiredJevFiles.filter { !jevSubmodule.file(it).asFile.isFile }
+        if (missing.isNotEmpty()) {
+            throw GradleException(
+                "Jev submodule is missing or incomplete: $missing. " +
+                    "Run git submodule update --init --recursive."
+            )
+        }
+    }
+}
+
+val prepareBundledJev = tasks.register<Sync>("prepareBundledJev") {
+    description = "Generates plugin resources and an extraction manifest from the Jev submodule."
+    dependsOn(verifyJevSubmodule)
+    includeEmptyDirs = false
+    from(jevSubmodule) {
+        include("dist/**", "package.json", "LICENSE", "THIRD_PARTY_NOTICES.md")
+        include("protocol/schema/jev-integration.schema.json", "runtime/cordis.patch.yml")
+        into("jev")
+    }
+    into(layout.buildDirectory.dir("generated/jev-resources"))
+    doLast {
+        val root = destinationDir.resolve("jev")
+        val files = root.walkTopDown().filter { it.isFile }
+            .map { it.relativeTo(root).invariantSeparatorsPath }.toSortedSet()
+        files.add("files.txt")
+        root.resolve("files.txt").writeText(files.joinToString("\n", postfix = "\n"))
+    }
+}
+
+sourceSets.named("main") {
+    resources.srcDir(prepareBundledJev)
+}
+
+val verifyBundledJev = tasks.register("verifyBundledJev") {
+    group = "verification"
+    description = "Checks the bundled Jev file manifest and all shipped JavaScript modules."
+    dependsOn("processResources")
+    val resources = layout.buildDirectory.dir("resources/main/jev")
+    inputs.dir(resources)
+    doLast {
+        val root = resources.get().asFile
+        val manifest = root.resolve("files.txt")
+        if (!manifest.isFile) throw GradleException("Bundled Jev file manifest is missing.")
+        val listed = manifest.readLines().filter { it.isNotBlank() }.toSet()
+        val required = requiredJevFiles.toSet() + "files.txt" + fileTree(root.resolve("dist")) {
+            include("**/*.js")
+        }.files.map { it.relativeTo(root).invariantSeparatorsPath }
+        val unlisted = required - listed
+        val missing = listed.filter { relative ->
+            val file = root.resolve(relative).toPath().normalize()
+            !file.startsWith(root.toPath()) || !file.toFile().isFile
+        }
+        if (unlisted.isNotEmpty() || missing.isNotEmpty()) {
+            throw GradleException("Bundled Jev resources are incomplete. Unlisted: $unlisted; missing: $missing")
+        }
+        logger.lifecycle("Verified ${listed.size} bundled Jev resources.")
+    }
+}
+
+tasks.named("buildPlugin") {
+    dependsOn(verifyBundledJev)
+}
+
 intellijPlatform {
     pluginConfiguration {
         ideaVersion {

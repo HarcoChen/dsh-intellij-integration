@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   java:
-    name: Java lint and compile
+    name: Java lint, compile, and bundled resources
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
@@ -20,6 +20,7 @@ jobs:
           # This job runs ./gradlew from the pull request's own tree. Keep GITHUB_TOKEN out of
           # the local git config so submitted build logic cannot read it back.
           persist-credentials: false
+          submodules: recursive
 
       - name: Set up JDK
         uses: actions/setup-java@v4
@@ -30,5 +31,5 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Check formatting, lint, and compilation
-        run: ./gradlew lint compileJava
+      - name: Check formatting, lint, compilation, and bundled Jev resources
+        run: ./gradlew lint compileJava verifyBundledJev

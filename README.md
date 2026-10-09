@@ -144,6 +144,7 @@ Download the plugin `.zip` from [GitHub Releases](https://github.com/HarcoChen/d
 To build from source, use **JDK 21** and the included Gradle wrapper:
 
 ```bash
+git submodule update --init --recursive
 ./gradlew format         # apply the repository's Java formatting rules
 ./gradlew lint           # verify formatting and run Checkstyle
 ./gradlew verifyPlugin   # structure and compatibility checks
@@ -151,6 +152,10 @@ To build from source, use **JDK 21** and the included Gradle wrapper:
 ```
 
 On Windows, use `gradlew.bat`. The first build downloads Gradle and the IntelliJ Platform dependencies.
+
+Gradle bundles Jev from the compiled distribution in `vendor/dsh-jev-integration`.
+The parent repository pins its commit; initialize the submodule before building.
+Jev requires no separate npm install or build for plugin packaging.
 
 ## Data use and privacy
 

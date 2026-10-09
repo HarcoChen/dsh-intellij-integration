@@ -1,5 +1,6 @@
 import { ChildProcess, execFile, spawn, type SpawnOptions } from "node:child_process";
 import { promisify } from "node:util";
+import { runtimeSpawnArguments } from "../runtimeLaunch";
 
 const execFileAsync = promisify(execFile);
 const owned = new WeakMap<ChildProcess, { pid: number; group?: number; termination?: Promise<void> }>();
@@ -8,7 +9,12 @@ const pause = (milliseconds: number): Promise<void> => new Promise(resolve => se
 /** Ownership is minted only by this spawn, never reconstructed from a lock or a PID supplied by a peer. */
 export function spawnOwnedRuntime(command: string, args: string[], options: SpawnOptions): ChildProcess {
     const group = process.platform !== "win32";
-    const child = spawn(command, args, { ...options, detached: group });
+    const invocation = runtimeSpawnArguments(command, args);
+    const child = spawn(command, invocation.args, {
+        ...options,
+        ...(invocation.windowsVerbatimArguments ? { windowsVerbatimArguments: true } : {}),
+        detached: group,
+    });
     if (child.pid !== undefined) owned.set(child, { pid: child.pid, ...(group ? { group: child.pid } : {}) });
     return child;
 }

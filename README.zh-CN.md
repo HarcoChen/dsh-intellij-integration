@@ -140,6 +140,7 @@ API Key 保存在 IntelliJ **Password Safe** 中，传递给新启动的本地 R
 源码构建需要 **JDK 21**，使用仓库附带的 Gradle wrapper：
 
 ```bash
+git submodule update --init --recursive
 ./gradlew format         # 应用仓库统一的 Java 格式化规则
 ./gradlew lint           # 检查格式并运行 Checkstyle
 ./gradlew verifyPlugin   # 结构与兼容性检查
@@ -147,6 +148,9 @@ API Key 保存在 IntelliJ **Password Safe** 中，传递给新启动的本地 R
 ```
 
 Windows 使用 `gradlew.bat`。首次构建会下载 Gradle 和 IntelliJ Platform 依赖。
+
+Gradle 从 `vendor/dsh-jev-integration` 子模块的已编译分发包生成 Jev 打包资源。
+父仓库固定子模块 commit，构建前需初始化；打包无需单独安装 npm 依赖或编译 Jev。
 
 ## 数据使用与隐私
 

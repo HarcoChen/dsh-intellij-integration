@@ -45,7 +45,10 @@ Copyright (c) 2026 dsh-community. The license is retained in that directory and 
 `src/main/resources/runtime/LICENSE` alongside the bundled helper.
 
 The IntelliJ adapter replaces editor UI and localization dependencies with a private
-stdin/stdout bridge. `runtime-helper/main.ts` supplies lifecycle orchestration;
+stdin/stdout bridge. `runtime-helper/runtimeLaunch.ts` adapts Windows command-interpreter
+arguments using the quoting fix from companion commit
+`7e45c2b19d8d7c724fda824a88e78b4d448cf05d`.
+`runtime-helper/main.ts` supplies lifecycle orchestration;
 `src/main/resources/runtime/helper.cjs` is the bundled artifact. Build instructions
 and local adaptations are documented in `runtime-helper/README.md`.
 
@@ -57,11 +60,11 @@ follows the companion's `src/runtimeAdvertisement.ts` schema.
 
 ## dsh-jev-integration Runtime package
 
-`src/main/resources/jev/` contains the built IDE-neutral
+`vendor/dsh-jev-integration` is a Git submodule of the IDE-neutral
 [dsh-jev-integration](https://github.com/HarcoChen/dsh-jev-integration) package,
-version 0.1.0 (`795907cbdf3347f97b27c473f4f6194f5877a74d`) from the companion
-dsh-ide checkout. Its MIT license and own
-third-party notices are retained alongside the distribution. The integration
+version 0.1.0, pinned to `e5d74c5d9153c5cac0d0373345afe6ce0622247c`.
+Gradle generates `jev/` plugin resources from its committed distribution and
+retains its MIT license and own third-party notices alongside the package. The integration
 calls a separately operated System One endpoint only when enabled.
 
 

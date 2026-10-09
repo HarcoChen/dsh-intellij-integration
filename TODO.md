@@ -5,12 +5,15 @@ An item is complete only after the host action, runtime protocol, projected stat
 
 Status: `[x]` implemented, `[-]` usable but not yet at VS Code parity, `[ ]` not implemented.
 
-## Current parity — dsh-ide v0.10.2（2026-10-03）
+## Current parity — dsh-ide v0.10.3 + Runtime quoting fix（2026-10-09）
 
-Target: companion `deb8d8f882586c42a20abfbb5609cb0643fac309` and Harness
+Target: companion `7e45c2b19d8d7c724fda824a88e78b4d448cf05d` and Harness
 `dsh-v0.2.0-rc.2`. The callable product features below are aligned; platform
 limits are explicit exceptions, rather than silently successful placeholders.
 Historical validation sections below retain their original coverage boundaries.
+The shared Webview has no changes since `deb8d8f` and keeps its existing pin.
+The new Jev package, packaging gate and Windows launch adapter are described in
+[the 0.10.3 sync report](DSH_IDE_0.10.3_SYNC.md).
 
 ### Completed differences
 
