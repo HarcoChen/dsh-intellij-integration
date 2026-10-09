@@ -23,6 +23,9 @@ function mergePatch(base, patch) {
             ...(patch.resultShaper?.keepKinds !== undefined ? { keepKinds: [...patch.resultShaper.keepKinds] } : {}),
         };
     }
+    if (base.tokenOptimization !== undefined || patch.tokenOptimization !== undefined) {
+        next.tokenOptimization = { ...(base.tokenOptimization ?? {}), ...(patch.tokenOptimization ?? {}) };
+    }
     if (base.doneGate !== undefined || patch.doneGate !== undefined) {
         next.doneGate = { ...(base.doneGate ?? {}), ...(patch.doneGate ?? {}) };
     }
@@ -40,7 +43,13 @@ function mergePatch(base, patch) {
         next.decisionTools = { ...(base.decisionTools ?? {}), ...(patch.decisionTools ?? {}) };
     }
     if (base.deterministicSafetyGuard !== undefined || patch.deterministicSafetyGuard !== undefined) {
-        next.deterministicSafetyGuard = { ...(base.deterministicSafetyGuard ?? {}), ...(patch.deterministicSafetyGuard ?? {}) };
+        next.deterministicSafetyGuard = {
+            ...(base.deterministicSafetyGuard ?? {}),
+            ...(patch.deterministicSafetyGuard ?? {}),
+            ...(patch.deterministicSafetyGuard?.customRules !== undefined
+                ? { customRules: patch.deterministicSafetyGuard.customRules.map(rule => ({ ...rule })) }
+                : {}),
+        };
     }
     if (patch.guardedTools !== undefined)
         next.guardedTools = [...patch.guardedTools];
@@ -52,11 +61,15 @@ function mergeConfig(base, patch) {
         guardedTools: [...base.guardedTools],
         loopGuard: { ...base.loopGuard, include: [...base.loopGuard.include], exclude: [...base.loopGuard.exclude] },
         resultShaper: { ...base.resultShaper, shapeTools: [...base.resultShaper.shapeTools], keepKinds: [...base.resultShaper.keepKinds] },
+        tokenOptimization: { ...base.tokenOptimization },
         doneGate: { ...base.doneGate },
         toolPruner: { ...base.toolPruner, alwaysRetain: [...base.toolPruner.alwaysRetain] },
         skillRouter: { ...base.skillRouter },
         decisionTools: { ...base.decisionTools },
-        deterministicSafetyGuard: { ...base.deterministicSafetyGuard },
+        deterministicSafetyGuard: {
+            ...base.deterministicSafetyGuard,
+            customRules: base.deterministicSafetyGuard.customRules.map(rule => ({ ...rule })),
+        },
     };
     if (patch.enabled !== undefined)
         next.enabled = patch.enabled;
@@ -90,6 +103,8 @@ function mergeConfig(base, patch) {
             ...(patch.resultShaper.keepKinds !== undefined ? { keepKinds: [...patch.resultShaper.keepKinds] } : {}),
         };
     }
+    if (patch.tokenOptimization !== undefined)
+        next.tokenOptimization = { ...next.tokenOptimization, ...patch.tokenOptimization };
     if (patch.doneGate !== undefined)
         next.doneGate = { ...next.doneGate, ...patch.doneGate };
     if (patch.toolPruner !== undefined) {
@@ -103,8 +118,15 @@ function mergeConfig(base, patch) {
         next.skillRouter = { ...next.skillRouter, ...patch.skillRouter };
     if (patch.decisionTools !== undefined)
         next.decisionTools = { ...next.decisionTools, ...patch.decisionTools };
-    if (patch.deterministicSafetyGuard !== undefined)
-        next.deterministicSafetyGuard = { ...next.deterministicSafetyGuard, ...patch.deterministicSafetyGuard };
+    if (patch.deterministicSafetyGuard !== undefined) {
+        next.deterministicSafetyGuard = {
+            ...next.deterministicSafetyGuard,
+            ...patch.deterministicSafetyGuard,
+            ...(patch.deterministicSafetyGuard.customRules !== undefined
+                ? { customRules: patch.deterministicSafetyGuard.customRules.map(rule => ({ ...rule })) }
+                : {}),
+        };
+    }
     return next;
 }
 function patchWithoutUnknown(value) {
@@ -139,6 +161,8 @@ function patchWithoutUnknown(value) {
             ...(value.resultShaper.keepKinds !== undefined ? { keepKinds: [...value.resultShaper.keepKinds] } : {}),
         };
     }
+    if (value.tokenOptimization !== undefined)
+        allowed.tokenOptimization = { ...value.tokenOptimization };
     if (value.doneGate !== undefined)
         allowed.doneGate = { ...value.doneGate };
     if (value.toolPruner !== undefined) {
@@ -151,8 +175,14 @@ function patchWithoutUnknown(value) {
         allowed.skillRouter = { ...value.skillRouter };
     if (value.decisionTools !== undefined)
         allowed.decisionTools = { ...value.decisionTools };
-    if (value.deterministicSafetyGuard !== undefined)
-        allowed.deterministicSafetyGuard = { ...value.deterministicSafetyGuard };
+    if (value.deterministicSafetyGuard !== undefined) {
+        allowed.deterministicSafetyGuard = {
+            ...value.deterministicSafetyGuard,
+            ...(value.deterministicSafetyGuard.customRules !== undefined
+                ? { customRules: value.deterministicSafetyGuard.customRules.map(rule => ({ ...rule })) }
+                : {}),
+        };
+    }
     return allowed;
 }
 function isRecord(value) {
@@ -195,6 +225,7 @@ export function validateConfigPatch(value) {
         'guardedTools',
         'loopGuard',
         'resultShaper',
+        'tokenOptimization',
         'doneGate',
         'toolPruner',
         'skillRouter',
@@ -305,6 +336,26 @@ export function validateConfigPatch(value) {
         for (const key of ['shapeTools', 'keepKinds']) {
             if (shaper[key] !== undefined) {
                 const error = validateStringArray(shaper[key], `resultShaper.${key}`, false);
+                if (error)
+                    return { error };
+            }
+        }
+    }
+    if (candidate.tokenOptimization !== undefined) {
+        const nestedError = validateNestedPatch(candidate.tokenOptimization, 'tokenOptimization', [
+            'enabled', 'deterministicFirst', 'minInputTokens', 'minEstimatedSavingsTokens',
+            'semanticFallback', 'maxDecisionLatencyMs',
+        ]);
+        if (nestedError)
+            return { error: nestedError };
+        const optimization = candidate.tokenOptimization;
+        for (const key of ['enabled', 'deterministicFirst', 'semanticFallback']) {
+            if (optimization[key] !== undefined && typeof optimization[key] !== 'boolean')
+                return { error: `tokenOptimization.${key} must be boolean` };
+        }
+        for (const key of ['minInputTokens', 'minEstimatedSavingsTokens', 'maxDecisionLatencyMs']) {
+            if (optimization[key] !== undefined) {
+                const error = validateNumber(optimization[key], `tokenOptimization.${key}`, 1, 120_000, true);
                 if (error)
                     return { error };
             }
@@ -433,7 +484,7 @@ export function validateConfigPatch(value) {
     }
     if (candidate.deterministicSafetyGuard !== undefined) {
         const nestedError = validateNestedPatch(candidate.deterministicSafetyGuard, 'deterministicSafetyGuard', [
-            'enabled', 'maxArgumentChars',
+            'enabled', 'maxArgumentChars', 'customRules',
         ]);
         if (nestedError)
             return { error: nestedError };
@@ -445,8 +496,52 @@ export function validateConfigPatch(value) {
             if (error)
                 return { error };
         }
+        if (guard.customRules !== undefined) {
+            if (!Array.isArray(guard.customRules) || guard.customRules.length > 128)
+                return { error: 'deterministicSafetyGuard.customRules must be an array with at most 128 rules' };
+            const ids = new Set();
+            for (const [index, value] of guard.customRules.entries()) {
+                if (!isRecord(value))
+                    return { error: `deterministicSafetyGuard.customRules[${index}] must be an object` };
+                const id = value.id;
+                const category = value.category;
+                const pattern = value.pattern;
+                const reason = value.reason;
+                if (typeof id !== 'string' || id.length < 1 || id.length > 80 || ids.has(id))
+                    return { error: `deterministicSafetyGuard.customRules[${index}].id must be unique and 1-80 characters` };
+                if (category !== 'destructive' && category !== 'privilege' && category !== 'credential')
+                    return { error: `deterministicSafetyGuard.customRules[${index}].category is invalid` };
+                if (typeof pattern !== 'string' || pattern.length < 1 || pattern.length > 500)
+                    return { error: `deterministicSafetyGuard.customRules[${index}].pattern must be 1-500 characters` };
+                if (typeof reason !== 'string' || reason.length < 1 || reason.length > 300)
+                    return { error: `deterministicSafetyGuard.customRules[${index}].reason must be 1-300 characters` };
+                const credentialClass = value.credentialClass;
+                if (credentialClass !== undefined && credentialClass !== 'real-credential' && credentialClass !== 'private-key' && credentialClass !== 'suspected-credential' && credentialClass !== 'placeholder')
+                    return { error: `deterministicSafetyGuard.customRules[${index}].credentialClass is invalid` };
+                if (value.enabled !== undefined && typeof value.enabled !== 'boolean')
+                    return { error: `deterministicSafetyGuard.customRules[${index}].enabled must be boolean` };
+                try {
+                    // Compile here so malformed rules are rejected before persistence.
+                    new RegExp(pattern);
+                }
+                catch {
+                    return { error: `deterministicSafetyGuard.customRules[${index}].pattern must be a valid regular expression` };
+                }
+                ids.add(id);
+            }
+        }
     }
-    const patch = patchWithoutUnknown(candidate);
+    const normalizedCandidate = { ...candidate };
+    if (isRecord(normalizedCandidate.deterministicSafetyGuard) && Array.isArray(normalizedCandidate.deterministicSafetyGuard.customRules)) {
+        normalizedCandidate.deterministicSafetyGuard = {
+            ...normalizedCandidate.deterministicSafetyGuard,
+            customRules: normalizedCandidate.deterministicSafetyGuard.customRules.map(rule => ({
+                ...rule,
+                enabled: rule.enabled !== false,
+            })),
+        };
+    }
+    const patch = patchWithoutUnknown(normalizedCandidate);
     const merged = mergeConfig(DEFAULT_CONFIG, patch);
     if (merged.blockThreshold < merged.askThreshold)
         return { error: 'blockThreshold must be at least askThreshold' };

@@ -30,6 +30,7 @@ export declare class JevIntegration {
     private readonly sessionScopes;
     private readonly sessionObjects;
     private readonly disposedSessions;
+    private readonly alreadyPrunedContents;
     private readonly hookDisposers;
     private decisionToolDisposers;
     private readonly decisionToolNames;
@@ -53,6 +54,8 @@ export declare class JevIntegration {
     private registerHooks;
     private getToolsService;
     private getSkillsService;
+    private getTokenMeterService;
+    private getToolResultPrunerService;
     private executionIdentity;
     private installRuntimeExtensions;
     private refreshDecisionToolsRegistration;

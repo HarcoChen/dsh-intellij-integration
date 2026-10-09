@@ -41,11 +41,21 @@ export const DEFAULT_RESULT_SHAPER = {
     shapeTools: ['bash', 'pwsh', 'terminal', 'run_command', 'execute_command'],
     thresholdChars: 8_000,
     maxPerTurn: 2,
-    keepKinds: ['warning', 'failure'],
+    keepKinds: ['warning', 'failure', 'error', 'summary'],
     minKindConfidence: 0.6,
     maxClusters: 24,
     sampleChars: 400,
     requestTimeoutMs: 4_000,
+};
+export const DEFAULT_TOKEN_OPTIMIZATION = {
+    // The coordinator is opt-in. A host can enable deterministic pruning and
+    // semantic fallback independently without changing the default DSH loop.
+    enabled: false,
+    deterministicFirst: true,
+    minInputTokens: 256,
+    minEstimatedSavingsTokens: 64,
+    semanticFallback: false,
+    maxDecisionLatencyMs: 1_500,
 };
 export const DEFAULT_DONE_GATE = {
     // Completion/evidence checking is experimental and must be explicitly enabled
@@ -106,6 +116,7 @@ export const DEFAULT_DETERMINISTIC_SAFETY_GUARD = {
     // the baseline protection active whenever DSH exposes tools.guard().
     enabled: true,
     maxArgumentChars: 32_000,
+    customRules: [],
 };
 export const ERROR_CODES = [
     'DJE-0001',
@@ -148,11 +159,12 @@ export const DEFAULT_CONFIG = {
     guardedTools: [...DEFAULT_GUARDED_TOOLS],
     loopGuard: { ...DEFAULT_LOOP_GUARD, include: [], exclude: [] },
     resultShaper: { ...DEFAULT_RESULT_SHAPER, shapeTools: [...DEFAULT_RESULT_SHAPER.shapeTools], keepKinds: [...DEFAULT_RESULT_SHAPER.keepKinds] },
+    tokenOptimization: { ...DEFAULT_TOKEN_OPTIMIZATION },
     doneGate: { ...DEFAULT_DONE_GATE },
     toolPruner: { ...DEFAULT_TOOL_PRUNER, alwaysRetain: [...DEFAULT_TOOL_PRUNER.alwaysRetain] },
     skillRouter: { ...DEFAULT_SKILL_ROUTER },
     decisionTools: { ...DEFAULT_DECISION_TOOLS },
-    deterministicSafetyGuard: { ...DEFAULT_DETERMINISTIC_SAFETY_GUARD },
+    deterministicSafetyGuard: { ...DEFAULT_DETERMINISTIC_SAFETY_GUARD, customRules: [] },
 };
 export function isErrorCode(value) {
     return typeof value === 'string' && ERROR_CODES.includes(value);

@@ -49,10 +49,21 @@
           keepKinds:
             - warning
             - failure
+            - error
+            - summary
           minKindConfidence: 0.6
           maxClusters: 24
           sampleChars: 400
           requestTimeoutMs: 4000
+        tokenOptimization:
+          # The coordinator is opt-in. semanticFallback is an additional
+          # privacy-sensitive switch for sending result samples to Jev.
+          enabled: false
+          deterministicFirst: true
+          minInputTokens: 256
+          minEstimatedSavingsTokens: 64
+          semanticFallback: false
+          maxDecisionLatencyMs: 1500
         doneGate:
           enabled: false
           blockThreshold: 0.75
@@ -113,3 +124,4 @@
         deterministicSafetyGuard:
           enabled: true
           maxArgumentChars: 32000
+          customRules: []

@@ -6,7 +6,7 @@ export { LoopGuardPolicy, evaluateStuckTrajectory } from './policies/loop-guard.
 export { ResultShaperPolicy, clusterLines, extractText, looksRepetitive, replaceText } from './policies/result-shaper.js';
 export { JevToolPrunerService } from './policies/tool-pruner.js';
 export { JevSkillRouterPolicy } from './policies/skill-router.js';
-export { evaluateDeterministicSafety } from './policies/deterministic-safety.js';
+export { classifyCredential, evaluateDeterministicSafety } from './policies/deterministic-safety.js';
 export { registerDecisionTools } from './decision-tools.js';
 export { VERSION } from './version.js';
 export const name = 'dsh-jev-integration';

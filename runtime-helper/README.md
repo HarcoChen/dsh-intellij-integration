@@ -28,6 +28,12 @@ Webview migration and its integration validation.
 lock, process ownership and migration modules are shared algorithms. The local
 `localUi`, `localize` and `guards` adapters replace VS Code dependencies;
 `localRuntimeUpgrade` imports the UI adapter and uses native PromiseLike typing.
+`runtimeProcess` additionally calls `runtimeLaunch.ts` to adapt the Java host's
+explicit Windows `cmd.exe /d /c` wrapper. This follows companion
+`7e45c2b19d8d7c724fda824a88e78b4d448cf05d`: quote each shell argument, preserve
+embedded quotes and trailing backslashes, and pass one `/d /s /c` command line
+with `windowsVerbatimArguments`. Native executables and POSIX arguments remain
+ordinary argument arrays. Process ownership and shutdown use the same spawn path.
 
 `main.ts` adapts those modules to the IntelliJ lifecycle. The IDE sends configuration
 and actions through private stdin. Prefixed stdout frames carry status, process

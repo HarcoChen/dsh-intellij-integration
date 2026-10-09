@@ -8,9 +8,11 @@ import { extractText as extractShaperText, replaceText } from './policies/result
 import { ResultShaperPolicy } from './policies/result-shaper.js';
 import { JevSkillRouterPolicy } from './policies/skill-router.js';
 import { JevToolPrunerService } from './policies/tool-pruner.js';
-import { evaluateDeterministicSafety } from './policies/deterministic-safety.js';
+import { classifyCredential, evaluateDeterministicSafety } from './policies/deterministic-safety.js';
 import { registerDecisionTools } from './decision-tools.js';
 import { StatisticsStore } from './stats.js';
+import { sanitizeFailureReason, sanitizeForJev } from './sanitize.js';
+import { applyNativeResultPruner, estimateContentTokens, estimateDecisionCost, estimatePotentialSavings, executionCallId, failureType, measureSessionTokens, preserveCriticalContent, tokenPair, } from './token-optimization.js';
 import { VERSION } from './version.js';
 function scopeKey(identity) {
     return JSON.stringify([identity.workspaceId, identity.sessionId ?? null]);
@@ -213,6 +215,29 @@ function waitForRetry(delayMs, signal) {
         signal?.addEventListener('abort', onAbort, { once: true });
     });
 }
+function createDecisionDeadline(parent, timeoutMs) {
+    const controller = new AbortController();
+    let timedOut = false;
+    let timer;
+    const onParentAbort = () => controller.abort();
+    if (parent?.aborted)
+        controller.abort();
+    else
+        parent?.addEventListener('abort', onParentAbort, { once: true });
+    timer = setTimeout(() => {
+        timedOut = true;
+        controller.abort();
+    }, timeoutMs);
+    return {
+        signal: controller.signal,
+        timedOut: () => timedOut,
+        dispose: () => {
+            if (timer !== undefined)
+                clearTimeout(timer);
+            parent?.removeEventListener('abort', onParentAbort);
+        },
+    };
+}
 async function callAdvisoryWithRetry(client, request, options, onRetry) {
     let retry = 0;
     for (;;) {
@@ -252,6 +277,7 @@ export class JevIntegration {
     sessionScopes = new Map();
     sessionObjects = new Map();
     disposedSessions = new Set();
+    alreadyPrunedContents = new WeakSet();
     hookDisposers = [];
     decisionToolDisposers = [];
     decisionToolNames = new Set();
@@ -293,6 +319,8 @@ export class JevIntegration {
             startupPatch.loopGuard = { ...options.loopGuard };
         if (options.resultShaper !== undefined)
             startupPatch.resultShaper = { ...options.resultShaper };
+        if (options.tokenOptimization !== undefined)
+            startupPatch.tokenOptimization = { ...options.tokenOptimization };
         if (options.doneGate !== undefined)
             startupPatch.doneGate = { ...options.doneGate };
         if (options.toolPruner !== undefined)
@@ -404,6 +432,12 @@ export class JevIntegration {
     getSkillsService() {
         return serviceFromContext(this.context, 'skills');
     }
+    getTokenMeterService() {
+        return serviceFromContext(this.context, 'tokenMeter');
+    }
+    getToolResultPrunerService() {
+        return serviceFromContext(this.context, 'toolResultPruner');
+    }
     executionIdentity(exec) {
         const session = exec.agent && isRecord(exec.agent) ? exec.agent.session : undefined;
         const sessionId = extractSession(session).id;
@@ -440,8 +474,22 @@ export class JevIntegration {
                     const identity = this.executionIdentity(execution);
                     const resolved = this.configState.resolve(identity?.workspaceId ?? '__deterministic-guard__', identity?.sessionId);
                     const match = evaluateDeterministicSafety(execution, resolved.values.guardedTools, resolved.values.deterministicSafetyGuard);
-                    if (identity)
+                    if (identity) {
                         this.stats.recordDeterministicGuard(identity.workspaceId, identity.sessionId, match !== undefined);
+                        const raw = execution.arguments !== undefined ? execution.arguments : execution.args;
+                        let serialized = '';
+                        try {
+                            serialized = JSON.stringify(raw) ?? String(raw);
+                        }
+                        catch {
+                            serialized = String(raw);
+                        }
+                        const credentialClass = classifyCredential(serialized);
+                        if (match !== undefined)
+                            this.stats.recordDeterministicRuleHit(identity.workspaceId, identity.sessionId, match.ruleId, match.credentialClass ?? credentialClass);
+                        else if (credentialClass !== undefined)
+                            this.stats.recordDeterministicRuleHit(identity.workspaceId, identity.sessionId, `credential.${credentialClass}`, credentialClass);
+                    }
                     return match === undefined ? undefined : `[DSH Jev deterministic safety] ${match.reason}. Review the command and request explicit approval.`;
                 });
                 if (typeof registered === 'function')
@@ -813,17 +861,22 @@ export class JevIntegration {
         void this.publishState(identity);
     }
     async invokePolicy(identity, client, request, timeoutMs, signal) {
+        const safeRequest = {
+            ...(request.model !== undefined ? { model: request.model } : {}),
+            state: typeof request.state === 'string' ? sanitizeFailureReason(sanitizeForJev(request.state)) : sanitizeForJev(request.state),
+            questions: sanitizeForJev(request.questions),
+        };
         const requestBytesEstimate = new TextEncoder().encode(JSON.stringify({
-            model: request.model ?? client.model,
-            state: typeof request.state === 'string' ? request.state : JSON.stringify(request.state),
-            questions: request.questions,
+            model: safeRequest.model ?? client.model,
+            state: typeof safeRequest.state === 'string' ? safeRequest.state : JSON.stringify(safeRequest.state),
+            questions: safeRequest.questions,
         })).byteLength;
         const finishActive = this.stats.begin(identity.workspaceId, identity.sessionId, requestBytesEstimate);
         this.incrementActive(identity);
         const started = Date.now();
         try {
             const callOptions = signal === undefined ? { timeoutMs } : { timeoutMs, signal };
-            const result = await callAdvisoryWithRetry(client, request, callOptions, (attempt, error) => {
+            const result = await callAdvisoryWithRetry(client, safeRequest, callOptions, (attempt, error) => {
                 this.context.logger?.debug?.(`dsh-jev-integration: retrying Jev policy (${attempt}/${ADVISORY_RETRIES}) after ${error.kind}`);
             });
             this.stats.recordCall(identity.workspaceId, identity.sessionId, {
@@ -850,7 +903,7 @@ export class JevIntegration {
                 : jevError?.kind === 'cancelled'
                     ? 'DJE-0009'
                     : 'DJE-0007';
-            const message = jevError?.message ?? (error instanceof Error ? error.message : String(error));
+            const message = sanitizeFailureReason(jevError?.kind ?? (error instanceof Error ? error.message : String(error)));
             this.setAvailability(identity, false, message, code);
             throw error;
         }
@@ -902,17 +955,8 @@ export class JevIntegration {
                 ],
             },
         };
-        const requestBytesEstimate = new TextEncoder().encode(JSON.stringify({ model: resolved.values.model, state: JSON.stringify(state), questions })).byteLength;
-        const finishActive = this.stats.begin(identity.workspaceId, identity.sessionId, requestBytesEstimate);
-        this.incrementActive(identity);
-        const callStarted = Date.now();
         try {
-            const callOptions = { timeoutMs: resolved.values.advisoryTimeoutMs };
-            if (exec.signal !== undefined)
-                callOptions.signal = exec.signal;
-            const result = await callAdvisoryWithRetry(client, { state, questions }, callOptions, (attempt, error) => {
-                this.context.logger?.debug?.(`dsh-jev-integration: retrying Jev advisory (${attempt}/${ADVISORY_RETRIES}) after ${error.kind}`);
-            });
+            const result = await this.invokePolicy(identity, client, { state, questions }, resolved.values.advisoryTimeoutMs, exec.signal);
             const hazards = ['is_destructive', 'is_exfiltration', 'is_jailbreak']
                 .map(key => noulProbability(result.answers[key]))
                 .filter((value) => typeof value === 'number');
@@ -925,8 +969,7 @@ export class JevIntegration {
                 decision = 'deny';
             else if ((maxHazard !== undefined && maxHazard >= resolved.values.askThreshold) || (riskScore !== undefined && riskScore >= 0.7))
                 decision = 'ask';
-            const measurement = { ok: true, latencyMs: Date.now() - callStarted, requestBytes: result.requestBytes, responseBytes: result.responseBytes };
-            this.stats.recordCall(identity.workspaceId, identity.sessionId, measurement, decision);
+            this.stats.recordDecision(identity.workspaceId, identity.sessionId, decision);
             this.setAvailability(identity, true);
             this.setDecision(identity, decision);
             if (decision === 'deny') {
@@ -946,17 +989,7 @@ export class JevIntegration {
             const jevError = error instanceof JevClientError ? error : undefined;
             const kind = jevError?.kind;
             const code = kind === 'timeout' ? 'DJE-0008' : kind === 'cancelled' ? 'DJE-0009' : 'DJE-0007';
-            const message = jevError?.message ?? (error instanceof Error ? error.message : String(error));
-            const timedOut = kind === 'timeout';
-            const cancelled = kind === 'cancelled';
-            this.stats.recordCall(identity.workspaceId, identity.sessionId, {
-                ok: false,
-                latencyMs: Date.now() - callStarted,
-                requestBytes: requestBytesEstimate,
-                responseBytes: 0,
-                timedOut,
-                cancelled,
-            }, 'allow');
+            const message = sanitizeFailureReason(kind ?? (error instanceof Error ? error.message : String(error)));
             // Jev is an optional advisory layer: a timeout, missing key, cancellation,
             // or upstream failure never blocks the normal DSH tool pipeline.
             this.setAvailability(identity, false, message, code);
@@ -964,13 +997,10 @@ export class JevIntegration {
             this.context.logger?.warn?.(`dsh-jev-integration: Jev advisory skipped for ${toolName}: ${message}`);
             return next();
         }
-        finally {
-            finishActive();
-            this.decrementActive(identity);
-        }
     }
     async postExecute(execValue, resultValue, next) {
         const baseDecision = await next();
+        await this.ready;
         const exec = isRecord(execValue) ? execValue : {};
         const result = isRecord(resultValue) ? resultValue : { content: resultValue };
         const session = exec.agent && isRecord(exec.agent) ? exec.agent.session : undefined;
@@ -980,14 +1010,67 @@ export class JevIntegration {
         const resolved = this.configState.resolve(identity.workspaceId, identity.sessionId);
         if (!resolved.values.enabled)
             return baseDecision;
-        if (!resolved.values.loopGuard.enabled && !resolved.values.resultShaper.enabled)
-            return baseDecision;
-        const client = new JevClient(resolved.values, this.options.apiKey, this.options.fetch);
-        if (!(await client.hasApiKey()))
-            return baseDecision;
-        let decision = baseDecision;
+        const tokenConfig = resolved.values.tokenOptimization;
+        const tokenEnabled = tokenConfig.enabled;
+        const canRewrite = baseDecision.kind !== 'block' && !Object.hasOwn(baseDecision, 'content') && !Object.hasOwn(baseDecision, 'value');
+        const tokenMeter = tokenEnabled ? this.getTokenMeterService() : undefined;
+        const resultPruner = tokenEnabled ? this.getToolResultPrunerService() : undefined;
+        const originalContent = result.content;
+        let workingResult = result;
+        const measuredSessionBefore = tokenEnabled ? measureSessionTokens(tokenMeter, session) : null;
+        let inputTokensBefore = estimateContentTokens(tokenMeter, originalContent, result.isError === true, executionCallId(exec));
+        if (inputTokensBefore === null)
+            inputTokensBefore = measuredSessionBefore;
+        let deterministicChanged = false;
+        const alreadyMarkedPruned = typeof extractShaperText(originalContent) === 'string'
+            && /(?:DSH native deterministic prune|lines dropped by DSH Jev result shaper|DSH Jev preserved critical lines)/.test(extractShaperText(originalContent) ?? '');
+        if (tokenEnabled && tokenConfig.deterministicFirst && canRewrite && result.isError !== true && !alreadyMarkedPruned && resultPruner?.pruneContent) {
+            const contentObject = originalContent && typeof originalContent === 'object' ? originalContent : undefined;
+            if (contentObject && this.alreadyPrunedContents.has(contentObject)) {
+                // The same result object can pass through more than one post-execute
+                // listener. Avoid applying a second replacement to an already handled
+                // content array.
+            }
+            else {
+                const native = applyNativeResultPruner(resultPruner, originalContent, false);
+                if (contentObject)
+                    this.alreadyPrunedContents.add(contentObject);
+                if (native.changed && native.content !== originalContent) {
+                    deterministicChanged = true;
+                    const replacement = { ...result, content: native.content };
+                    workingResult = replacement;
+                }
+                if (native.content && typeof native.content === 'object')
+                    this.alreadyPrunedContents.add(native.content);
+            }
+        }
+        const afterDeterministicTokens = tokenEnabled
+            ? estimateContentTokens(tokenMeter, workingResult.content, workingResult.isError === true, executionCallId(exec))
+            : null;
+        const pairAfterDeterministic = tokenPair(inputTokensBefore, afterDeterministicTokens);
+        const wantsSemanticShaper = resolved.values.resultShaper.enabled
+            && (!tokenEnabled || tokenConfig.semanticFallback);
+        const needsJev = resolved.values.loopGuard.enabled || wantsSemanticShaper;
+        const client = needsJev ? new JevClient(resolved.values, this.options.apiKey, this.options.fetch) : undefined;
+        if (needsJev && client !== undefined && !(await client.hasApiKey())) {
+            if (tokenEnabled && wantsSemanticShaper) {
+                this.stats.recordTokenOptimization(identity.workspaceId, identity.sessionId, 'fail-open', {
+                    inputTokensBefore,
+                    inputTokensAfter: afterDeterministicTokens,
+                    tokensRemoved: pairAfterDeterministic.removed,
+                    netTokensSaved: pairAfterDeterministic.removed,
+                    failureReason: 'missing-api-key',
+                });
+            }
+            return deterministicChanged && canRewrite
+                ? { ...baseDecision, kind: 'accept', action: 'accept', content: workingResult.content }
+                : baseDecision;
+        }
+        let decision = deterministicChanged && canRewrite
+            ? { ...baseDecision, kind: 'accept', action: 'accept', content: workingResult.content }
+            : baseDecision;
         if (resolved.values.loopGuard.enabled) {
-            const loopOutcome = await this.loopGuard.inspect(exec, result, resolved.values.loopGuard, (request, options) => this.invokePolicy(identity, client, request, options.timeoutMs, options.signal));
+            const loopOutcome = await this.loopGuard.inspect(exec, workingResult, resolved.values.loopGuard, (request, options) => this.invokePolicy(identity, client, request, options.timeoutMs, options.signal));
             if (loopOutcome.action === 'warning' || loopOutcome.action === 'interrupt') {
                 this.stats.recordLoopGuard(identity.workspaceId, identity.sessionId, loopOutcome.action);
                 if (loopOutcome.context !== undefined && decision.kind !== 'block') {
@@ -998,24 +1081,113 @@ export class JevIntegration {
                 this.stats.recordLoopGuard(identity.workspaceId, identity.sessionId, 'uncertain');
             }
         }
-        if (resolved.values.resultShaper.enabled
-            && result.isError !== true
-            && decision.kind !== 'block'
-            && !Object.hasOwn(decision, 'content')
-            && !Object.hasOwn(decision, 'value')) {
-            const originalText = extractShaperText(result.content);
-            if (originalText !== undefined && this.resultShaper.shouldConsider(exec, originalText, resolved.values.resultShaper)) {
-                const shaped = await this.resultShaper.shape(originalText, exec.name ?? '', exec, resolved.values.resultShaper, (request, options) => this.invokePolicy(identity, client, request, options.timeoutMs, options.signal));
-                if (shaped !== undefined) {
-                    this.stats.recordResultShape(identity.workspaceId, identity.sessionId, originalText.length - shaped.text.length);
-                    decision = {
-                        ...decision,
-                        kind: 'accept',
-                        action: 'accept',
-                        content: replaceText(result.content, shaped.text),
-                    };
+        let tokenOutcome;
+        let decisionLatencyMs = 0;
+        let decisionCostTokens = null;
+        let tokenFailure = {};
+        if (wantsSemanticShaper
+            && workingResult.isError !== true
+            && canRewrite) {
+            const originalText = extractShaperText(workingResult.content);
+            const considered = originalText !== undefined && this.resultShaper.shouldConsider(exec, originalText, resolved.values.resultShaper);
+            if (!considered) {
+                if (tokenEnabled)
+                    tokenOutcome = 'skipped-low-roi';
+            }
+            else {
+                const expectedSavings = tokenEnabled ? estimatePotentialSavings(tokenMeter, originalText ?? '') : null;
+                const decisionEstimateRequest = {
+                    state: { tool: exec.name ?? '', outputSample: (originalText ?? '').slice(0, 1_500) },
+                    questions: { kind_0: { type: 'choice', instructions: 'Classify repeated tool output lines.', criteria: { routine_progress: 'routine', warning: 'warning', failure: 'failure', error: 'error', summary: 'summary' } } },
+                };
+                decisionCostTokens = tokenEnabled ? estimateDecisionCost(tokenMeter, decisionEstimateRequest) : null;
+                const belowInput = tokenEnabled && inputTokensBefore !== null && inputTokensBefore < tokenConfig.minInputTokens;
+                const deterministicEnough = tokenEnabled && pairAfterDeterministic.removed !== null && pairAfterDeterministic.removed >= tokenConfig.minEstimatedSavingsTokens;
+                const expectedBelowThreshold = tokenEnabled && expectedSavings !== null && expectedSavings < tokenConfig.minEstimatedSavingsTokens;
+                const belowDecisionCost = tokenEnabled && expectedSavings !== null && decisionCostTokens !== null && expectedSavings <= decisionCostTokens;
+                if (belowInput || deterministicEnough || expectedBelowThreshold || belowDecisionCost || !tokenConfig.semanticFallback && tokenEnabled) {
+                    if (tokenEnabled)
+                        tokenOutcome = 'skipped-low-roi';
+                }
+                else {
+                    const semanticStarted = Date.now();
+                    let semanticFailure;
+                    const deadline = tokenEnabled ? createDecisionDeadline(exec.signal, tokenConfig.maxDecisionLatencyMs) : undefined;
+                    const shaped = await (async () => {
+                        try {
+                            return await this.resultShaper.shape(originalText ?? '', exec.name ?? '', exec, tokenEnabled
+                                ? { ...resolved.values.resultShaper, keepKinds: [...new Set([...resolved.values.resultShaper.keepKinds, 'warning', 'failure', 'error', 'summary'])] }
+                                : resolved.values.resultShaper, (request, options) => {
+                                const signal = deadline?.signal ?? options.signal;
+                                const timeoutMs = deadline === undefined
+                                    ? options.timeoutMs
+                                    : Math.min(options.timeoutMs, tokenConfig.maxDecisionLatencyMs);
+                                return this.invokePolicy(identity, client, request, timeoutMs, signal).then(response => {
+                                    if (deadline?.timedOut())
+                                        throw new JevClientError('timeout', 'token optimization decision latency exceeded');
+                                    return response;
+                                }).catch(error => {
+                                    if (deadline?.timedOut() && !exec.signal?.aborted) {
+                                        const timeout = new JevClientError('timeout', 'token optimization decision latency exceeded');
+                                        semanticFailure = timeout;
+                                        throw timeout;
+                                    }
+                                    semanticFailure = error;
+                                    throw error;
+                                });
+                            });
+                        }
+                        finally {
+                            deadline?.dispose();
+                        }
+                    })();
+                    decisionLatencyMs = Date.now() - semanticStarted;
+                    tokenOutcome = shaped === undefined && semanticFailure !== undefined ? 'failure' : 'decision';
+                    if (semanticFailure !== undefined) {
+                        tokenFailure = {
+                            type: failureType(semanticFailure),
+                            reason: sanitizeFailureReason(semanticFailure instanceof Error ? semanticFailure.message : 'semantic result shaper failed'),
+                        };
+                        tokenOutcome = 'failure';
+                    }
+                    if (shaped !== undefined) {
+                        const shapedOutput = replaceText(workingResult.content, shaped.text);
+                        const shapedContent = Array.isArray(shapedOutput)
+                            ? preserveCriticalContent(workingResult.content, shapedOutput)
+                            : shapedOutput;
+                        this.stats.recordResultShape(identity.workspaceId, identity.sessionId, (originalText?.length ?? 0) - shaped.text.length);
+                        workingResult = { ...workingResult, content: shapedContent };
+                        decision = {
+                            ...decision,
+                            kind: 'accept',
+                            action: 'accept',
+                            content: shapedContent,
+                        };
+                    }
                 }
             }
+        }
+        else if (tokenEnabled) {
+            tokenOutcome = 'skipped-low-roi';
+        }
+        if (tokenEnabled) {
+            const inputTokensAfter = estimateContentTokens(tokenMeter, workingResult.content, workingResult.isError === true, executionCallId(exec))
+                ?? (workingResult === result ? afterDeterministicTokens : null);
+            const pair = tokenPair(inputTokensBefore, inputTokensAfter);
+            const netTokensSaved = pair.removed === null
+                ? null
+                : tokenOutcome === 'decision' && decisionCostTokens === null
+                    ? null
+                    : Math.max(0, pair.removed - (tokenOutcome === 'decision' ? decisionCostTokens ?? 0 : 0));
+            this.stats.recordTokenOptimization(identity.workspaceId, identity.sessionId, tokenOutcome ?? 'skipped-low-roi', {
+                inputTokensBefore,
+                inputTokensAfter,
+                tokensRemoved: pair.removed,
+                netTokensSaved,
+                decisionLatencyMs,
+                ...(tokenFailure.type !== undefined ? { failureType: tokenFailure.type } : {}),
+                ...(tokenFailure.reason !== undefined ? { failureReason: tokenFailure.reason } : {}),
+            });
         }
         return decision;
     }
@@ -1070,9 +1242,12 @@ export class JevIntegration {
         if (this.sessionEventQueues.get(sessionId) === pending)
             this.sessionEventQueues.delete(sessionId);
         this.clearSessionTrace(sessionId);
+        await this.ready;
         const identity = this.sessionScopes.get(sessionId) ?? await this.resolveWorkspace(sessionValue);
-        if (identity?.sessionId !== undefined)
+        if (identity?.sessionId !== undefined) {
             this.configState.clearSession(identity.workspaceId, identity.sessionId);
+            this.stats.clearSession(identity.workspaceId, identity.sessionId);
+        }
         this.sessionScopes.delete(sessionId);
     }
     enqueueSessionEvent(sessionValue, eventValue) {
@@ -1280,6 +1455,8 @@ export class JevIntegration {
                     'system-prompt/assemble',
                     'tools.register',
                     'tools.guard',
+                    'tokenMeter (optional)',
+                    'toolResultPruner (optional)',
                 ],
             },
             pluginMounted: this.mounted,
@@ -1302,6 +1479,9 @@ export class JevIntegration {
                 skillRouter: this.mounted && Boolean(this.getSkillsService()),
                 decisionTools: this.mounted && Boolean(this.getToolsService()?.register),
                 deterministicSafetyGuard: this.mounted && Boolean(this.getToolsService()?.guard),
+                tokenMeter: this.mounted && Boolean(this.getTokenMeterService()?.estimateMessage || this.getTokenMeterService()?.measure),
+                toolResultPruner: this.mounted && Boolean(this.getToolResultPrunerService()?.pruneContent),
+                tokenOptimization: this.mounted,
             },
             jev: { baseUrl: resolved.values.baseUrl, model: resolved.values.model, available },
         };

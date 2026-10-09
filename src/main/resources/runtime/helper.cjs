@@ -307,12 +307,35 @@ var env = { clipboard: { async writeText(text) {
 // upstream/runtimeProcess.ts
 var import_node_child_process = require("node:child_process");
 var import_node_util = require("node:util");
+
+// runtimeLaunch.ts
+function runtimeSpawnArguments(command, args, platform = process.platform) {
+  if (platform !== "win32" || !/(?:^|[\\/])cmd(?:\.exe)?$/iu.test(command) || args[0]?.toLowerCase() !== "/d" || args[1]?.toLowerCase() !== "/c" || args.length < 3) {
+    return { args };
+  }
+  const launcher = args[2];
+  if (/["%!\r\n]/u.test(launcher)) {
+    throw new Error("DSH launcher path cannot be safely invoked through the Windows shell");
+  }
+  const quoted = args.slice(2).map((argument) => `"${argument.replace(/(\\*)"/gu, (_match, slashes) => `${slashes}${slashes}""`).replace(/\\+$/u, (slashes) => slashes + slashes)}"`);
+  return {
+    args: ["/d", "/s", "/c", `"${quoted.join(" ")}"`],
+    windowsVerbatimArguments: true
+  };
+}
+
+// upstream/runtimeProcess.ts
 var execFileAsync = (0, import_node_util.promisify)(import_node_child_process.execFile);
 var owned = /* @__PURE__ */ new WeakMap();
 var pause = (milliseconds) => new Promise((resolve6) => setTimeout(resolve6, milliseconds));
 function spawnOwnedRuntime(command, args, options) {
   const group = process.platform !== "win32";
-  const child2 = (0, import_node_child_process.spawn)(command, args, { ...options, detached: group });
+  const invocation = runtimeSpawnArguments(command, args);
+  const child2 = (0, import_node_child_process.spawn)(command, invocation.args, {
+    ...options,
+    ...invocation.windowsVerbatimArguments ? { windowsVerbatimArguments: true } : {},
+    detached: group
+  });
   if (child2.pid !== void 0) owned.set(child2, { pid: child2.pid, ...group ? { group: child2.pid } : {} });
   return child2;
 }

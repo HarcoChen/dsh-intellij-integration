@@ -83,6 +83,31 @@
         "requestTimeoutMs": { "type": "integer", "minimum": 1, "maximum": 120000 }
       }
     },
+    "tokenOptimizationConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled", "deterministicFirst", "minInputTokens", "minEstimatedSavingsTokens", "semanticFallback", "maxDecisionLatencyMs"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "deterministicFirst": { "type": "boolean" },
+        "minInputTokens": { "type": "integer", "minimum": 1, "maximum": 120000 },
+        "minEstimatedSavingsTokens": { "type": "integer", "minimum": 1, "maximum": 120000 },
+        "semanticFallback": { "type": "boolean" },
+        "maxDecisionLatencyMs": { "type": "integer", "minimum": 1, "maximum": 120000 }
+      }
+    },
+    "tokenOptimizationPatch": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "deterministicFirst": { "type": "boolean" },
+        "minInputTokens": { "type": "integer", "minimum": 1, "maximum": 120000 },
+        "minEstimatedSavingsTokens": { "type": "integer", "minimum": 1, "maximum": 120000 },
+        "semanticFallback": { "type": "boolean" },
+        "maxDecisionLatencyMs": { "type": "integer", "minimum": 1, "maximum": 120000 }
+      }
+    },
     "doneGatePatch": {
       "type": "object",
       "additionalProperties": false,
@@ -191,10 +216,15 @@
     "deterministicSafetyGuardConfig": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["enabled", "maxArgumentChars"],
+      "required": ["enabled", "maxArgumentChars", "customRules"],
       "properties": {
         "enabled": { "type": "boolean" },
-        "maxArgumentChars": { "type": "integer", "minimum": 1, "maximum": 1000000 }
+        "maxArgumentChars": { "type": "integer", "minimum": 1, "maximum": 1000000 },
+        "customRules": {
+          "type": "array",
+          "maxItems": 128,
+          "items": { "$ref": "#/$defs/deterministicSafetyRule" }
+        }
       }
     },
     "deterministicSafetyGuardPatch": {
@@ -202,7 +232,38 @@
       "additionalProperties": false,
       "properties": {
         "enabled": { "type": "boolean" },
-        "maxArgumentChars": { "type": "integer", "minimum": 1, "maximum": 1000000 }
+        "maxArgumentChars": { "type": "integer", "minimum": 1, "maximum": 1000000 },
+        "customRules": {
+          "type": "array",
+          "maxItems": 128,
+          "items": { "$ref": "#/$defs/deterministicSafetyRulePatch" }
+        }
+      }
+    },
+    "deterministicSafetyRule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "category", "pattern", "reason", "enabled"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "category": { "enum": ["destructive", "privilege", "credential"] },
+        "pattern": { "type": "string", "minLength": 1, "maxLength": 500 },
+        "reason": { "type": "string", "minLength": 1, "maxLength": 300 },
+        "credentialClass": { "enum": ["real-credential", "private-key", "suspected-credential", "placeholder"] },
+        "enabled": { "type": "boolean" }
+      }
+    },
+    "deterministicSafetyRulePatch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "category", "pattern", "reason"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "category": { "enum": ["destructive", "privilege", "credential"] },
+        "pattern": { "type": "string", "minLength": 1, "maxLength": 500 },
+        "reason": { "type": "string", "minLength": 1, "maxLength": 300 },
+        "credentialClass": { "enum": ["real-credential", "private-key", "suspected-credential", "placeholder"] },
+        "enabled": { "type": "boolean" }
       }
     },
     "errorCode": {
@@ -235,6 +296,7 @@
         "guardedTools",
         "loopGuard",
         "resultShaper",
+        "tokenOptimization",
         "doneGate",
         "toolPruner",
         "skillRouter",
@@ -252,6 +314,7 @@
         "guardedTools": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
         "loopGuard": { "$ref": "#/$defs/loopGuardConfig" },
         "resultShaper": { "$ref": "#/$defs/resultShaperConfig" },
+        "tokenOptimization": { "$ref": "#/$defs/tokenOptimizationConfig" },
         "doneGate": { "$ref": "#/$defs/doneGateConfig" },
         "toolPruner": { "$ref": "#/$defs/toolPrunerConfig" },
         "skillRouter": { "$ref": "#/$defs/skillRouterConfig" },
@@ -273,6 +336,7 @@
         "guardedTools": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
         "loopGuard": { "$ref": "#/$defs/loopGuardPatch" },
         "resultShaper": { "$ref": "#/$defs/resultShaperPatch" },
+        "tokenOptimization": { "$ref": "#/$defs/tokenOptimizationPatch" },
         "doneGate": { "$ref": "#/$defs/doneGatePatch" },
         "toolPruner": { "$ref": "#/$defs/toolPrunerPatch" },
         "skillRouter": { "$ref": "#/$defs/skillRouterPatch" },
@@ -341,7 +405,10 @@
         "skillRouterCalls", "skillRouterSkipped", "skillRouterLowConfidence", "skillRouterFailOpen",
         "skillRouterAdviceCount", "skillRouterAdviceChars", "skillRouterLatencyMs",
         "decisionToolCalls", "decisionToolUnknown", "decisionToolFailOpen", "decisionToolLatencyMs",
-        "deterministicGuardChecks", "deterministicGuardDenies"
+        "deterministicGuardChecks", "deterministicGuardDenies",
+        "inputTokensBefore", "inputTokensAfter", "tokensRemoved", "decisionCalls", "decisionLatencyMs",
+        "skippedLowRoi", "failures", "failOpen", "estimatedCostUsd", "cacheHitRate", "netTokensSaved",
+        "lastFailureType", "lastFailureReason", "deterministicRuleHits", "credentialClassHits"
       ],
       "properties": {
         "workspaceId": { "type": "string", "minLength": 1 },
@@ -391,7 +458,32 @@
         "decisionToolFailOpen": { "type": "integer", "minimum": 0 },
         "decisionToolLatencyMs": { "type": "number", "minimum": 0 },
         "deterministicGuardChecks": { "type": "integer", "minimum": 0 },
-        "deterministicGuardDenies": { "type": "integer", "minimum": 0 }
+        "deterministicGuardDenies": { "type": "integer", "minimum": 0 },
+        "inputTokensBefore": { "type": ["integer", "null"], "minimum": 0 },
+        "inputTokensAfter": { "type": ["integer", "null"], "minimum": 0 },
+        "tokensRemoved": { "type": ["integer", "null"], "minimum": 0 },
+        "decisionCalls": { "type": "integer", "minimum": 0 },
+        "decisionLatencyMs": { "type": "number", "minimum": 0 },
+        "skippedLowRoi": { "type": "integer", "minimum": 0 },
+        "failures": { "type": "integer", "minimum": 0 },
+        "failOpen": { "type": "integer", "minimum": 0 },
+        "estimatedCostUsd": { "type": ["number", "null"], "minimum": 0 },
+        "cacheHitRate": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+        "netTokensSaved": { "type": ["integer", "null"] },
+        "lastFailureType": { "type": ["string", "null"], "enum": ["timeout", "network", "429", "5xx", "cancel", "invalid-response", "http", null] },
+        "lastFailureReason": { "type": ["string", "null"], "maxLength": 200 },
+        "deterministicRuleHits": { "type": "object", "additionalProperties": { "type": "integer", "minimum": 0 } },
+        "credentialClassHits": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["real-credential", "private-key", "suspected-credential", "placeholder"],
+          "properties": {
+            "real-credential": { "type": "integer", "minimum": 0 },
+            "private-key": { "type": "integer", "minimum": 0 },
+            "suspected-credential": { "type": "integer", "minimum": 0 },
+            "placeholder": { "type": "integer", "minimum": 0 }
+          }
+        }
       }
     },
     "protocolError": {
@@ -448,7 +540,8 @@
             "configRead", "configWrite", "stateRead", "statsRead", "statsReset",
             "stateEvents", "preExecuteHook", "postExecuteHook", "loopGuard", "resultShaper",
             "doneEvidenceGate", "turnStoppingHook", "nextTurnOverride",
-            "toolPruner", "skillRouter", "decisionTools", "deterministicSafetyGuard"
+            "toolPruner", "skillRouter", "decisionTools", "deterministicSafetyGuard",
+            "tokenMeter", "toolResultPruner", "tokenOptimization"
           ],
           "properties": {
             "configRead": { "type": "boolean" },
@@ -467,7 +560,10 @@
             "toolPruner": { "type": "boolean" },
             "skillRouter": { "type": "boolean" },
             "decisionTools": { "type": "boolean" },
-            "deterministicSafetyGuard": { "type": "boolean" }
+            "deterministicSafetyGuard": { "type": "boolean" },
+            "tokenMeter": { "type": "boolean" },
+            "toolResultPruner": { "type": "boolean" },
+            "tokenOptimization": { "type": "boolean" }
           }
         },
         "jev": {

@@ -35,6 +35,20 @@ export interface ResultShaperConfig {
     sampleChars: number;
     requestTimeoutMs: number;
 }
+export interface TokenOptimizationConfig {
+    /** Master switch for the result token optimization coordinator. */
+    enabled: boolean;
+    /** Run the host's deterministic pruner before any Jev advisory. */
+    deterministicFirst: boolean;
+    /** Do not ask Jev for results below this measured input size. */
+    minInputTokens: number;
+    /** Minimum measured savings worth considering before a Jev call. */
+    minEstimatedSavingsTokens: number;
+    /** Allow the existing result shaper to call Jev after deterministic pruning. */
+    semanticFallback: boolean;
+    /** Hard wall-clock budget for one semantic result-shaper decision. */
+    maxDecisionLatencyMs: number;
+}
 export interface DoneGateConfig {
     enabled: boolean;
     blockThreshold: number;
@@ -79,9 +93,20 @@ export interface DecisionToolsConfig {
 export interface DeterministicSafetyGuardConfig {
     enabled: boolean;
     maxArgumentChars: number;
+    customRules: DeterministicSafetyRuleConfig[];
+}
+export type CredentialClass = 'real-credential' | 'private-key' | 'suspected-credential' | 'placeholder';
+export interface DeterministicSafetyRuleConfig {
+    id: string;
+    category: 'destructive' | 'privilege' | 'credential';
+    pattern: string;
+    reason: string;
+    credentialClass?: CredentialClass;
+    enabled: boolean;
 }
 export declare const DEFAULT_LOOP_GUARD: LoopGuardConfig;
 export declare const DEFAULT_RESULT_SHAPER: ResultShaperConfig;
+export declare const DEFAULT_TOKEN_OPTIMIZATION: TokenOptimizationConfig;
 export declare const DEFAULT_DONE_GATE: DoneGateConfig;
 export declare const DEFAULT_TOOL_PRUNER: ToolPrunerConfig;
 export declare const DEFAULT_SKILL_ROUTER: SkillRouterConfig;
@@ -105,20 +130,24 @@ export interface IntegrationConfig {
     guardedTools: string[];
     loopGuard: LoopGuardConfig;
     resultShaper: ResultShaperConfig;
+    tokenOptimization: TokenOptimizationConfig;
     doneGate: DoneGateConfig;
     toolPruner: ToolPrunerConfig;
     skillRouter: SkillRouterConfig;
     decisionTools: DecisionToolsConfig;
     deterministicSafetyGuard: DeterministicSafetyGuardConfig;
 }
-export type IntegrationConfigPatch = Partial<Omit<IntegrationConfig, 'loopGuard' | 'resultShaper' | 'doneGate' | 'toolPruner' | 'skillRouter' | 'decisionTools' | 'deterministicSafetyGuard'>> & {
+export type IntegrationConfigPatch = Partial<Omit<IntegrationConfig, 'loopGuard' | 'resultShaper' | 'tokenOptimization' | 'doneGate' | 'toolPruner' | 'skillRouter' | 'decisionTools' | 'deterministicSafetyGuard'>> & {
     loopGuard?: Partial<LoopGuardConfig>;
     resultShaper?: Partial<ResultShaperConfig>;
+    tokenOptimization?: Partial<TokenOptimizationConfig>;
     doneGate?: Partial<DoneGateConfig>;
     toolPruner?: Partial<ToolPrunerConfig>;
     skillRouter?: Partial<SkillRouterConfig>;
     decisionTools?: Partial<DecisionToolsConfig>;
-    deterministicSafetyGuard?: Partial<DeterministicSafetyGuardConfig>;
+    deterministicSafetyGuard?: Partial<Omit<DeterministicSafetyGuardConfig, 'customRules'>> & {
+        customRules?: Array<Partial<DeterministicSafetyRuleConfig>>;
+    };
 };
 export declare const DEFAULT_CONFIG: IntegrationConfig;
 export interface EffectiveConfig {
@@ -194,7 +223,23 @@ export interface StatisticsSnapshot {
     decisionToolLatencyMs: number;
     deterministicGuardChecks: number;
     deterministicGuardDenies: number;
+    inputTokensBefore: number | null;
+    inputTokensAfter: number | null;
+    tokensRemoved: number | null;
+    decisionCalls: number;
+    decisionLatencyMs: number;
+    skippedLowRoi: number;
+    failures: number;
+    failOpen: number;
+    estimatedCostUsd: number | null;
+    cacheHitRate: number | null;
+    netTokensSaved: number | null;
+    lastFailureType: TokenOptimizationFailureType | null;
+    lastFailureReason: string | null;
+    deterministicRuleHits: Record<string, number>;
+    credentialClassHits: Record<CredentialClass, number>;
 }
+export type TokenOptimizationFailureType = 'timeout' | 'network' | '429' | '5xx' | 'cancel' | 'invalid-response' | 'http';
 export interface RuntimeCompatibility {
     minimumDshRuntime: string;
     testedDshRuntime: string;
@@ -226,6 +271,9 @@ export interface CapabilitiesResponse {
         skillRouter: boolean;
         decisionTools: boolean;
         deterministicSafetyGuard: boolean;
+        tokenMeter: boolean;
+        toolResultPruner: boolean;
+        tokenOptimization: boolean;
     };
     jev: {
         baseUrl: string;

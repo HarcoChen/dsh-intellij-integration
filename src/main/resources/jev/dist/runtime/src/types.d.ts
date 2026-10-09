@@ -1,4 +1,4 @@
-import type { DoneGateConfig, DecisionToolsConfig, DeterministicSafetyGuardConfig, IntegrationConfig, LoopGuardConfig, ProtocolError, ResultShaperConfig, RuntimeState, SkillRouterConfig, ToolPrunerConfig } from '../../protocol/src/index.js';
+import type { DoneGateConfig, DecisionToolsConfig, DeterministicSafetyGuardConfig, DeterministicSafetyRuleConfig, IntegrationConfig, LoopGuardConfig, ProtocolError, ResultShaperConfig, RuntimeState, SkillRouterConfig, TokenOptimizationConfig, ToolPrunerConfig } from '../../protocol/src/index.js';
 import type { JevCallResult, JevQuestion } from './jev-client.js';
 export interface DshSessionHeader {
     cwd?: string;
@@ -9,6 +9,7 @@ export interface DshSessionLike {
 }
 export interface ToolExecutionLike {
     name?: string;
+    callId?: string;
     arguments?: unknown;
     args?: unknown;
     signal?: AbortSignal;
@@ -36,6 +37,23 @@ export interface ToolPrunerServiceLike {
             signal?: AbortSignal;
         }) => Promise<JevCallResult>;
     }): Promise<readonly ToolSchemaLike[]> | readonly ToolSchemaLike[];
+}
+/** Structural view of DSH's optional replay token-meter service. */
+export interface TokenMeterServiceLike {
+    estimateMessage?(message: unknown): number;
+    measure?(session: unknown, requestHeader?: unknown): {
+        totalTokens?: number;
+        [key: string]: unknown;
+    };
+}
+/** Structural view of DSH's model-free current tool-result pruner. */
+export interface ToolResultPrunerServiceLike {
+    measureContent?(blocks: readonly unknown[]): number;
+    pruneContent?(blocks: readonly unknown[]): readonly unknown[] | null;
+    pruneSession?(session: unknown): {
+        charsRemoved?: number;
+        [key: string]: unknown;
+    };
 }
 export interface SkillSummaryLike {
     name: string;
@@ -173,11 +191,14 @@ export interface RuntimePluginOptions {
     guardedTools?: string[];
     loopGuard?: Partial<LoopGuardConfig>;
     resultShaper?: Partial<ResultShaperConfig>;
+    tokenOptimization?: Partial<TokenOptimizationConfig>;
     doneGate?: Partial<DoneGateConfig>;
     toolPruner?: Partial<ToolPrunerConfig>;
     skillRouter?: Partial<SkillRouterConfig>;
     decisionTools?: Partial<DecisionToolsConfig>;
-    deterministicSafetyGuard?: Partial<DeterministicSafetyGuardConfig>;
+    deterministicSafetyGuard?: Partial<Omit<DeterministicSafetyGuardConfig, 'customRules'>> & {
+        customRules?: Array<Partial<DeterministicSafetyRuleConfig>>;
+    };
     persistenceRootDir?: string;
     integrationCommit?: string;
     dshRuntimeVersion?: string;

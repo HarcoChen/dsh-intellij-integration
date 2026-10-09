@@ -51,6 +51,26 @@ function createSnapshot(workspaceId, sessionId) {
         decisionToolLatencyMs: 0,
         deterministicGuardChecks: 0,
         deterministicGuardDenies: 0,
+        inputTokensBefore: null,
+        inputTokensAfter: null,
+        tokensRemoved: null,
+        decisionCalls: 0,
+        decisionLatencyMs: 0,
+        skippedLowRoi: 0,
+        failures: 0,
+        failOpen: 0,
+        estimatedCostUsd: null,
+        cacheHitRate: null,
+        netTokensSaved: null,
+        lastFailureType: null,
+        lastFailureReason: null,
+        deterministicRuleHits: {},
+        credentialClassHits: {
+            'real-credential': 0,
+            'private-key': 0,
+            'suspected-credential': 0,
+            placeholder: 0,
+        },
     };
     if (sessionId !== undefined)
         snapshot.sessionId = sessionId;
@@ -62,6 +82,7 @@ function cloneSnapshot(snapshot) {
 export class StatisticsStore {
     persistence;
     scopes = new Map();
+    tokenAccountingUnknown = new Set();
     persistQueue = Promise.resolve();
     onChanged;
     onPersistenceError;
@@ -81,7 +102,12 @@ export class StatisticsStore {
         for (const [key, snapshot] of Object.entries(value.scopes)) {
             if (snapshot && typeof snapshot.workspaceId === 'string') {
                 const defaults = createSnapshot(snapshot.workspaceId, snapshot.sessionId);
-                this.scopes.set(key, { ...defaults, ...snapshot });
+                this.scopes.set(key, {
+                    ...defaults,
+                    ...snapshot,
+                    deterministicRuleHits: { ...defaults.deterministicRuleHits, ...(snapshot.deterministicRuleHits ?? {}) },
+                    credentialClassHits: { ...defaults.credentialClassHits, ...(snapshot.credentialClassHits ?? {}) },
+                });
             }
         }
     }
@@ -152,6 +178,16 @@ export class StatisticsStore {
     recordSkipped(workspaceId, sessionId) {
         const snapshot = this.getOrCreate(workspaceId, sessionId);
         snapshot.skippedCalls += 1;
+        this.changed(snapshot);
+    }
+    recordDecision(workspaceId, sessionId, decision) {
+        const snapshot = this.getOrCreate(workspaceId, sessionId);
+        if (decision === 'allow')
+            snapshot.allowDecisions += 1;
+        if (decision === 'ask')
+            snapshot.askDecisions += 1;
+        if (decision === 'deny')
+            snapshot.denyDecisions += 1;
         this.changed(snapshot);
     }
     recordLoopGuard(workspaceId, sessionId, outcome) {
@@ -228,10 +264,67 @@ export class StatisticsStore {
             snapshot.deterministicGuardDenies += 1;
         this.changed(snapshot);
     }
+    recordDeterministicRuleHit(workspaceId, sessionId, ruleId, credentialClass) {
+        const snapshot = this.getOrCreate(workspaceId, sessionId);
+        snapshot.deterministicRuleHits[ruleId] = (snapshot.deterministicRuleHits[ruleId] ?? 0) + 1;
+        if (credentialClass !== undefined)
+            snapshot.credentialClassHits[credentialClass] += 1;
+        this.changed(snapshot);
+    }
+    recordTokenOptimization(workspaceId, sessionId, outcome, measurement) {
+        const snapshot = this.getOrCreate(workspaceId, sessionId);
+        if (outcome === 'decision')
+            snapshot.decisionCalls += 1;
+        if (outcome === 'skipped-low-roi')
+            snapshot.skippedLowRoi += 1;
+        if (outcome === 'fail-open' || outcome === 'failure')
+            snapshot.failOpen += 1;
+        if (outcome === 'failure')
+            snapshot.failures += 1;
+        if (measurement.decisionLatencyMs !== undefined)
+            snapshot.decisionLatencyMs += Math.max(0, measurement.decisionLatencyMs);
+        snapshot.inputTokensBefore = measurement.inputTokensBefore;
+        snapshot.inputTokensAfter = measurement.inputTokensAfter;
+        const key = scopeKey(workspaceId, sessionId);
+        if (measurement.tokensRemoved === null || measurement.netTokensSaved === null)
+            this.tokenAccountingUnknown.add(key);
+        if (this.tokenAccountingUnknown.has(key)) {
+            snapshot.tokensRemoved = null;
+            snapshot.netTokensSaved = null;
+        }
+        else {
+            if (snapshot.tokensRemoved === null)
+                snapshot.tokensRemoved = measurement.tokensRemoved;
+            else
+                snapshot.tokensRemoved += Math.max(0, measurement.tokensRemoved ?? 0);
+            if (snapshot.netTokensSaved === null)
+                snapshot.netTokensSaved = measurement.netTokensSaved;
+            else
+                snapshot.netTokensSaved += measurement.netTokensSaved ?? 0;
+        }
+        if (measurement.failureType !== undefined)
+            snapshot.lastFailureType = measurement.failureType;
+        if (measurement.failureReason !== undefined)
+            snapshot.lastFailureReason = measurement.failureReason.slice(0, 200);
+        // No price table or Jev cache contract exists in DSH 0.1.x. Keep these
+        // values explicitly null instead of presenting invented estimates.
+        snapshot.estimatedCostUsd = null;
+        snapshot.cacheHitRate = null;
+        this.changed(snapshot);
+    }
+    clearSession(workspaceId, sessionId) {
+        const key = scopeKey(workspaceId, sessionId);
+        if (!this.scopes.delete(key))
+            return;
+        this.tokenAccountingUnknown.delete(key);
+        this.persist();
+    }
     async reset(workspaceId, sessionId) {
         await this.ready;
         const replacement = createSnapshot(workspaceId, sessionId);
-        this.scopes.set(scopeKey(workspaceId, sessionId), replacement);
+        const key = scopeKey(workspaceId, sessionId);
+        this.scopes.set(key, replacement);
+        this.tokenAccountingUnknown.delete(key);
         this.changed(replacement);
         await this.persistQueue;
         return cloneSnapshot(replacement);
