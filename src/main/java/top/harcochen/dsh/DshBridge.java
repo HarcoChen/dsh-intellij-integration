@@ -210,10 +210,6 @@ public final class DshBridge implements Disposable {
         boolean dark = luminance(background) < 0.48;
         Color foreground =
                 themeColor("Label.foreground", dark ? new Color(0xDFE1E5) : new Color(0x1F2329));
-        Color muted =
-                themeColor(
-                        "Label.disabledForeground",
-                        dark ? new Color(0x9DA3AD) : new Color(0x6C707E));
         Color panel = themeColor("Panel.background", background);
         Color surface =
                 themeColor("PopupMenu.background", themeColor("TextField.background", panel));
@@ -268,6 +264,19 @@ public final class DshBridge implements Disposable {
         Color menu = themeColor("PopupMenu.background", surface);
         Color menuForeground = themeColor("PopupMenu.foreground", foreground);
         Color code = themeColor("TextArea.background", input);
+        // Descriptions are readable content, not disabled controls. Keep the theme's secondary
+        // text color where possible, adjusting it for the surfaces used by the webview.
+        Color muted =
+                readableMutedColor(
+                        themeColor(
+                                "Label.infoForeground",
+                                dark ? new Color(0x9DA3AD) : new Color(0x6C707E)),
+                        foreground,
+                        background,
+                        panel,
+                        surface,
+                        input,
+                        code);
         Font labelFont = UIManager.getFont("Label.font");
         String family =
                 labelFont == null
@@ -383,6 +392,39 @@ public final class DshBridge implements Disposable {
     private static double luminance(Color color) {
         return (0.2126 * color.getRed() + 0.7152 * color.getGreen() + 0.0722 * color.getBlue())
                 / 255.0;
+    }
+
+    private static Color readableMutedColor(
+            Color preferred, Color foreground, Color... backgrounds) {
+        // Aim for the 4.5:1 contrast used for normal text, including small status labels.
+        for (int step = 0; step <= 20; step++) {
+            Color candidate = blend(preferred, foreground, step / 20.0);
+            double textLuminance = relativeLuminance(candidate);
+            boolean readable = true;
+            for (Color background : backgrounds) {
+                double backgroundLuminance = relativeLuminance(background);
+                double contrast =
+                        (Math.max(textLuminance, backgroundLuminance) + 0.05)
+                                / (Math.min(textLuminance, backgroundLuminance) + 0.05);
+                if (contrast < 4.5) {
+                    readable = false;
+                    break;
+                }
+            }
+            if (readable) return candidate;
+        }
+        return foreground;
+    }
+
+    private static double relativeLuminance(Color color) {
+        return 0.2126 * linearChannel(color.getRed())
+                + 0.7152 * linearChannel(color.getGreen())
+                + 0.0722 * linearChannel(color.getBlue());
+    }
+
+    private static double linearChannel(int channel) {
+        double value = channel / 255.0;
+        return value <= 0.04045 ? value / 12.92 : Math.pow((value + 0.055) / 1.055, 2.4);
     }
 
     private static Color blend(Color base, Color overlay, double amount) {
