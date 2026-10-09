@@ -570,8 +570,7 @@ final class DshWebviewActionSanitizer {
             return ("http".equalsIgnoreCase(uri.getScheme())
                             || "https".equalsIgnoreCase(uri.getScheme()))
                     && uri.getHost() != null
-                    && uri.getUserInfo() == null
-                    && uri.getFragment() == null;
+                    && uri.getUserInfo() == null;
         } catch (IllegalArgumentException ignored) {
             return false;
         }

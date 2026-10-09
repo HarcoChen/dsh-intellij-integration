@@ -108,6 +108,10 @@ input::placeholder {
   max-width: 100%;
 }
 
+.dsh-message-body p {
+  white-space: normal;
+}
+
 @media (max-width: 420px) {
   .dsh-header {
     gap: 4px;

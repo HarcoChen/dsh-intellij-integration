@@ -425,27 +425,9 @@ public final class DshMessageProjector {
         if (object.has("content")) collectText(object.get("content"), output, reasoning, depth + 1);
     }
 
-    /** Conservative Markdown rendering; the webview still owns the layout and controls. */
+    /** Renders message Markdown; the webview still owns the layout and controls. */
     public static String markdownHtml(String value) {
-        if (value == null || value.isEmpty()) return "";
-        String escaped = escapeHtml(value);
-        escaped =
-                escaped.replaceAll("(?s)```([\\w+#.-]*)\\n(.*?)```", "<pre><code>$2</code></pre>");
-        escaped = escaped.replaceAll("`([^`]+)`", "<code>$1</code>");
-        escaped = escaped.replaceAll("\\*\\*([^*]+)\\*\\*", "<strong>$1</strong>");
-        escaped = escaped.replaceAll("(?m)^### (.+)$", "<h3>$1</h3>");
-        escaped = escaped.replaceAll("(?m)^## (.+)$", "<h2>$1</h2>");
-        escaped = escaped.replaceAll("(?m)^# (.+)$", "<h1>$1</h1>");
-        escaped = escaped.replaceAll("\\n", "<br>");
-        return "<p>" + escaped + "</p>";
-    }
-
-    private static String escapeHtml(String value) {
-        return value.replace("&", "&amp;")
-                .replace("<", "&lt;")
-                .replace(">", "&gt;")
-                .replace("\"", "&quot;")
-                .replace("'", "&#39;");
+        return DshMarkdownRenderer.render(value);
     }
 
     private static long eventSeq(JsonObject event) {

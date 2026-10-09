@@ -18,6 +18,10 @@ group = "top.harcochen"
 version = providers.gradleProperty("pluginVersion").orElse("0.0.0-dev").get()
 
 dependencies {
+    implementation("org.commonmark:commonmark:0.30.0")
+    implementation("org.commonmark:commonmark-ext-gfm-tables:0.30.0")
+    implementation("org.commonmark:commonmark-ext-gfm-strikethrough:0.30.0")
+
     intellijPlatform {
         // Build against the common IntelliJ IDEA Community platform. The
         // implementation only uses IntelliJ Platform APIs, so the resulting
