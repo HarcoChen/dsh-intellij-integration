@@ -7,8 +7,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
  * Owns the code payloads referenced by webview code-action buttons.
@@ -20,9 +18,6 @@ import java.util.regex.Pattern;
 final class DshMarkdownRenderCache {
     private static final int MAX_ENTRIES = 2_000;
     private static final int MAX_CODE_BYTES = 65_536;
-    private static final Pattern FENCE =
-            Pattern.compile("(?ms)^ {0,3}(`{3,}|~{3,})([^\\n]*)\\n(.*?)^ {0,3}\\1[ \\t]*$");
-
     private final LinkedHashMap<String, Entry> entries = new LinkedHashMap<>();
     private final Map<String, Map<String, String>> codeByRenderId = new LinkedHashMap<>();
 
@@ -88,25 +83,19 @@ final class DshMarkdownRenderCache {
     }
 
     private static Rendered renderMarkdown(String source) {
-        String normalized = source.replace("\r\n", "\n").replace('\r', '\n');
-        Matcher matcher = FENCE.matcher(normalized);
-        StringBuilder html = new StringBuilder();
         Map<String, String> blocks = new LinkedHashMap<>();
-        int cursor = 0;
-        while (matcher.find()) {
-            html.append(
-                    DshMessageProjector.markdownHtml(
-                            normalized.substring(cursor, matcher.start())));
-            String language = safeLanguage(matcher.group(2));
-            String code = matcher.group(3);
-            String blockId = "code-" + blocks.size();
-            boolean copyable = code.getBytes(StandardCharsets.UTF_8).length <= MAX_CODE_BYTES;
-            if (copyable) blocks.put(blockId, code);
-            html.append(codeBlockHtml(code, language, copyable ? blockId : null));
-            cursor = matcher.end();
-        }
-        html.append(DshMessageProjector.markdownHtml(normalized.substring(cursor)));
-        return new Rendered(html.toString(), blocks);
+        String html =
+                DshMarkdownRenderer.render(
+                        source,
+                        (code, info) -> {
+                            String language = safeLanguage(info);
+                            String blockId = "code-" + blocks.size();
+                            boolean copyable =
+                                    code.getBytes(StandardCharsets.UTF_8).length <= MAX_CODE_BYTES;
+                            if (copyable) blocks.put(blockId, code);
+                            return codeBlockHtml(code, language, copyable ? blockId : null);
+                        });
+        return new Rendered(html, blocks);
     }
 
     private static String codeBlockHtml(String code, String language, String id) {

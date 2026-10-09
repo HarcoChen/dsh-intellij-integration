@@ -1,5 +1,15 @@
 # Third-Party Notices
 
+## commonmark-java
+
+The plugin bundles `org.commonmark:commonmark`, `commonmark-ext-gfm-tables`,
+and `commonmark-ext-gfm-strikethrough`, version 0.30.0, from
+[commonmark-java](https://github.com/commonmark/commonmark-java).
+These libraries parse and render chat Markdown.
+
+Copyright (c) 2015, Robin Stocker. Licensed under the BSD 2-Clause License.
+The full license is included in `src/main/resources/licenses/commonmark-BSD-2-Clause.txt`.
+
 ## DeepSeek Harness fish icon
 
 `src/main/resources/icons/dsh.svg` and `dsh-dark.svg` are derived from the
