@@ -197,6 +197,11 @@ public final class DshRuntimeService implements Disposable {
 
     /** Called by the settings page after applying a new command or URL. */
     public void settingsChanged() {
+        settingsChanged(true);
+    }
+
+    /** Refreshes all chat views immediately for local composer preferences. */
+    public void settingsChanged(boolean restartRequired) {
         if (!DshSettingsState.getInstance(project).autonomousDebugging && debugBridge != null) {
             DshDebugBridge bridge = debugBridge;
             debugBridge = null;
@@ -205,12 +210,14 @@ public final class DshRuntimeService implements Disposable {
         // A changed server URL should not silently discard an active process.
         // The next explicit Start/Restart uses the new settings; the panel is
         // refreshed so its status and error message remain truthful.
-        if (status.state == RuntimeState.RUNNING && baseUrl != null) {
+        if (restartRequired && status.state == RuntimeState.RUNNING && baseUrl != null) {
             setStatus(
                     new RuntimeStatus(
                             RuntimeState.RUNNING,
                             baseUrl,
                             DshBundle.message("dsh.runtime.settings.changed")));
+        } else {
+            setStatus(status);
         }
     }
 

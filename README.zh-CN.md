@@ -117,6 +117,7 @@ API Key 保存在 IntelliJ **Password Safe** 中，传递给新启动的本地 R
 | 命令 / 参数 | `auto` / 空 | 发现兼容的本机或 Desktop 注册的 `dsh`；也支持明确配置 pnpm/npx。自动下载独立 Runtime 已弃用。 |
 | 服务地址 / 端口 | `""` / `0` | 优先连接已运行的 DSH Runtime；本地启动时端口 `0` 表示自动选择可用端口。 |
 | 自动启动 | `true` | 项目打开时自动启动或连接 Runtime。 |
+| 按 Enter 发送消息 | 关闭 | 开启后 Enter 发送、Shift+Enter 换行；两种模式都支持 Ctrl/Cmd+Enter 发送，修改后立即生效。 |
 | Runtime 版本 | `0.2.0-rc.2` | 明确配置 pnpm/npx 启动时使用的版本；本机 Runtime 最低支持 `0.1.5-rc.1`。 |
 | 自主调试 | 关闭 | 通过本机 MCP 操作已有 IDE 配置及公共调试能力；开启后需重启插件拥有的 Runtime。 |
 | Laya/Jev 集成 | 关闭 | 本地启动 Runtime 随附 System One 集成，可配置地址、模型和可选能力。 |
