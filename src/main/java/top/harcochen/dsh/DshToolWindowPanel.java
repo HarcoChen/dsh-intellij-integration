@@ -1307,6 +1307,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
         JsonObject panel = runtimeSettings.panel();
         if (panel != null) state.add("settings", panel.deepCopy());
         state.addProperty("selectionEnabled", ideContext.isSelectionEnabled());
+        state.addProperty("enterToSend", DshSettingsState.getInstance(project).enterToSend);
         state.addProperty("modeSelectionEnabled", agentPresets.modeSelectionEnabled());
         JsonObject status = new JsonObject();
         status.addProperty(

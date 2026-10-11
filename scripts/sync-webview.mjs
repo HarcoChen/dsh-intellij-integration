@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { resolve, join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
+import { adaptComposerPreferences } from './webview/composer-preferences.mjs';
 
 // Rebuild the checked-in bundle from the audited companion commit and its npm dependencies.
 const repo = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -16,6 +17,7 @@ try {
     const archive = execFileSync('git', ['archive', pin, 'webview/src', 'src'], { cwd: upstream, maxBuffer: 20 * 1024 * 1024 });
     execFileSync('tar', ['-x', '-C', temp], { input: archive });
     await symlink(join(upstream, 'node_modules'), join(temp, 'node_modules'), 'dir');
+    await adaptComposerPreferences(temp);
     const headerPath = join(temp, 'webview/src/components/Header.tsx');
     let header = await readFile(headerPath, 'utf8');
     const anchor = '        { key: "workspaces",';
@@ -38,6 +40,7 @@ try {
         'Browse Runtime workspace files': '浏览 Runtime 工作区文件', 'Configure Jev API key': '配置 Jev API Key',
         'What’s new': '更新说明', 'Enable the Schedule bundle in plugin settings to use reminders.': '请在插件设置中启用 Schedule bundle 以使用提醒。',
         'Open chat in editor tab': '在编辑器标签页打开聊天',
+        'Enter to send; Shift+Enter for a new line.': 'Enter 发送，Shift+Enter 换行。',
     };
     const localeAnchor = 'const ZH_CN:';
     const start = locale.indexOf('{', locale.indexOf(localeAnchor));

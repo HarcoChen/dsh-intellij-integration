@@ -121,6 +121,7 @@ Open **Settings | Tools | DeepSeek Harness**.
 | Command / Args | `auto` / empty | Discover a compatible local or Desktop-registered `dsh`; explicit pnpm/npx launch commands remain supported. Automatic standalone Runtime download is deprecated. |
 | Server URL / Port | `""` / `0` | Prefer an already running DSH Runtime; port `0` selects an available port for local startup. |
 | Auto start | `true` | Start or connect to the Runtime when the project opens. |
+| Send with Enter | Disabled | Enable Enter to send and Shift+Enter to insert a new line. Ctrl/Cmd+Enter sends in either mode; changes apply immediately. |
 | Runtime version | `0.2.0-rc.2` | Version for explicit package-manager launch commands; the minimum supported local Runtime is `0.1.5-rc.1`. |
 | Autonomous debugger | Disabled | Local MCP access to existing IDE configurations and public debugger controls; restart an owned Runtime after enabling. |
 | Laya/Jev integration | Disabled | Bundled System One integration for locally started Runtimes; the endpoint, model, and optional policies are configurable. |

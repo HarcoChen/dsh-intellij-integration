@@ -23601,6 +23601,7 @@
     "What\u2019s new": "\u66F4\u65B0\u8BF4\u660E",
     "Enable the Schedule bundle in plugin settings to use reminders.": "\u8BF7\u5728\u63D2\u4EF6\u8BBE\u7F6E\u4E2D\u542F\u7528 Schedule bundle \u4EE5\u4F7F\u7528\u63D0\u9192\u3002",
     "Open chat in editor tab": "\u5728\u7F16\u8F91\u5668\u6807\u7B7E\u9875\u6253\u5F00\u804A\u5929",
+    "Enter to send; Shift+Enter for a new line.": "Enter \u53D1\u9001\uFF0CShift+Enter \u6362\u884C\u3002",
     "Ready": "\u5C31\u7EEA",
     "Provisioning": "\u6B63\u5728\u521B\u5EFA",
     "Required by plugin management": "\u63D2\u4EF6\u7BA1\u7406\u529F\u80FD\u5FC5\u9700",
@@ -25444,6 +25445,7 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
     submitting,
     agentStatusLabel,
     autoOpenReasoning,
+    enterToSend = false,
     messageFeedback
   }) {
     const listRef = (0, import_react9.useRef)(null);
@@ -25497,7 +25499,7 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
         onKeyDown: handleMarkdownKeydown
       },
       messageFeedback?.status === "error" && messageFeedback.error ? /* @__PURE__ */ import_react9.default.createElement("div", { className: "dsh-feedback-status", role: "status" }, messageFeedback.error) : null,
-      stableMessages.length === 0 ? /* @__PURE__ */ import_react9.default.createElement("div", { className: "dsh-empty" }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "dsh-empty-title" }, t("Describe a task.")), /* @__PURE__ */ import_react9.default.createElement("div", { className: "dsh-empty-detail" }, t("The current selection is attached automatically. You can also use @ to reference files."), /* @__PURE__ */ import_react9.default.createElement("br", null), t("Ctrl/Cmd + Enter to send."))) : stableMessages.map((message) => /* @__PURE__ */ import_react9.default.createElement(
+      stableMessages.length === 0 ? /* @__PURE__ */ import_react9.default.createElement("div", { className: "dsh-empty" }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "dsh-empty-title" }, t("Describe a task.")), /* @__PURE__ */ import_react9.default.createElement("div", { className: "dsh-empty-detail" }, t("The current selection is attached automatically. You can also use @ to reference files."), /* @__PURE__ */ import_react9.default.createElement("br", null), t(enterToSend ? "Enter to send; Shift+Enter for a new line." : "Ctrl/Cmd + Enter to send."))) : stableMessages.map((message) => /* @__PURE__ */ import_react9.default.createElement(
         MessageItem,
         {
           key: message.id,
@@ -27536,6 +27538,7 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
     context,
     selection,
     selectionEnabled,
+    enterToSend = false,
     fileReferenceCandidates,
     skills,
     modeSelectionEnabled,
@@ -27916,6 +27919,7 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
           value: text,
           disabled: submitting,
           rows: 2,
+          title: t(enterToSend ? "Enter to send; Shift+Enter for a new line." : "Ctrl/Cmd + Enter to send."),
           "aria-expanded": activeMenuId !== void 0,
           "aria-controls": activeMenuId,
           "aria-activedescendant": activeDescendant,
@@ -27932,6 +27936,8 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
             if (others.length) void fileDrafts.addFiles(others);
           },
           onKeyDown: (event) => {
+            if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return;
+            if (enterToSend && event.key === "Enter" && event.shiftKey && !event.ctrlKey && !event.metaKey) return;
             if (event.key === "Tab" && event.shiftKey && !event.altKey && !event.ctrlKey && !event.metaKey && !event.repeat && !referenceMenuVisible && completion.skillMatches.length === 0 && completion.slashCandidateCount === 0) {
               if (planCommandAvailable) {
                 event.preventDefault();
@@ -27941,9 +27947,9 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
             }
             if (handleReferenceKeyDown(event)) return;
             if (completion.handleCompletionKeyDown(event)) return;
-            if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+            if (event.key === "Enter" && (event.ctrlKey || event.metaKey || enterToSend && !event.shiftKey && !event.altKey)) {
               event.preventDefault();
-              send();
+              if (!event.repeat) send();
             }
           }
         }
@@ -28516,6 +28522,7 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
         submitting: state.submitting,
         agentStatusLabel: state.agentStatusLabel,
         autoOpenReasoning: state.autoOpenReasoning,
+        enterToSend: state.enterToSend,
         messageFeedback: state.messageFeedback
       }
     ), !state.focusMode ? /* @__PURE__ */ import_react38.default.createElement(Interactions, { interactions: state.interactions }) : null, !state.focusMode ? /* @__PURE__ */ import_react38.default.createElement(
@@ -28550,6 +28557,7 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
         context: state.context,
         selection: state.selection,
         selectionEnabled: state.selectionEnabled,
+        enterToSend: state.enterToSend,
         fileReferenceCandidates: state.fileReferenceCandidates,
         skills: state.skills,
         modeSelectionEnabled: state.modeSelectionEnabled,

@@ -35,6 +35,7 @@ public final class DshSettingsConfigurable implements Configurable {
     private JBTextArea agentStatusLabels;
     private JBCheckBox autoStart;
     private JBCheckBox persistSession;
+    private JBCheckBox enterToSend;
     private JBCheckBox installWhenMissing;
     private JBCheckBox useManagedRuntime;
     private JBCheckBox autonomousDebugging;
@@ -85,6 +86,8 @@ public final class DshSettingsConfigurable implements Configurable {
         agentStatusLabels = new JBTextArea(4, 40);
         autoStart = new JBCheckBox(DshBundle.message("dsh.settings.auto.start.label"));
         persistSession = new JBCheckBox(DshBundle.message("dsh.settings.persist.session.label"));
+        enterToSend = new JBCheckBox(DshBundle.message("dsh.settings.enter.to.send.label"));
+        enterToSend.setToolTipText(DshBundle.message("dsh.settings.enter.to.send.tooltip"));
         installWhenMissing =
                 new JBCheckBox(DshBundle.message("dsh.settings.install.when.missing.label"));
         useManagedRuntime = new JBCheckBox(DshBundle.message("dsh.settings.managed.runtime.label"));
@@ -160,6 +163,7 @@ public final class DshSettingsConfigurable implements Configurable {
         panel.add(agentStatusLabels, labelsField);
         addCheckbox(autoStart);
         addCheckbox(persistSession);
+        addCheckbox(enterToSend);
         addCheckbox(autonomousDebugging);
         addCheckbox(enableCompaction);
         addCheckbox(jevEnabled);
@@ -230,6 +234,10 @@ public final class DshSettingsConfigurable implements Configurable {
     public boolean isModified() {
         if (panel == null) return false;
         DshSettingsState state = DshSettingsState.getInstance(project);
+        return enterToSend.isSelected() != state.enterToSend || otherSettingsModified(state);
+    }
+
+    private boolean otherSettingsModified(DshSettingsState state) {
         return !safe(command.getText()).equals(safe(state.command))
                 || !safe(commandArgs.getText()).equals(safe(state.commandArgs))
                 || !safe(serverUrl.getText()).equals(safe(state.serverUrl))
@@ -266,6 +274,7 @@ public final class DshSettingsConfigurable implements Configurable {
     @Override
     public void apply() throws ConfigurationException {
         DshSettingsState state = DshSettingsState.getInstance(project);
+        boolean restartRequired = otherSettingsModified(state);
         int port =
                 parseRequired(
                         serverPort.getText(),
@@ -345,13 +354,14 @@ public final class DshSettingsConfigurable implements Configurable {
         state.agentStatusLabels = parsedLabels();
         state.autoStart = autoStart.isSelected();
         state.persistSession = persistSession.isSelected();
+        state.enterToSend = enterToSend.isSelected();
         state.installWhenMissing = installWhenMissing.isSelected();
         state.useManagedRuntime = useManagedRuntime.isSelected();
         state.autonomousDebugging = autonomousDebugging.isSelected();
         state.enableCompaction = enableCompaction.isSelected();
         state.recoveryEnabled = recoveryEnabled.isSelected();
         state.recoveryAutoPersistBundleIsolation = recoveryIsolation.isSelected();
-        DshRuntimeService.getInstance(project).settingsChanged();
+        DshRuntimeService.getInstance(project).settingsChanged(restartRequired);
     }
 
     @Override
@@ -371,6 +381,7 @@ public final class DshSettingsConfigurable implements Configurable {
         agentStatusLabels.setText(String.join("\n", state.agentStatusLabels));
         autoStart.setSelected(state.autoStart);
         persistSession.setSelected(state.persistSession);
+        enterToSend.setSelected(state.enterToSend);
         installWhenMissing.setSelected(state.installWhenMissing);
         useManagedRuntime.setSelected(state.useManagedRuntime);
         autonomousDebugging.setSelected(state.autonomousDebugging);

@@ -32,7 +32,7 @@ Copyright (c) 2026 HanaAyane. Licensed under the MIT License.
 `src/main/resources/webview/main.js` and `main.css` are built artifacts from
 the MIT-licensed [dsh-ide](https://github.com/HarcoChen/dsh-vsc-integration)
 repository, version 0.10.2, commit `deb8d8f882586c42a20abfbb5609cb0643fac309`,
-with IntelliJ-specific menu and Schedule adapters. `scripts/sync-webview.mjs`
+with IntelliJ-specific menu, Schedule, and composer preference adapters. `scripts/sync-webview.mjs`
 rebuilds the artifacts from that pin and the companion checkout's npm dependencies.
 They are adapted at runtime through the JCEF bridge documented in `DshBridge.java`.
 

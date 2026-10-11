@@ -25,6 +25,9 @@ public final class DshSettingsState implements PersistentStateComponent<DshSetti
     /** Whether the selected session id survives IDE restarts. */
     public boolean persistSession = true;
 
+    /** Use Enter to send a prompt and Shift+Enter to insert a new line. */
+    public boolean enterToSend = false;
+
     /** Last selected session for this project; empty when nothing is pinned. */
     public String lastSessionId = "";
 
@@ -93,6 +96,7 @@ public final class DshSettingsState implements PersistentStateComponent<DshSetti
         serverPort = state.serverPort;
         autoStart = state.autoStart;
         persistSession = state.persistSession;
+        enterToSend = state.enterToSend;
         lastSessionId = state.lastSessionId;
         installWhenMissing = state.installWhenMissing;
         useManagedRuntime = state.useManagedRuntime;
