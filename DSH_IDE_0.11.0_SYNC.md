@@ -33,6 +33,27 @@ Jev 子模块保持 `e5d74c5`，本批上游没有更新该指针。
 启动器和兼容广告保留实际版本。未知版本的外部 Runtime 不通过缺失接口推断 owner。
 IDE 终端上下文仍受 2024.3 公共 API 限制，与本次 Host PTY 功能分别处理。
 
+## 完整性复查与后续修复
+
+首批迁移提交 `bf52093` 后，再按上游入口和生命周期复查，补齐以下遗漏：
+
+- 注册 Runtime 终端、诊断附件、插件管理和会话中心的原生 Find Action 入口，
+  并把诊断附件加入编辑器菜单；默认状态短语与上游英文一致。
+- 本地重启、恢复和密钥配置不再被尚未建立的 Remote 授权拦截；需要 Host 的
+  管理入口先等待连接和访问基线，再执行授权检查。终端没有选中会话时明确提示。
+- 聊天和 Trace 共用文件定位：项目内文件在 IDE 打开，其他路径尝试 Host 提供的
+  `canOpenWorkspacePath` / `openWorkspacePath`；保留事件目录与跨系统路径语义。
+- 授权更新时先暂停订阅恢复，取消的 mux 流不再向已关闭视图发送结束回调；
+  Trace 在撤权时清除历史、投影和详情，迟到结果不能重新填入。
+- 终端按连接代次丢弃过时画面，用 xterm 完成写入后的确认限制待渲染字节，
+  超限时关闭附件并显示错误；恢复屏幕与已排队写入保持顺序。
+
+这表示已实现本次核对出的可迁移能力，不代表所有平台功能或环境均已验收。
+明确没有实现的差异仍见 TODO 的 Platform exceptions：2024.3 的 IDE shell
+命令/输出上下文、通用 XDebugger 没有公开契约的 DAP 选项，以及 VS Code
+Chat Participant/proposed provider API。日程编辑、删除和历史等操作使用原生
+管理流程承接，共享 Webview 的只读摘要不代表相应 Host 功能缺失。
+
 ## 验证
 
 - helper 与 terminal-view TypeScript strict/noEmit 检查通过。
@@ -48,6 +69,12 @@ IDE 终端上下文仍受 2024.3 公共 API 限制，与本次 Host PTY 功能�
 - 另以临时 Java 集成入口直接连接隔离的真实 Host：Java 访问/事件/工作区/控制/目录
   基线、会话 follow、PTY retain、双向输入 ack、有序输出、关闭清理与连接重建通过。
   该检查验证 Java 适配层；上游脚本的覆盖不能替代 Java UI 的人工验收。
+- 后续复查重新通过 TypeScript strict、Gradle lint/buildPlugin 和 IC/PC Plugin
+  Verifier，并复跑 Java 真实 Host 的终端/重连检查。另用临时非 owner 策略验证
+  取消的 mux 流不触发结束回调，以及连续四次撤权/重新授权：历史和目录缓存清空，
+  原有 follow 自动恢复，carrier generation 不变。
+- 已尝试启动隔离 IntelliJ 沙箱，但本机界面自动化无法访问该 Java 应用窗口；
+  因此没有将 JCEF/原生界面点击流程标为验收通过。
 - 实际 Git 子目录验证确认 `hash-object --path` 使用 cwd 相对路径，`cat-file --filters`
   使用仓库相对路径，避免 CRLF/filter 处理错位。
 

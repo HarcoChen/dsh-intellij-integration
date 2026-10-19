@@ -12,7 +12,6 @@ import com.intellij.openapi.fileChooser.FileChooser;
 import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.fileEditor.FileEditorManager;
-import com.intellij.openapi.fileEditor.OpenFileDescriptor;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.vfs.LocalFileSystem;
@@ -760,49 +759,6 @@ final class DshIdeContextController {
                                         "dsh.context.git.diff.failed", DshJson.message(error)));
                     }
                 });
-    }
-
-    void openFileLocation(JsonObject action, String directory) {
-        String path = DshJson.string(action, "path");
-        int line = DshJson.integer(action, "line", 1);
-        int column = DshJson.integer(action, "column", 1);
-        if (path == null || path.isBlank()) {
-            return;
-        }
-        ApplicationManager.getApplication()
-                .invokeLater(
-                        () -> {
-                            String resolved;
-                            try {
-                                resolved = DshWorkingDirectory.resolve(path, directory);
-                            } catch (RuntimeException error) {
-                                notifyUser(DshBundle.message("dsh.file.invalid.path", path));
-                                return;
-                            }
-                            VirtualFile file =
-                                    LocalFileSystem.getInstance().findFileByPath(resolved);
-                            if (file != null) {
-                                new OpenFileDescriptor(
-                                                project,
-                                                file,
-                                                Math.max(0, line - 1),
-                                                Math.max(0, column - 1))
-                                        .navigate(true);
-                            } else {
-                                notifyUser(DshBundle.message("dsh.file.not.found", path));
-                            }
-                        });
-    }
-
-    private String resolvePath(String path) {
-        Path candidate = Path.of(path);
-        if (candidate.isAbsolute()) {
-            return candidate.normalize().toString();
-        }
-        String root = project.getBasePath();
-        return root == null
-                ? candidate.normalize().toString()
-                : Path.of(root).resolve(candidate).normalize().toString();
     }
 
     private String displayPath(VirtualFile file) {

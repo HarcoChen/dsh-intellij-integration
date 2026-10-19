@@ -303,6 +303,7 @@ public final class DshRemoteConnection implements AutoCloseable {
 
     private void refreshAccess(int gen) {
         if (gen != generation) return;
+        generationConnected = false;
         if (accessStarted) {
             for (QuestionWait wait : questionWaits.values()) wait.close();
             questionWaits.clear();
@@ -1043,16 +1044,19 @@ public final class DshRemoteConnection implements AutoCloseable {
         ExtraStream stream = new ExtraStream(endpoint, args, items, terminal);
         execute(
                 () -> {
+                    if (stream.closed) return;
                     extraStreams.put(id, stream);
                     if (generationConnected) openExtra(stream);
                 });
-        return () ->
-                execute(
-                        () -> {
-                            stream.closed = true;
-                            extraStreams.remove(id);
-                            if (stream.handle != null) stream.handle.cancel();
-                        });
+        return () -> {
+            stream.closed = true;
+            execute(
+                    () -> {
+                        stream.closed = true;
+                        extraStreams.remove(id);
+                        if (stream.handle != null) stream.handle.cancel();
+                    });
+        };
     }
 
     DshRemoteService.FeatureStream duplexStream(

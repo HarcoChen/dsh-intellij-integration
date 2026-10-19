@@ -14,6 +14,10 @@ final class DshActionAccess {
         if (Set.of(
                         "ready",
                         "start",
+                        "restart",
+                        "restartRuntime",
+                        "configureApiKey",
+                        "configureJevApiKey",
                         "newSession",
                         "newSessionInCurrentWorkspace",
                         "toggleFocus",
@@ -104,7 +108,6 @@ final class DshActionAccess {
                 switch (type) {
                     case "configureWebSearch", "mutateSettings", "manageProviders" ->
                             "settings/mutate";
-                    case "configureApiKey" -> "credentials/set";
                     case "openSettingsDocument" -> "settings/openSettingsDocument";
                     case "setPluginEnabled" -> "pluginManager/setPluginEnabled";
                     case "setBundleEnabled" -> "pluginManager/setBundleEnabled";

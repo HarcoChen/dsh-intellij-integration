@@ -689,6 +689,43 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
         if (action == null) return;
         String type = string(action, "type");
         if (type == null || type.isBlank()) return;
+        if (!remote.access().available()
+                && !DshRemoteService.PHASE_CONNECTED.equals(remote.phase())
+                && Set.of(
+                                "openRuntimeTerminal",
+                                "managePlugins",
+                                "manageProviders",
+                                "configureWebSearch",
+                                "manageAgentPresets",
+                                "manageAccount",
+                                "manageSchedules",
+                                "manageWorkspaces",
+                                "manageSessions",
+                                "openSessionCenter")
+                        .contains(type)) {
+            String selected = sessionId;
+            operations.execute(
+                    () -> {
+                        try {
+                            remote.startAndAwait();
+                            ApplicationManager.getApplication()
+                                    .invokeLater(
+                                            () -> {
+                                                if (!disposed
+                                                        && java.util.Objects.equals(
+                                                                selected, sessionId))
+                                                    receiveAction(action);
+                                            });
+                        } catch (Exception unavailable) {
+                            notify(DshJson.message(unavailable));
+                        }
+                    });
+            return;
+        }
+        if ("openRuntimeTerminal".equals(type) && sessionId == null) {
+            notify(DshBundle.message("dsh.terminal.no.session"));
+            return;
+        }
         if (!DshActionAccess.allows(remote.access(), action, sessionId)) {
             notify(DshBundle.message("dsh.remote.access.denied"));
             return;
@@ -760,7 +797,10 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
             case "refreshRuntimeFile" -> runtimeFiles.refresh();
             case "showWhatsNew" -> DshWhatsNew.show(project, true);
             case "openInEditor" -> DshChatEditorProvider.open(project);
-            case "openRuntimeTerminal" -> runtimeTerminals.open(sessionId);
+            case "openRuntimeTerminal" -> {
+                if (sessionId == null) notify(DshBundle.message("dsh.terminal.no.session"));
+                else runtimeTerminals.open(sessionId);
+            }
             case "openTerminalCommandPicker" ->
                     notify(DshBundle.message("dsh.terminal.context.unavailable"));
             case "openBrowser" -> openBrowser();
@@ -858,7 +898,20 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
                                         original)
                                 : DshWorkingDirectory.current(
                                         sessionView(sessionId), sessionRow(sessionId));
-                ideContext.openFileLocation(action, directory == null ? original : directory);
+                String selected = sessionId;
+                DshFileNavigation.open(
+                        project,
+                        remote,
+                        runtime,
+                        operations,
+                        action,
+                        directory == null ? original : directory,
+                        () ->
+                                !disposed
+                                        && java.util.Objects.equals(selected, sessionId)
+                                        && remote.access()
+                                                .allows("session/follow", "session", selected),
+                        this::notify);
             }
             case "retryPrompt" -> prompts.retry(stringOr(action, "id", ""));
             case "selectModel" -> sessionActions.selectModel();

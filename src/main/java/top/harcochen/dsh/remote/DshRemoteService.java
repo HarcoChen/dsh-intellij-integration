@@ -351,6 +351,49 @@ public final class DshRemoteService implements Disposable {
         return result;
     }
 
+    public void startAndAwait() {
+        runtime.startAsync().join();
+        CompletableFuture<Void> ready = new CompletableFuture<>();
+        Consumer<DshRemoteState.Snapshot> listener =
+                value -> {
+                    if (PHASE_CONNECTED.equals(value.phase)) ready.complete(null);
+                };
+        addListener(listener);
+        try {
+            listener.accept(snapshot);
+            ready.get(20, java.util.concurrent.TimeUnit.SECONDS);
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            throw DshRemoteException.carrier(
+                    "remote", "Interrupted while connecting to the Runtime", interrupted);
+        } catch (Exception unavailable) {
+            throw DshRemoteException.carrier(
+                    "remote", "The Runtime connection is not ready", unavailable);
+        } finally {
+            removeListener(listener);
+        }
+    }
+
+    public boolean canOpenWorkspacePath() {
+        JsonElement value = unary.call("session/canOpenWorkspacePath", new JsonObject());
+        if (value == null || !value.isJsonPrimitive() || !value.getAsJsonPrimitive().isBoolean())
+            throw DshRemoteException.protocol(
+                    "session/canOpenWorkspacePath", "Invalid Host path capability", null);
+        return value.getAsBoolean();
+    }
+
+    public void openWorkspacePath(String path) {
+        JsonObject request = new JsonObject();
+        request.addProperty("path", path);
+        JsonElement value =
+                unary.call("session/openWorkspacePath", DshRemoteContracts.withRequest(request));
+        if (value == null
+                || !value.isJsonObject()
+                || !DshJson.bool(value.getAsJsonObject(), "opened", false))
+            throw DshRemoteException.protocol(
+                    "session/openWorkspacePath", "Invalid Host path-open response", null);
+    }
+
     public JsonElement callFeature(String endpoint, JsonObject args) throws DshRemoteException {
         return unary.call(endpoint, args);
     }

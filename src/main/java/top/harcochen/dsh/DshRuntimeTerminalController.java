@@ -219,7 +219,11 @@ final class DshRuntimeTerminalController implements AutoCloseable {
                         });
         private DshRuntimeTerminal attachment;
         private boolean ready;
-        private boolean closed;
+        private volatile boolean closed;
+        private volatile long displayEpoch;
+        private final java.util.ArrayDeque<JsonObject> output = new java.util.ArrayDeque<>();
+        private int pendingOutputBytes;
+        private boolean outputPosted;
         private long generation = -1;
         private int cols = 100;
         private int rows = 30;
@@ -283,6 +287,13 @@ final class DshRuntimeTerminalController implements AutoCloseable {
             if ("ready".equals(type)) {
                 ready = true;
                 connect();
+            } else if ("rendered".equals(type)) {
+                long epoch = DshJson.longValue(action.get("epoch"), -1);
+                int bytes = DshJson.integer(action, "bytes", -1);
+                synchronized (this) {
+                    if (epoch == displayEpoch && bytes >= 0 && bytes <= pendingOutputBytes)
+                        pendingOutputBytes -= bytes;
+                }
             } else if ("input".equals(type) && attachment != null)
                 attachment.write(DshJson.strictString(action, "data"));
             else if ("resize".equals(type)) {
@@ -299,6 +310,8 @@ final class DshRuntimeTerminalController implements AutoCloseable {
                     || !DshRemoteService.PHASE_CONNECTED.equals(remote.phase())) return;
             detach();
             generation = remote.snapshot().generation;
+            long expectedGeneration = generation;
+            long epoch = displayEpoch;
             DshRuntimeTerminal next =
                     new DshRuntimeTerminal(
                             remote,
@@ -306,16 +319,18 @@ final class DshRuntimeTerminalController implements AutoCloseable {
                             () ->
                                     !closed
                                             && current(endpoint)
-                                            && remote.snapshot().generation == generation
+                                            && remote.snapshot().generation == expectedGeneration
+                                            && epoch == displayEpoch
                                             && remote.access()
                                                     .allows("terminal/attach", "session", session),
                             frame -> {
-                                post(frame);
+                                post(frame, epoch);
                                 if ("snapshot".equals(DshJson.string(frame, "type")))
                                     ApplicationManager.getApplication()
                                             .invokeLater(
                                                     () -> {
-                                                        if (attachment != null)
+                                                        if (epoch == displayEpoch
+                                                                && attachment != null)
                                                             attachment.resize(cols, rows);
                                                     });
                             },
@@ -327,6 +342,11 @@ final class DshRuntimeTerminalController implements AutoCloseable {
         }
 
         private void detach() {
+            synchronized (this) {
+                displayEpoch++;
+                output.clear();
+                pendingOutputBytes = 0;
+            }
             if (attachment != null) attachment.close();
             attachment = null;
             JsonObject frame = new JsonObject();
@@ -337,19 +357,51 @@ final class DshRuntimeTerminalController implements AutoCloseable {
         }
 
         private void post(JsonObject frame) {
-            ApplicationManager.getApplication()
-                    .invokeLater(
-                            () -> {
-                                if (!closed)
-                                    browser.getCefBrowser()
-                                            .executeJavaScript(
-                                                    "window.dshTerminalReceive&&window.dshTerminalReceive("
-                                                            + frame.toString()
-                                                                    .replace("<", "\\u003c")
-                                                            + ");",
-                                                    browser.getCefBrowser().getURL(),
-                                                    0);
-                            });
+            post(frame, displayEpoch);
+        }
+
+        private synchronized void post(JsonObject frame, long epoch) {
+            if (closed || epoch != displayEpoch) return;
+            String data = DshJson.strictString(frame, "data");
+            int bytes = data == null ? 0 : data.getBytes(StandardCharsets.UTF_8).length;
+            int maximum =
+                    Math.min(
+                            16 * 1024 * 1024,
+                            DshJson.integer(limits, "maxBufferedBytes", 2 * 1024 * 1024));
+            if ((long) pendingOutputBytes + bytes > maximum || output.size() >= 4096) {
+                output.clear();
+                pendingOutputBytes = 0;
+                throw new IllegalStateException(DshBundle.message("dsh.terminal.output.limit"));
+            }
+            JsonObject view = frame.deepCopy();
+            view.addProperty("viewEpoch", epoch);
+            output.addLast(view);
+            pendingOutputBytes += bytes;
+            if (outputPosted) return;
+            outputPosted = true;
+            ApplicationManager.getApplication().invokeLater(this::drainOutput);
+        }
+
+        private void drainOutput() {
+            com.google.gson.JsonArray frames = new com.google.gson.JsonArray();
+            long epoch;
+            synchronized (this) {
+                outputPosted = false;
+                if (closed) {
+                    output.clear();
+                    return;
+                }
+                epoch = displayEpoch;
+                while (!output.isEmpty()) frames.add(output.removeFirst());
+            }
+            if (epoch != displayEpoch) return;
+            browser.getCefBrowser()
+                    .executeJavaScript(
+                            "if(window.dshTerminalReceive){for(const frame of "
+                                    + frames.toString().replace("<", "\\u003c")
+                                    + ")window.dshTerminalReceive(frame);}",
+                            browser.getCefBrowser().getURL(),
+                            0);
         }
 
         @Override

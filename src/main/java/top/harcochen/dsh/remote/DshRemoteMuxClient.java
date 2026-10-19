@@ -347,6 +347,7 @@ public final class DshRemoteMuxClient {
         stream.terminal = true;
         streams.remove(streamId);
         rememberTerminal(streamId);
+        if (stream.cancelRequested) return;
         try {
             stream.handler.onTerminal(error);
         } catch (RuntimeException failure) {

@@ -88,6 +88,10 @@
         <action id="Dsh.RefreshRuntimeFile" class="top.harcochen.dsh.action.DshCommandAction" />
         <action id="Dsh.ShowWhatsNew" class="top.harcochen.dsh.action.DshCommandAction" />
         <action id="Dsh.OpenInEditor" class="top.harcochen.dsh.action.DshCommandAction" />
+        <action id="Dsh.OpenRuntimeTerminal" class="top.harcochen.dsh.action.DshCommandAction" />
+        <action id="Dsh.AttachDiagnostics" class="top.harcochen.dsh.action.DshCommandAction" />
+        <action id="Dsh.ManagePlugins" class="top.harcochen.dsh.action.DshCommandAction" />
+        <action id="Dsh.OpenSessionCenter" class="top.harcochen.dsh.action.DshCommandAction" />
         <action id="Dsh.Diagnose" class="top.harcochen.dsh.action.DshCommandAction" />
         <action id="Dsh.AskAboutSelection" class="top.harcochen.dsh.action.DshAskAboutSelectionAction">
             <add-to-group group-id="EditorPopupMenu" anchor="last" />
@@ -121,6 +125,7 @@
             <reference ref="Dsh.Fix" />
             <reference ref="Dsh.Review" />
             <reference ref="Dsh.Docs" />
+            <reference ref="Dsh.AttachDiagnostics" />
         </group>
     </actions>
 </idea-plugin>

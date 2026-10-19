@@ -25,6 +25,11 @@ The bundled Jev gitlink remains `e5d74c5`. See
 - [x] Durable Job lifecycle history, cache-only projection hints and migration labels.
 - [x] Ordered account notifications with titles, expiry/deduplication and account fences.
 - [x] Preserve Enter-to-send preference, IME handling and composer focus restoration.
+- [x] Native Find Action entries for Runtime terminal, diagnostics, plugin manager and
+  Session center; local restart/credential actions work before Remote authorization.
+- [x] Shared file navigation with historical directory resolution and optional Host opener.
+- [x] Trace revocation cleanup, canceled-stream terminal suppression, access rebaseline
+  ordering and bounded terminal rendering with stale-frame fences.
 
 ### Completed differences
 

@@ -6130,18 +6130,23 @@ WARNING: This link could potentially be dangerous`)) {
   var writable = false;
   window.dshTerminalReceive = (frame) => {
     if (frame.type === "snapshot") {
-      terminal.reset();
       terminal.options.scrollback = Math.min(1e5, Math.max(0, frame.scrollback ?? 5e3));
-      terminal.write(frame.data ?? "");
-    } else if (frame.type === "output") terminal.write(frame.data ?? "");
+    }
+    if (frame.type === "snapshot" || frame.type === "output") {
+      const data = frame.data ?? "";
+      const bytes = new TextEncoder().encode(data).byteLength;
+      terminal.write((frame.type === "snapshot" ? "\x1Bc" : "") + data, () => {
+        window.dshTerminalPost({ type: "rendered", bytes, epoch: frame.viewEpoch });
+        if (frame.type === "snapshot") {
+          fit.fit();
+          terminal.focus();
+        }
+      });
+    }
     writable = frame.writable ?? writable;
     terminal.options.disableStdin = !writable;
     const status = document.getElementById("status");
     status.textContent = frame.message ?? (writable ? "DSH Runtime" : "DSH Runtime \xB7 read only");
-    if (frame.type === "snapshot") {
-      fit.fit();
-      terminal.focus();
-    }
   };
   terminal.onData((data) => {
     if (writable) window.dshTerminalPost({ type: "input", data });

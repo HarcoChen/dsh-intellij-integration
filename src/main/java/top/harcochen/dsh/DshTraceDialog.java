@@ -7,12 +7,9 @@ import com.google.gson.JsonParser;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.diagnostic.Logger;
-import com.intellij.openapi.fileEditor.OpenFileDescriptor;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.DialogWrapper;
 import com.intellij.openapi.util.Disposer;
-import com.intellij.openapi.vfs.LocalFileSystem;
-import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.ui.jcef.JBCefBrowser;
 import com.intellij.ui.jcef.JBCefBrowserBase;
 import com.intellij.ui.jcef.JBCefJSQuery;
@@ -22,7 +19,6 @@ import java.awt.Font;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Path;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -95,6 +91,7 @@ final class DshTraceDialog extends DialogWrapper {
         private final AtomicBoolean refreshInFlight = new AtomicBoolean();
         private final AtomicBoolean refreshQueued = new AtomicBoolean();
         private volatile long appliedTailCursor = Long.MIN_VALUE;
+        private volatile long accessRevision = -1;
         private volatile DshTraceProjector.Projection projection =
                 new DshTraceProjector.Projection(List.of(), List.of(), java.util.Map.of(), 0);
         private volatile JsonObject history = new JsonObject();
@@ -147,8 +144,17 @@ final class DshTraceDialog extends DialogWrapper {
 
         /** Runs on the Remote connection executor. */
         private void onSnapshot(DshRemoteState.Snapshot snapshotFrame) {
+            if (disposed) return;
+            long revision = remote.access().revision();
+            boolean changed = revision != accessRevision;
+            accessRevision = revision;
+            if (remote.access().available()
+                    && !remote.access().allows("session/follow", "session", sessionId)) {
+                queueRefresh();
+                return;
+            }
             DshRemoteState.FollowView view = snapshotFrame.follows.get("session:" + sessionId);
-            if (view == null || view.cursor == appliedTailCursor) return;
+            if (!changed && (view == null || view.cursor == appliedTailCursor)) return;
             queueRefresh();
         }
 
@@ -168,6 +174,26 @@ final class DshTraceDialog extends DialogWrapper {
         private void refresh() {
             if (disposed || !refreshInFlight.compareAndSet(false, true)) return;
             try {
+                long revision = remote.access().revision();
+                if (remote.access().available()
+                        && !remote.access().allows("session/follow", "session", sessionId)) {
+                    history = new JsonObject();
+                    projection =
+                            new DshTraceProjector.Projection(
+                                    List.of(), List.of(), java.util.Map.of(), 0);
+                    baselineLoaded = false;
+                    appliedTailCursor = Long.MIN_VALUE;
+                    error = DshBundle.message("dsh.remote.access.denied");
+                    ApplicationManager.getApplication()
+                            .invokeLater(
+                                    () -> {
+                                        selectedId = null;
+                                        publish();
+                                    });
+                    return;
+                }
+                if (!remote.access().available()) return;
+                String endpoint = runtime.getUrl();
                 JsonObject next;
                 JsonObject tail = currentTail();
                 if (baselineLoaded) {
@@ -181,6 +207,10 @@ final class DshTraceDialog extends DialogWrapper {
                         !baselineLoaded || !sameEvents(history, next)
                                 ? DshTraceProjector.project(next)
                                 : DshTraceProjector.withProjectionItems(projection, next);
+                if (disposed
+                        || revision != remote.access().revision()
+                        || !java.util.Objects.equals(endpoint, runtime.getUrl())
+                        || !remote.access().allows("session/follow", "session", sessionId)) return;
                 history = next;
                 projection = nextProjection;
                 baselineLoaded = true;
@@ -220,6 +250,8 @@ final class DshTraceDialog extends DialogWrapper {
             if (disposed) return;
             String type = string(action, "type");
             if (type == null) return;
+            if (!"ready".equals(type)
+                    && !remote.access().allows("session/follow", "session", sessionId)) return;
             switch (type) {
                 case "ready" -> {
                     if (!hasOnly(action, "type")) return;
@@ -310,6 +342,17 @@ final class DshTraceDialog extends DialogWrapper {
 
         private void publish() {
             if (!ready || disposed) return;
+            if (remote.access().available()
+                    && !remote.access().allows("session/follow", "session", sessionId)) {
+                history = new JsonObject();
+                projection =
+                        new DshTraceProjector.Projection(
+                                List.of(), List.of(), java.util.Map.of(), 0);
+                baselineLoaded = false;
+                appliedTailCursor = Long.MIN_VALUE;
+                selectedId = null;
+                error = DshBundle.message("dsh.remote.access.denied");
+            }
             List<DshTraceProjector.Row> filtered = filteredRows();
             int maximum = Math.max(0, filtered.size() - PAGE_SIZE);
             offset = followLatest ? maximum : Math.min(Math.max(0, offset), maximum);
@@ -557,6 +600,7 @@ final class DshTraceDialog extends DialogWrapper {
                 String kind,
                 JsonElement raw,
                 List<DshTraceProjector.Field> fields) {
+            if (!remote.access().allows("session/follow", "session", sessionId)) return;
             JsonObject detail = new JsonObject();
             detail.addProperty("id", id);
             detail.addProperty("title", title);
@@ -613,25 +657,21 @@ final class DshTraceDialog extends DialogWrapper {
                                     history, DshJson.longValue(row.view().get("seq"), 0), original);
             if (root == null) root = original;
             if (root == null || original == null) return;
-            try {
-                Path base = Path.of(original).toAbsolutePath().normalize();
-                Path resolved =
-                        Path.of(DshWorkingDirectory.resolve(value, root))
-                                .toAbsolutePath()
-                                .normalize();
-                if (!resolved.startsWith(base)) return;
-                VirtualFile file =
-                        LocalFileSystem.getInstance().refreshAndFindFileByPath(resolved.toString());
-                if (file != null)
-                    new OpenFileDescriptor(
-                                    project,
-                                    file,
-                                    Math.toIntExact(line - 1),
-                                    column == null ? 0 : Math.toIntExact(column - 1))
-                            .navigate(true);
-            } catch (RuntimeException ignored) {
-                // Treat malformed/untrusted webview paths as a no-op.
-            }
+            DshFileNavigation.open(
+                    project,
+                    remote,
+                    runtime,
+                    refresher,
+                    action,
+                    root,
+                    () ->
+                            !disposed
+                                    && remote.access()
+                                            .allows("session/follow", "session", sessionId),
+                    message -> {
+                        error = message;
+                        ApplicationManager.getApplication().invokeLater(this::publish);
+                    });
         }
 
         private String sessionTitle() {

@@ -20,6 +20,10 @@ public final class DshCommandAction extends DumbAwareAction {
         String id = ActionManager.getInstance().getId(this);
         String command =
                 switch (id == null ? "" : id) {
+                    case "Dsh.OpenRuntimeTerminal" -> "openRuntimeTerminal";
+                    case "Dsh.AttachDiagnostics" -> "openDiagnosticsPicker";
+                    case "Dsh.ManagePlugins" -> "managePlugins";
+                    case "Dsh.OpenSessionCenter" -> "openSessionCenter";
                     case "Dsh.OpenBrowser" -> "openBrowser";
                     case "Dsh.OpenLogs" -> "openLogs";
                     case "Dsh.ConfigureApiKey" -> "configureApiKey";
