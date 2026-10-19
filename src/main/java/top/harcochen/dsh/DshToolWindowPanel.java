@@ -1457,6 +1457,14 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
                 "canRunCommands",
                 sessionId != null
                         && remote.access().allows("commands/execute", "session", sessionId));
+        accessView.addProperty(
+                "canSelectPreset",
+                sessionId != null
+                        && remote.access().allows("agentPresets/select", "session", sessionId));
+        accessView.addProperty(
+                "canReadSession",
+                sessionId != null
+                        && remote.access().allows("session/follow", "session", sessionId));
         state.add("access", accessView);
         state.addProperty("enterToSend", DshSettingsState.getInstance(project).enterToSend);
         state.addProperty("modeSelectionEnabled", agentPresets.modeSelectionEnabled());

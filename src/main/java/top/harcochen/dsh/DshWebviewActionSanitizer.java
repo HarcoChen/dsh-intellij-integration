@@ -73,6 +73,32 @@ final class DshWebviewActionSanitizer {
         if (type == null || type.length() > 64 || !type.matches("[A-Za-z][A-Za-z0-9]*")) {
             return null;
         }
+        if ("insertEditorReference".equals(type) || "explainDebugState".equals(type))
+            return hasOnly(input, "type") ? input : null;
+        if ("prefillGitDiff".equals(type))
+            return hasOnly(input, "type", "kind")
+                            && Set.of("explain", "fix", "review", "docs")
+                                    .contains(DshJson.stringOr(input, "kind", ""))
+                            && strictString(input, "kind") != null
+                    ? input
+                    : null;
+        if ("askAboutResource".equals(type)) {
+            String path = strictString(input, "path");
+            return hasOnly(input, "type", "path", "isDirectory")
+                            && path != null
+                            && !path.isBlank()
+                            && path.length() <= 4096
+                            && path.chars().noneMatch(value -> value < 32 || value == 127)
+                            && !path.replace('\\', '/').startsWith("/")
+                            && !path.matches("^[A-Za-z]:.*")
+                            && !java.util.Arrays.asList(path.replace('\\', '/').split("/", -1))
+                                    .contains("..")
+                            && input.has("isDirectory")
+                            && input.get("isDirectory").isJsonPrimitive()
+                            && input.getAsJsonPrimitive("isDirectory").isBoolean()
+                    ? input
+                    : null;
+        }
         if ("sendPrompt".equals(type)) {
             if (!hasOnly(input, "type", "text", "mode", "images", "files")) {
                 return null;

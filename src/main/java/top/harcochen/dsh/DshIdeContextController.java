@@ -505,7 +505,7 @@ final class DshIdeContextController {
                 });
     }
 
-    void attachDiagnostics() {
+    boolean attachDiagnostics() {
         Editor editor = FileEditorManager.getInstance(project).getSelectedTextEditor();
         VirtualFile file =
                 editor == null
@@ -513,40 +513,34 @@ final class DshIdeContextController {
                         : FileDocumentManager.getInstance().getFile(editor.getDocument());
         if (editor == null || file == null) {
             notifyUser(DshBundle.message("dsh.context.no.diagnostics"));
-            return;
+            return false;
         }
         String pathLabel = displayPath(file);
-        Document document = editor.getDocument();
         List<String> lines = diagnostics(project, file);
         if (lines.isEmpty()) {
             notifyUser(DshBundle.message("dsh.context.no.diagnostics"));
-            return;
+            return false;
         }
-        if (!lines.isEmpty()) {
-            javax.swing.JList<String> list = new javax.swing.JList<>(lines.toArray(new String[0]));
-            list.setSelectionInterval(0, lines.size() - 1);
-            javax.swing.JScrollPane scroll = new javax.swing.JScrollPane(list);
-            scroll.setPreferredSize(new java.awt.Dimension(850, 360));
-            com.intellij.openapi.ui.DialogWrapper picker =
-                    new com.intellij.openapi.ui.DialogWrapper(project) {
-                        {
-                            setTitle(DshBundle.message("dsh.context.diagnostics.choose"));
-                            init();
-                        }
+        javax.swing.JList<String> list = new javax.swing.JList<>(lines.toArray(new String[0]));
+        list.setSelectionInterval(0, lines.size() - 1);
+        javax.swing.JScrollPane scroll = new javax.swing.JScrollPane(list);
+        scroll.setPreferredSize(new java.awt.Dimension(850, 360));
+        com.intellij.openapi.ui.DialogWrapper picker =
+                new com.intellij.openapi.ui.DialogWrapper(project) {
+                    {
+                        setTitle(DshBundle.message("dsh.context.diagnostics.choose"));
+                        init();
+                    }
 
-                        @Override
-                        protected javax.swing.JComponent createCenterPanel() {
-                            return scroll;
-                        }
-                    };
-            if (!picker.showAndGet()) return;
-            lines = list.getSelectedValuesList();
-            if (lines.isEmpty()) return;
-        }
-        String full =
-                lines.isEmpty()
-                        ? pathLabel + ": no diagnostics reported by the IDE."
-                        : String.join("\n", lines);
+                    @Override
+                    protected javax.swing.JComponent createCenterPanel() {
+                        return scroll;
+                    }
+                };
+        if (!picker.showAndGet()) return false;
+        lines = list.getSelectedValuesList();
+        if (lines.isEmpty()) return false;
+        String full = String.join("\n", lines);
         String content = limitContext(full);
         JsonObject item = new JsonObject();
         item.addProperty("id", java.util.UUID.randomUUID().toString());
@@ -557,6 +551,7 @@ final class DshIdeContextController {
         item.addProperty("byteLength", content.getBytes(StandardCharsets.UTF_8).length);
         item.addProperty("truncated", content.length() < full.length());
         replaceContextItem(item);
+        return true;
     }
 
     private void attachFolder() {

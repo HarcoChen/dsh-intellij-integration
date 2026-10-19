@@ -157,11 +157,7 @@ final class DshPromptController {
         java.util.regex.Pattern diagnostics =
                 java.util.regex.Pattern.compile("(^|\\s)@diagnostics(?=\\s|$)");
         if (diagnostics.matcher(text).find()) {
-            DshPluginManagementController.ui(
-                    () -> {
-                        ideContext.attachDiagnostics();
-                        return null;
-                    });
+            if (!DshPluginManagementController.ui(ideContext::attachDiagnostics)) return;
             text = diagnostics.matcher(text).replaceAll("$1").trim();
         }
         JsonArray images =

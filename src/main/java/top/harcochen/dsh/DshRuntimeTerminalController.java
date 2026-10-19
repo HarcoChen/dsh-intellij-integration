@@ -22,6 +22,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.Consumer;
 import javax.swing.JComponent;
+import top.harcochen.dsh.remote.DshRemoteException;
 import top.harcochen.dsh.remote.DshRemoteService;
 import top.harcochen.dsh.remote.DshRemoteState;
 import top.harcochen.dsh.remote.DshRuntimeTerminal;
@@ -178,17 +179,31 @@ final class DshRuntimeTerminalController implements AutoCloseable {
                         });
     }
 
-    private synchronized void flushCloses() {
-        for (var entry : new ArrayList<>(pendingCloses.entrySet())) {
+    private void flushCloses() {
+        Map<String, JsonObject> pending;
+        synchronized (this) {
+            pending = new LinkedHashMap<>(pendingCloses);
+        }
+        for (var entry : pending.entrySet()) {
             JsonObject close = entry.getValue();
             if (!current(DshJson.string(close, "endpoint"))) continue;
+            boolean remove = false;
             try {
                 JsonObject args = close.deepCopy();
                 args.remove("endpoint");
                 remote.callFeature("terminal/close", args);
-                pendingCloses.remove(entry.getKey());
+                remove = true;
             } catch (RuntimeException failure) {
-                /* Retry against this exact Runtime after reconnect. */
+                // Only transport failures can recover by reconnecting to this Runtime.
+                remove =
+                        !(failure instanceof DshRemoteException remoteError)
+                                || remoteError.layer() != DshRemoteException.Layer.CARRIER;
+            }
+            if (remove) {
+                synchronized (this) {
+                    if (pendingCloses.get(entry.getKey()) == close)
+                        pendingCloses.remove(entry.getKey());
+                }
             }
         }
     }

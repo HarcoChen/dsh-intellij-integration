@@ -378,7 +378,11 @@ final class DshChangeReviewStore {
             review = session == null ? null : session.reviews.get(turn);
             if (session == null || review == null || !"capturing".equals(review.state)) return;
         }
-        GitContext git = createGitContext(session.cwd);
+        GitContext git =
+                createGitContext(
+                        review.operationDirectory == null || review.operationDirectory.isBlank()
+                                ? session.cwd
+                                : review.operationDirectory);
         if (git == null) {
             // Not a repository: there is nothing to diff against, and an empty
             // review would claim the turn changed nothing.

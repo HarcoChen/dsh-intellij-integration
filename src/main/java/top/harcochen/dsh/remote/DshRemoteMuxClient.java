@@ -134,6 +134,9 @@ public final class DshRemoteMuxClient {
         closed = true;
         dispatch.execute(
                 () -> {
+                    failAll(
+                            DshRemoteException.carrier(
+                                    DshRemoteContracts.MUX_PATH, "Remote mux disposed", null));
                     closeSocket("disposed");
                     http.shutdownNow();
                 });
@@ -149,8 +152,9 @@ public final class DshRemoteMuxClient {
         streams.put(streamId, stream);
         boolean sent = sendText(DshRemoteContracts.streamOpen(streamId, endpoint, args).toString());
         if (!sent) {
-            streams.remove(streamId);
-            handler.onTerminal(
+            finish(
+                    streamId,
+                    stream,
                     errorObject("carrier", "DSH remote mux socket is not open", new JsonObject()));
             return () -> {};
         }
@@ -347,7 +351,6 @@ public final class DshRemoteMuxClient {
         stream.terminal = true;
         streams.remove(streamId);
         rememberTerminal(streamId);
-        if (stream.cancelRequested) return;
         try {
             stream.handler.onTerminal(error);
         } catch (RuntimeException failure) {
@@ -366,20 +369,15 @@ public final class DshRemoteMuxClient {
     private void failAll(Throwable error) {
         List<String> ids = new ArrayList<>(streams.keySet());
         for (String streamId : ids) {
-            OpenStream stream = streams.remove(streamId);
+            OpenStream stream = streams.get(streamId);
             if (stream == null || stream.terminal) continue;
-            stream.terminal = true;
-            try {
-                stream.handler.onTerminal(
-                        errorObject(
-                                "carrier",
-                                error.getMessage() == null
-                                        ? String.valueOf(error)
-                                        : error.getMessage(),
-                                new JsonObject()));
-            } catch (RuntimeException failure) {
-                diagnostic.accept("Remote stream failure handler threw: " + failure);
-            }
+            finish(
+                    streamId,
+                    stream,
+                    errorObject(
+                            "carrier",
+                            error.getMessage() == null ? String.valueOf(error) : error.getMessage(),
+                            new JsonObject()));
         }
     }
 

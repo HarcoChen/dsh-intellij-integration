@@ -2,7 +2,6 @@ package top.harcochen.dsh;
 
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-import java.nio.file.Path;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import top.harcochen.dsh.remote.DshRemoteState;
@@ -59,7 +58,7 @@ public final class DshWorkingDirectory {
     public static String resolve(String path, String directory) {
         if (directory == null || directory.isBlank()) return path;
         boolean windows = directory.matches("^[A-Za-z]:[\\\\/].*") || directory.startsWith("\\\\");
-        if (!windows) return Path.of(directory).resolve(path).normalize().toString();
+        if (!windows) return resolvePosix(path, directory);
         String base = directory.replace('\\', '/');
         String value = path.replace('\\', '/');
         if (value.matches("^[A-Za-z]:(?:[^/].*)?"))
@@ -80,6 +79,22 @@ public final class DshWorkingDirectory {
             } else parts.addLast(part);
         }
         return (prefix + String.join("/", parts)).replace('/', '\\');
+    }
+
+    private static String resolvePosix(String path, String directory) {
+        if (path.indexOf('\0') >= 0 || directory.indexOf('\0') >= 0)
+            throw new IllegalArgumentException("Invalid POSIX Host path");
+        String value = path.startsWith("/") ? path : directory + "/" + path;
+        boolean absolute = value.startsWith("/");
+        Deque<String> parts = new ArrayDeque<>();
+        for (String part : value.split("/")) {
+            if (part.isEmpty() || part.equals(".")) continue;
+            if (part.equals("..")) {
+                if (!parts.isEmpty() && !parts.peekLast().equals("..")) parts.removeLast();
+                else if (!absolute) parts.addLast(part);
+            } else parts.addLast(part);
+        }
+        return (absolute ? "/" : "") + String.join("/", parts);
     }
 
     private static String windowsRoot(String path) {

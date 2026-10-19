@@ -63,7 +63,7 @@ relinquishes child ownership rather than starting another Runtime.
 
 The v0.11.0 synchronization updates default/wire pins to Harness
 `687f282e8625c6b8d11ff58211a90524be2e4317` and adopts the companion's English
-recovery attribution text. See `../DSH_IDE_0.11.0_SYNC.md`.
+recovery attribution text. See [the repository TODO](../TODO.md) for scope and validation boundaries.
 
 The browser terminal assets are independently reproducible:
 

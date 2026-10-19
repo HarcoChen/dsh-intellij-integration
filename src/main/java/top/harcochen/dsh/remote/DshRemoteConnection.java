@@ -258,7 +258,7 @@ public final class DshRemoteConnection implements AutoCloseable {
         access.reset();
         accessStarted = false;
         accessStream =
-                mux.open(
+                openManaged(
                         "remoteAccess/follow",
                         new JsonObject(),
                         new DshRemoteMuxClient.StreamHandler() {
@@ -466,9 +466,41 @@ public final class DshRemoteConnection implements AutoCloseable {
         Objects.requireNonNull(settled);
     }
 
+    /** Local cancellation releases a subscription without treating its transport end as failure. */
+    private DshRemoteMuxClient.StreamHandle openManaged(
+            String endpoint, JsonObject args, DshRemoteMuxClient.StreamHandler handler) {
+        AtomicBoolean cancelled = new AtomicBoolean();
+        DshRemoteMuxClient.StreamHandle handle =
+                mux.open(
+                        endpoint,
+                        args,
+                        new DshRemoteMuxClient.StreamHandler() {
+                            @Override
+                            public void onItem(JsonObject value) {
+                                if (!cancelled.get()) handler.onItem(value);
+                            }
+
+                            @Override
+                            public void onTerminal(JsonObject error) {
+                                if (!cancelled.get()) handler.onTerminal(error);
+                            }
+                        });
+        return new DshRemoteMuxClient.StreamHandle() {
+            @Override
+            public boolean send(JsonObject value) {
+                return !cancelled.get() && handle.send(value);
+            }
+
+            @Override
+            public void cancel() {
+                if (cancelled.compareAndSet(false, true)) handle.cancel();
+            }
+        };
+    }
+
     private void openCoreStream(String endpoint, JsonObject args, Consumer<JsonObject> sink) {
         StreamLease lease =
-                new StreamLease(mux.open(endpoint, args, new CoreStreamHandler(endpoint, sink)));
+                new StreamLease(openManaged(endpoint, args, new CoreStreamHandler(endpoint, sink)));
         coreStreams.put(endpoint, lease);
     }
 
@@ -482,7 +514,7 @@ public final class DshRemoteConnection implements AutoCloseable {
         state.openFollow(lease.address, FOLLOW_MAX_MESSAGES);
         StreamLease stream =
                 new StreamLease(
-                        mux.open(
+                        openManaged(
                                 DshRemoteContracts.STREAM_SESSION_FOLLOW,
                                 DshRemoteContracts.argsSessionFollow(
                                         lease.address, FOLLOW_MAX_MESSAGES),
@@ -950,7 +982,7 @@ public final class DshRemoteConnection implements AutoCloseable {
         args.addProperty("agentId", sessionId);
         args.addProperty("callId", callId);
         wait.handle =
-                mux.open(
+                openManaged(
                         "userQuestions/attachWait",
                         args,
                         new DshRemoteMuxClient.StreamHandler() {
@@ -1121,7 +1153,7 @@ public final class DshRemoteConnection implements AutoCloseable {
         }
         long gen = generation;
         stream.handle =
-                mux.open(
+                openManaged(
                         stream.endpoint,
                         args,
                         new DshRemoteMuxClient.StreamHandler() {
@@ -1169,7 +1201,7 @@ public final class DshRemoteConnection implements AutoCloseable {
             int maxMessages,
             Consumer<JsonObject> items,
             Consumer<JsonObject> terminalError) {
-        return mux.open(
+        return openManaged(
                 DshRemoteContracts.STREAM_SESSION_FOLLOW,
                 DshRemoteContracts.argsSessionFollow(address, maxMessages),
                 new DshRemoteMuxClient.StreamHandler() {

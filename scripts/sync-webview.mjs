@@ -5,6 +5,7 @@ import { resolve, join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import { adaptComposerPreferences } from './webview/composer-preferences.mjs';
+import { adaptComposerAccess } from './webview/composer-access.mjs';
 
 // Rebuild the checked-in bundle from the audited companion commit and its npm dependencies.
 const repo = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -18,6 +19,7 @@ try {
     execFileSync('tar', ['-x', '-C', temp], { input: archive });
     await symlink(join(upstream, 'node_modules'), join(temp, 'node_modules'), 'dir');
     await adaptComposerPreferences(temp);
+    await adaptComposerAccess(temp);
     const headerPath = join(temp, 'webview/src/components/Header.tsx');
     let header = await readFile(headerPath, 'utf8');
     const anchor = '        { key: "workspaces",';

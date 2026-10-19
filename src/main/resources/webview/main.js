@@ -27480,6 +27480,7 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
   var SLASH_MENU_ID = "dsh-slash-completion";
   var SKILL_MENU_ID = "dsh-skill-completion";
   function useSlashCompletion({
+    access,
     text,
     setText,
     skills,
@@ -27493,6 +27494,12 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
     const resetSlashIndex = (0, import_react31.useCallback)(() => setSlashIndex(0), []);
     const available = (0, import_react31.useMemo)(() => mergeSlashCommands(commands, modeSelectionEnabled), [commands, modeSelectionEnabled]);
     const executeSlashCommand = (0, import_react31.useCallback)((name) => {
+      const command = available.find((entry) => entry.name === name.toLowerCase().split(/\s+/u)[0]);
+      const action = command?.action?.type;
+      if (command?.origin === "host" && (access?.canSend === false || access?.canRunCommands === false)) return true;
+      if ((action === "selectModel" || command?.name === "/effort") && access?.canSelectModel === false) return true;
+      if (action === "selectAgentPreset" && access?.canSelectPreset === false) return true;
+      if (action === "openTrace" && access?.canReadSession === false) return true;
       const handled = runSlashCommand(name, {
         reasoningEffortAvailable: !!reasoningEffort?.options.length,
         onShowEffort,
@@ -27502,7 +27509,7 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
       setText("");
       setSlashIndex(0);
       return true;
-    }, [reasoningEffort, onShowEffort, setText, available]);
+    }, [access, reasoningEffort, onShowEffort, setText, available]);
     const slashQuery = text.match(/^\/(\S*)$/u)?.[1]?.toLowerCase();
     const slashMatches = slashQuery === void 0 ? [] : available.filter((command) => command.name.slice(1).startsWith(slashQuery));
     const slashSkillMatches = slashQuery === void 0 ? [] : skills.filter(
@@ -27527,6 +27534,7 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
         setText(`${text.slice(0, start)}/${name} `);
         setSlashIndex(0);
       } else if (/^\/\S*$/u.test(text)) {
+        if (access?.canSend === false) return;
         postAction({ type: "sendPrompt", text: `/${name}`, mode: "queue" });
         setText("");
         setSlashIndex(0);
@@ -27534,7 +27542,7 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
         return;
       }
       window.requestAnimationFrame(focusTextarea);
-    }, [text, setText, focusTextarea]);
+    }, [access?.canSend, text, setText, focusTextarea]);
     const handleCompletionKeyDown = (event) => {
       if (skillMatches.length) {
         if (event.key === "ArrowDown") {
@@ -27723,6 +27731,7 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
     }, []);
     const onShowEffort = (0, import_react33.useCallback)(() => setEffortVisible(true), []);
     const completion = useSlashCompletion({
+      access,
       text,
       setText,
       skills,

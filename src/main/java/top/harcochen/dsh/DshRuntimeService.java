@@ -239,6 +239,14 @@ public final class DshRuntimeService implements Disposable {
                             ? DshRuntimeEndpoint.ofBase(configuredUrl)
                             : configuredEndpoint);
             if (isRemoteHealthy(configuredUrl)) {
+                DshRuntimeEndpoint local = DshRuntimeEndpoint.parse(configuredUrl, true);
+                String advertisedUrl = local == null ? configuredUrl : local.baseUrl;
+                for (DshRuntimeEndpoint advertised : advertisements.read()) {
+                    if (advertisedUrl.equals(advertised.baseUrl)) {
+                        launchedVersion = advertised.runtimeVersion;
+                        break;
+                    }
+                }
                 setStatus(
                         new RuntimeStatus(
                                 RuntimeState.RUNNING,

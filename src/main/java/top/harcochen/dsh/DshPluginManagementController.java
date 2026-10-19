@@ -200,6 +200,13 @@ final class DshPluginManagementController {
                                                                             "pluginManager/installBundle",
                                                                             args);
                                                                 } catch (RuntimeException error) {
+                                                                    if (error
+                                                                                    instanceof
+                                                                                    DshRemoteException
+                                                                                            remoteError
+                                                                            && remoteError
+                                                                                    .isCapabilityMissing())
+                                                                        throw error;
                                                                     assertEndpoint(endpoint);
                                                                     JsonObject wait =
                                                                             new JsonObject();
@@ -263,7 +270,7 @@ final class DshPluginManagementController {
                                                                                 settled));
                                                     Thread.sleep(100);
                                                 }
-                                                result.complete(work.join());
+                                                result.complete(await(work));
                                             } catch (Exception error) {
                                                 result.completeExceptionally(error);
                                             } finally {
@@ -273,7 +280,19 @@ final class DshPluginManagementController {
                                     });
                     return null;
                 });
-        return result.join();
+        return await(result);
+    }
+
+    private static <T> T await(CompletableFuture<T> future) {
+        try {
+            return future.join();
+        } catch (java.util.concurrent.CompletionException error) {
+            Throwable cause = error;
+            while (cause instanceof java.util.concurrent.CompletionException
+                    && cause.getCause() != null) cause = cause.getCause();
+            if (cause instanceof RuntimeException runtimeError) throw runtimeError;
+            throw error;
+        }
     }
 
     private void cancelInstallation(String endpoint, String requestId, AtomicBoolean settled) {
