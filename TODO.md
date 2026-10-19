@@ -10,8 +10,7 @@ Status: `[x]` implemented, `[-]` usable but not yet at VS Code parity, `[ ]` not
 Target: companion `96d3aaff973879617b82f9187d4b2d344a12f5ed` and Harness
 `dsh-v0.2.1-rc.2` (`687f282e8625c6b8d11ff58211a90524be2e4317`).
 The Webview and Trace are rebuilt from that commit with IntelliJ adapters.
-The bundled Jev gitlink remains `e5d74c5`. See
-[the 0.11.0 sync report](DSH_IDE_0.11.0_SYNC.md) for scope and validation boundaries.
+The bundled Jev gitlink remains `e5d74c5`. Scope and validation boundaries are tracked below.
 
 - [x] Runtime terminal retention, duplex input acknowledgements, bounded queues,
   screen restoration, native close cleanup, and legacy RC.2 follow/unary input.
