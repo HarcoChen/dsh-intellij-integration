@@ -48,6 +48,10 @@ public final class DshRemoteMuxClient {
     public interface StreamHandle {
         /** Cancel the stream; at most one cancel frame is sent. */
         void cancel();
+
+        default boolean send(JsonObject value) {
+            return false;
+        }
     }
 
     private final Supplier<String> baseUrl;
@@ -179,6 +183,18 @@ public final class DshRemoteMuxClient {
         }
 
         @Override
+        public boolean send(JsonObject value) {
+            OpenStream stream = streams.get(streamId);
+            if (cancelled || stream == null || stream.terminal || stream.cancelRequested)
+                return false;
+            JsonObject frame = new JsonObject();
+            frame.addProperty("type", "item");
+            frame.addProperty("streamId", streamId);
+            frame.add("value", value.deepCopy());
+            return sendText(frame.toString());
+        }
+
+        @Override
         public void cancel() {
             if (cancelled) return;
             cancelled = true;
@@ -301,6 +317,7 @@ public final class DshRemoteMuxClient {
         }
         switch (type) {
             case "item" -> {
+                if (stream.cancelRequested) return;
                 JsonObject value =
                         frame.has("value") && frame.get("value").isJsonObject()
                                 ? frame.getAsJsonObject("value")

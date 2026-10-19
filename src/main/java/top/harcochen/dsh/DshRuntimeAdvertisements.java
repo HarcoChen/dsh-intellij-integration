@@ -119,8 +119,10 @@ final class DshRuntimeAdvertisements {
                                     true);
                     DshRuntimeEndpoint launch =
                             DshRuntimeEndpoint.parse(DshJson.string(record, "launchUrl"), true);
-                    if (base != null && launch != null && base.baseUrl.equals(launch.baseUrl))
+                    if (base != null && launch != null && base.baseUrl.equals(launch.baseUrl)) {
+                        launch.runtimeVersion = DshJson.string(record, "runtimeVersion");
                         result.add(launch);
+                    }
                 } catch (RuntimeException ignored) {
                 }
             }

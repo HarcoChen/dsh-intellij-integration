@@ -41,11 +41,18 @@ public final class DshRemoteConnection implements AutoCloseable {
         void onAuthFailure(DshRemoteException error);
 
         void onAccountEvent(String event);
+
+        void onFeatureEvent(String event, JsonArray args);
     }
 
     static final int FOLLOW_MAX_MESSAGES = 250;
     private static final long OPENING_TIMEOUT_MS = 15_000;
     private static final long MAX_BACKOFF_MS = 8_000;
+
+    final DshRemoteAccess access = new DshRemoteAccess();
+    private final Supplier<String> runtimeVersion;
+    private DshRemoteMuxClient.StreamHandle accessStream;
+    private boolean accessStarted;
 
     private final DshRemoteMuxClient mux;
     private final DshRemoteUnaryClient unary;
@@ -81,7 +88,9 @@ public final class DshRemoteConnection implements AutoCloseable {
             DshRemoteUnaryClient unary,
             java.util.function.Supplier<java.util.Map<String, String>> headers,
             Callbacks callbacks,
-            Consumer<String> diagnostic) {
+            Consumer<String> diagnostic,
+            Supplier<String> runtimeVersion) {
+        this.runtimeVersion = runtimeVersion;
         this.unary = unary;
         this.callbacks = callbacks;
         this.executor =
@@ -246,8 +255,91 @@ public final class DshRemoteConnection implements AutoCloseable {
 
     private void onSocketOpen(int gen) {
         if (gen != generation || opening == null) return;
-        events = new DshRemoteEventClient(mux, unary, new EventListener(), gen);
-        events.open();
+        access.reset();
+        accessStarted = false;
+        accessStream =
+                mux.open(
+                        "remoteAccess/follow",
+                        new JsonObject(),
+                        new DshRemoteMuxClient.StreamHandler() {
+                            private boolean first = true;
+
+                            @Override
+                            public void onItem(JsonObject frame) {
+                                if (gen != generation) return;
+                                try {
+                                    access.apply(frame, first);
+                                    first = false;
+                                    refreshAccess(gen);
+                                } catch (RuntimeException invalid) {
+                                    access.reset();
+                                    if (accessStream != null) accessStream.cancel();
+                                    callbacks.onDropped(invalid.getMessage());
+                                    refreshAccess(gen);
+                                }
+                            }
+
+                            @Override
+                            public void onTerminal(JsonObject error) {
+                                if (gen != generation) return;
+                                String version = runtimeVersion.get();
+                                String code = string(error, "code");
+                                boolean missing =
+                                        error != null
+                                                && ("gateway/invocation-unavailable".equals(code)
+                                                        || "http-404".equals(code));
+                                if (first
+                                        && missing
+                                        && top.harcochen.dsh.DshRuntimeVersion.exact(version)
+                                                != null
+                                        && top.harcochen.dsh.DshRuntimeVersion.compare(
+                                                        version, "0.2.1-alpha.3")
+                                                < 0) access.legacyOwner();
+                                else if (!access.owner()) access.reset();
+                                refreshAccess(gen);
+                            }
+                        });
+    }
+
+    private void refreshAccess(int gen) {
+        if (gen != generation) return;
+        if (accessStarted) {
+            for (QuestionWait wait : questionWaits.values()) wait.close();
+            questionWaits.clear();
+            if (events != null) events.close();
+            events = null;
+            for (StreamLease lease : coreStreams.values()) lease.handle.cancel();
+            coreStreams.clear();
+            for (FollowLease lease : follows.values()) lease.stream = null;
+            for (String key : new ArrayList<>(follows.keySet())) {
+                FollowLease lease = follows.get(key);
+                if (!access.allows("session/follow", "session", sessionIdOf(lease.address)))
+                    state.closeFollow(key);
+            }
+            for (ExtraStream stream : extraStreams.values()) {
+                if (stream.handle != null) stream.handle.cancel();
+                stream.handle = null;
+                if (!stream.reopen) stream.closed = true;
+                JsonObject denied = new JsonObject();
+                denied.addProperty("code", "remote-access/denied");
+                denied.addProperty("message", "Remote access changed; reopen this view");
+                stream.terminal.accept(denied);
+            }
+            state.beginGeneration(generation, "connecting");
+            opening = new Opening();
+        }
+        accessStarted = true;
+        if (access.owner()) {
+            events = new DshRemoteEventClient(mux, unary, new EventListener(), gen);
+            events.open();
+        } else onEventsReady("", "", gen);
+        publish();
+    }
+
+    private static String sessionIdOf(JsonObject address) {
+        return string(address, "childSessionId") == null
+                ? string(address, "sessionId")
+                : string(address, "childSessionId");
     }
 
     private void onSocketLost(int gen, Throwable error) {
@@ -261,14 +353,19 @@ public final class DshRemoteConnection implements AutoCloseable {
         opening.clientId = clientId;
         opening.hostHome = hostHome;
         opening.eventsReady = true;
-        openCoreStream(
-                DshRemoteContracts.STREAM_WORKSPACE_FOLLOW,
-                DshRemoteContracts.argsEmpty(),
-                this::onWorkspaceFrame);
-        openCoreStream(
-                DshRemoteContracts.STREAM_SESSION_CONTROL,
-                DshRemoteContracts.argsEmpty(),
-                this::onControlFrame);
+        if (!access.allows("workspace/follow")) opening.workspaceReady = true;
+        else
+            openCoreStream(
+                    DshRemoteContracts.STREAM_WORKSPACE_FOLLOW,
+                    DshRemoteContracts.argsEmpty(),
+                    this::onWorkspaceFrame);
+        if (!access.allows("session/control")) opening.controlReady = true;
+        else
+            openCoreStream(
+                    DshRemoteContracts.STREAM_SESSION_CONTROL,
+                    DshRemoteContracts.argsEmpty(),
+                    this::onControlFrame);
+        checkOpeningComplete();
     }
 
     private void onWorkspaceFrame(JsonObject item) {
@@ -304,20 +401,33 @@ public final class DshRemoteConnection implements AutoCloseable {
                 || !opening.controlReady) {
             return;
         }
+        if (opening.catalogRequested) return;
+        opening.catalogRequested = true;
+        if (!access.allows("session/list")) {
+            onSessionBaseline(new JsonArray());
+            return;
+        }
         String endpoint = DshRemoteContracts.SESSION_LIST;
         long requestedGeneration = generation;
+        Opening requestedOpening = opening;
         unary.callAsync(endpoint, DshRemoteContracts.argsSessionList())
                 .whenComplete(
                         (value, error) ->
                                 execute(
                                         () -> {
                                             if (requestedGeneration != generation
-                                                    || opening == null) return;
+                                                    || opening != requestedOpening) return;
                                             if (error != null) {
                                                 Throwable cause =
                                                         error.getCause() == null
                                                                 ? error
                                                                 : error.getCause();
+                                                if (cause instanceof DshRemoteException denied
+                                                        && "remote-access/denied"
+                                                                .equals(denied.code())) {
+                                                    onSessionBaseline(new JsonArray());
+                                                    return;
+                                                }
                                                 teardown(
                                                         "Remote session baseline failed: "
                                                                 + cause.getMessage(),
@@ -363,7 +473,9 @@ public final class DshRemoteConnection implements AutoCloseable {
 
     private void openFollowStream(String key) {
         FollowLease lease = follows.get(key);
-        if (lease == null || lease.stream != null) return;
+        if (lease == null
+                || lease.stream != null
+                || !access.allows("session/follow", "session", sessionIdOf(lease.address))) return;
         // Register the state-side follow first: applyFollowFrame drops frames
         // for addresses it does not know about.
         state.openFollow(lease.address, FOLLOW_MAX_MESSAGES);
@@ -461,6 +573,9 @@ public final class DshRemoteConnection implements AutoCloseable {
             opening = null;
         }
         generationConnected = false;
+        access.reset();
+        if (accessStream != null) accessStream.cancel();
+        accessStream = null;
         for (QuestionWait wait : questionWaits.values()) wait.close();
         questionWaits.clear();
         if (events != null) events.close();
@@ -468,6 +583,7 @@ public final class DshRemoteConnection implements AutoCloseable {
         for (ExtraStream stream : extraStreams.values()) {
             if (stream.handle != null) stream.handle.cancel();
             stream.handle = null;
+            if (!stream.reopen) stream.closed = true;
             JsonObject error = new JsonObject();
             error.addProperty("code", "carrier/disconnected");
             error.addProperty("message", reason);
@@ -523,6 +639,12 @@ public final class DshRemoteConnection implements AutoCloseable {
 
     /** Answer one pending waterfall; may block on HTTP. Returns null on success. */
     DshRemoteException answer(String eventId, JsonObject outcome, long expectedGeneration) {
+        if (!access.owner())
+            return DshRemoteException.remote(
+                    "$events/result",
+                    "remote-access/denied",
+                    "Only the Runtime owner can answer interactive requests",
+                    null);
         DshRemoteEventClient current = events;
         if (current == null || expectedGeneration != pendingGeneration.get()) {
             return DshRemoteException.carrier(
@@ -549,6 +671,7 @@ public final class DshRemoteConnection implements AutoCloseable {
             executor.execute(
                     () -> {
                         if (gen != generation) return;
+                        callbacks.onFeatureEvent(event, args);
                         if ("settings/document-updated".equals(event)
                                 || "commands/change".equals(event)
                                 || "agent-preset/selected".equals(event)) {
@@ -673,6 +796,16 @@ public final class DshRemoteConnection implements AutoCloseable {
             executor.execute(
                     () -> {
                         if (error != null) {
+                            if ("remote-access/denied".equals(string(error, "code"))) {
+                                if (opening != null) {
+                                    if ("workspace/follow".equals(endpoint))
+                                        opening.workspaceReady = true;
+                                    if ("session/control".equals(endpoint))
+                                        opening.controlReady = true;
+                                    checkOpeningComplete();
+                                }
+                                return;
+                            }
                             teardown(
                                     "Remote "
                                             + endpoint
@@ -720,6 +853,11 @@ public final class DshRemoteConnection implements AutoCloseable {
                         // Session not found (or equivalent): retire the follow instead of
                         // tearing down the whole generation.
                         String code = string(error, "code");
+                        if ("remote-access/denied".equals(code)) {
+                            state.closeFollow(key);
+                            publish();
+                            return;
+                        }
                         if ("session/not-found".equals(code)) {
                             if (lease != null) {
                                 follows.remove(key);
@@ -917,6 +1055,53 @@ public final class DshRemoteConnection implements AutoCloseable {
                         });
     }
 
+    DshRemoteService.FeatureStream duplexStream(
+            String endpoint,
+            JsonObject args,
+            Consumer<JsonObject> items,
+            Consumer<JsonObject> terminal) {
+        String id = java.util.UUID.randomUUID().toString();
+        ExtraStream stream = new ExtraStream(endpoint, () -> args, items, terminal);
+        stream.reopen = false;
+        execute(
+                () -> {
+                    if (stream.closed) return;
+                    extraStreams.put(id, stream);
+                    if (generationConnected) openExtra(stream);
+                    else {
+                        JsonObject error = new JsonObject();
+                        error.addProperty("code", "carrier/disconnected");
+                        error.addProperty("message", "Remote connection is unavailable");
+                        terminal.accept(error);
+                    }
+                });
+        return new DshRemoteService.FeatureStream() {
+            @Override
+            public void send(JsonObject item) {
+                execute(
+                        () -> {
+                            if (stream.closed || stream.handle == null) return;
+                            if (!stream.handle.send(item)) {
+                                JsonObject error = new JsonObject();
+                                error.addProperty("code", "carrier/disconnected");
+                                error.addProperty("message", "Remote input was discarded");
+                                terminal.accept(error);
+                            }
+                        });
+            }
+
+            @Override
+            public void close() {
+                stream.closed = true;
+                execute(
+                        () -> {
+                            extraStreams.remove(id);
+                            if (stream.handle != null) stream.handle.cancel();
+                        });
+            }
+        };
+    }
+
     private void openExtra(ExtraStream stream) {
         if (stream.closed) return;
         JsonObject args;
@@ -956,7 +1141,8 @@ public final class DshRemoteConnection implements AutoCloseable {
         final Consumer<JsonObject> items;
         final Consumer<JsonObject> terminal;
         DshRemoteMuxClient.StreamHandle handle;
-        boolean closed;
+        volatile boolean closed;
+        boolean reopen = true;
 
         ExtraStream(
                 String endpoint,
@@ -1019,6 +1205,7 @@ public final class DshRemoteConnection implements AutoCloseable {
     }
 
     private static final class Opening {
+        boolean catalogRequested;
         boolean eventsReady;
         boolean workspaceReady;
         boolean controlReady;

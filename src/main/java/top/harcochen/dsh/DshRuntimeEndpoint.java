@@ -22,6 +22,7 @@ final class DshRuntimeEndpoint {
 
     final String baseUrl;
     final String launchUrl;
+    String runtimeVersion;
 
     private DshRuntimeEndpoint(String baseUrl, String launchUrl) {
         this.baseUrl = baseUrl;

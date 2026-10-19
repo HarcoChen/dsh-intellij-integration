@@ -6,8 +6,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /** Exact SemVer compatibility; package selectors must be resolved by the launcher first. */
-final class DshRuntimeVersion {
-    static final String DEFAULT = "0.2.0-rc.2";
+public final class DshRuntimeVersion {
+    static final String DEFAULT = "0.2.1-rc.2";
     static final String MINIMUM = "0.1.5-rc.1";
     private static final Pattern VERSION =
             Pattern.compile(
@@ -16,7 +16,7 @@ final class DshRuntimeVersion {
 
     private DshRuntimeVersion() {}
 
-    static String exact(String value) {
+    public static String exact(String value) {
         if (value == null || !VERSION.matcher(value).matches()) return null;
         String pre =
                 value.split("\\+", 2)[0].split("-", 2).length == 2
@@ -43,7 +43,7 @@ final class DshRuntimeVersion {
         return exact(value) != null && compare(value, MINIMUM) >= 0;
     }
 
-    private static int compare(String left, String right) {
+    public static int compare(String left, String right) {
         Matcher a = VERSION.matcher(left), b = VERSION.matcher(right);
         a.matches();
         b.matches();

@@ -9,7 +9,7 @@ import { adaptComposerPreferences } from './webview/composer-preferences.mjs';
 // Rebuild the checked-in bundle from the audited companion commit and its npm dependencies.
 const repo = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const upstream = resolve(process.argv[2] ?? join(repo, '../dsh-ide'));
-const pin = 'deb8d8f882586c42a20abfbb5609cb0643fac309';
+const pin = '96d3aaff973879617b82f9187d4b2d344a12f5ed';
 const require = createRequire(join(upstream, 'package.json'));
 const { build } = require('esbuild');
 const temp = await mkdtemp(join(tmpdir(), 'dsh-intellij-webview-'));
@@ -38,7 +38,7 @@ try {
     const labels = {
         'Manage DeepSeek account': '管理 DeepSeek 账户', 'Manage schedules': '管理日程',
         'Browse Runtime workspace files': '浏览 Runtime 工作区文件', 'Configure Jev API key': '配置 Jev API Key',
-        'What’s new': '更新说明', 'Enable the Schedule bundle in plugin settings to use reminders.': '请在插件设置中启用 Schedule bundle 以使用提醒。',
+        'What’s new': '更新说明', 'Schedule is unavailable in this Runtime version or disabled in plugin settings.': '当前 Runtime 版本不支持日程，或已在插件设置中禁用。',
         'Open chat in editor tab': '在编辑器标签页打开聊天',
         'Enter to send; Shift+Enter for a new line.': 'Enter 发送，Shift+Enter 换行。',
     };
@@ -50,5 +50,7 @@ try {
     await writeFile(localePath, locale);
     await build({ absWorkingDir: temp, preserveSymlinks: true, bundle: true, platform: 'browser', target: ['es2022'],
         format: 'iife', banner: { js: '"use strict";' }, sourcemap: false, entryPoints: ['webview/src/main.tsx'], outfile: join(repo, 'src/main/resources/webview/main.js'), loader: { '.css': 'css' } });
+    await build({ absWorkingDir: temp, preserveSymlinks: true, bundle: true, platform: 'browser', target: ['es2022'],
+        format: 'iife', banner: { js: '"use strict";' }, sourcemap: false, entryPoints: ['webview/src/trace/main.ts'], outfile: join(repo, 'src/main/resources/webview/trace.js') });
     console.log(`Synced webview from dsh-ide ${pin}`);
 } finally { await rm(temp, { recursive: true, force: true }); }

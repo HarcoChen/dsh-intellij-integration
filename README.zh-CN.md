@@ -91,7 +91,7 @@ Agent 可启动已有 Run/Debug 配置、管理源码断点、暂停/继续/单�
 
 Runtime 0.1.5 适配包括断线后恢复临时流式回答、V3 历史与压缩记录、附件提交、子代理排队提示，以及重连后显式恢复 Goal。模式选择遵循 Runtime 策略，技能菜单悬停显示来源路径。上下文环形条悬停查看统计，点击模型名称切换模型。
 
-默认 Runtime 已更新到 `0.2.0-rc.2`。聊天菜单增加原生“管理会话”“管理 DeepSeek 账户”“管理日程”对话框。会话可固定、恢复归档；账户管理使用 Runtime 的浏览器登录流程，并显示资料、余额和赠金提醒；日程可跨会话查看，当前会话的提醒可编辑、删除或查看投递历史。没有项目目录时，首次显式创建会话可初始化 Runtime 默认 Workspace。
+默认 Runtime 已更新到 `0.2.1-rc.2`。聊天菜单增加原生“管理会话”“管理 DeepSeek 账户”“管理日程”对话框。会话可固定、恢复归档；账户管理使用 Runtime 的浏览器登录流程，并显示资料、余额和赠金提醒；日程可跨会话查看，当前会话的提醒可编辑、删除或查看投递历史。没有项目目录时，首次显式创建会话可初始化 Runtime 默认 Workspace。
 
 插件还内置共享的 Laya/Jev Runtime 集成，并装载到本插件启动的本地 Runtime 中；默认关闭。可在 **Settings → Tools → DeepSeek Harness** 中开启集成及所需功能，从聊天菜单配置 System One API Key，再重启 Runtime。密钥保存在 IntelliJ Password Safe；服务地址支持 HTTPS，也支持本机 Laya 的 localhost/127.0.0.1 HTTP。插件不会修改外部管理的 Runtime。
 
@@ -107,6 +107,12 @@ API Key 保存在 IntelliJ **Password Safe** 中，传递给新启动的本地 R
 
 通过 Find Action 的 **DSH：浏览 Runtime 工作区文件**，或 `/ide` 入口，浏览当前会话在 Host 上的文件。原生预览只读，支持最大 1 MiB 的 UTF-8 文本、文件变更刷新和手动刷新，并绑定打开时的 Runtime。
 
+会话菜单新增**会话中心**，支持实时搜索，优先显示待处理请求，并显示 Harness Workspace 分组。聊天区显示当前工作目录；历史文件链接和工具 Diff 按操作发生时的目录定位。可从附件菜单或 `@diagnostics` 选择当前文件的诊断，Jobs 面板也会保留只读历史记录。
+
+通过聊天菜单中的**打开 Runtime 终端**创建或重新连接 Host PTY。切换会话时保留终端身份，重连时恢复屏幕，关闭视图时请求清理 Host 进程；断线时丢弃未结算输入。它与 IDE 终端上下文功能各自独立。
+
+**安装或卸载插件**使用 Runtime 官方软件包管理器，支持检查软件包、确认安装或卸载、批准构建脚本、查看进度和取消安装。设置提供网页搜索与抓取配置，自定义提供方可编辑 Runtime schema 定义的模型推理等级。Remote 访问授权会限制聊天操作，读取权限不会自动授予发送消息或回答交互请求的权限。
+
 ## 配置
 
 
@@ -118,7 +124,7 @@ API Key 保存在 IntelliJ **Password Safe** 中，传递给新启动的本地 R
 | 服务地址 / 端口 | `""` / `0` | 优先连接已运行的 DSH Runtime；本地启动时端口 `0` 表示自动选择可用端口。 |
 | 自动启动 | `true` | 项目打开时自动启动或连接 Runtime。 |
 | 按 Enter 发送消息 | 关闭 | 开启后 Enter 发送、Shift+Enter 换行；两种模式都支持 Ctrl/Cmd+Enter 发送，修改后立即生效。 |
-| Runtime 版本 | `0.2.0-rc.2` | 明确配置 pnpm/npx 启动时使用的版本；本机 Runtime 最低支持 `0.1.5-rc.1`。 |
+| Runtime 版本 | `0.2.1-rc.2` | 明确配置 pnpm/npx 启动时使用的版本；本机 Runtime 最低支持 `0.1.5-rc.1`。 |
 | 自主调试 | 关闭 | 通过本机 MCP 操作已有 IDE 配置及公共调试能力；开启后需重启插件拥有的 Runtime。 |
 | Laya/Jev 集成 | 关闭 | 本地启动 Runtime 随附 System One 集成，可配置地址、模型和可选能力。 |
 | npm 镜像 | `https://registry.npmmirror.com` | 下载后备重试的 Registry 镜像。 |

@@ -197,7 +197,7 @@ public final class DshRemoteState {
         String type = string(frame, "type");
         if (type == null) return;
         switch (type) {
-            case "baseline" -> {
+            case "baseline", "replace" -> {
                 JsonObject value =
                         frame.has("value") && frame.get("value").isJsonObject()
                                 ? frame.getAsJsonObject("value")
@@ -296,7 +296,7 @@ public final class DshRemoteState {
     void applyControlFrame(JsonObject frame) {
         String type = string(frame, "type");
         if (type == null) return;
-        if ("baseline".equals(type)) {
+        if ("baseline".equals(type) || "replace".equals(type)) {
             JsonObject value =
                     frame.has("value") && frame.get("value").isJsonObject()
                             ? frame.getAsJsonObject("value")
@@ -361,7 +361,8 @@ public final class DshRemoteState {
 
     /** Merge a projections block ({asOfSeq, values}) into the session's cells. */
     void seedProjection(String sessionId, JsonObject block) {
-        if (block == null) return;
+        if (block == null || (block.has("kind") && !"sequenced".equals(string(block, "kind"))))
+            return;
         long asOfSeq = block.has("asOfSeq") ? longValue(block.get("asOfSeq"), -1L) : -1L;
         JsonObject values =
                 block.has("values") && block.get("values").isJsonObject()
@@ -757,6 +758,28 @@ public final class DshRemoteState {
                 String workspaceTitle = string(workspace, "title");
                 if (workspaceTitle != null) row.addProperty("workspaceTitle", workspaceTitle);
             }
+            copyIfPresent(raw, row, "cwd");
+            copyIfPresent(raw, row, "formatStatus");
+            copyIfPresent(raw, row, "origin");
+            copyIfPresent(raw, row, "parentSessionId");
+            copyIfPresent(raw, row, "updatedAt");
+            copyIfPresent(raw, row, "createdAt");
+            JsonObject projectionHint =
+                    raw.has("projections") && raw.get("projections").isJsonObject()
+                            ? raw.getAsJsonObject("projections")
+                            : null;
+            if (projectionHint != null) {
+                String kind = string(projectionHint, "kind");
+                if (kind == null || "sequenced".equals(kind))
+                    row.add("projections", projectionHint.deepCopy());
+                else if (("cached".equals(kind) || "migration-required".equals(kind))
+                        && projectionHint.has("values")
+                        && projectionHint.get("values").isJsonObject()) {
+                    row.add("cachedProjectionValues", projectionHint.get("values").deepCopy());
+                    JsonObject hints = projectionHint.getAsJsonObject("values");
+                    copyIfPresent(hints, row, "agentPreset");
+                }
+            }
             if (raw.has("blank")) row.add("blank", raw.get("blank").deepCopy());
             if (raw.has("agentPreset")) row.add("agentPreset", raw.get("agentPreset").deepCopy());
             JsonElement rawProjections = raw.get("projections");
@@ -766,7 +789,9 @@ public final class DshRemoteState {
                         values.has("values") && values.get("values").isJsonObject()
                                 ? values.getAsJsonObject("values")
                                 : null;
-                if (block != null && block.has("subagentTiming")) {
+                if (block != null
+                        && block.has("subagentTiming")
+                        && (!values.has("kind") || "sequenced".equals(string(values, "kind")))) {
                     long baselineSeq = longValue(values.get("asOfSeq"), -1L);
                     ProjectionCell known = cells.get("subagentTiming");
                     if (known == null || baselineSeq > known.seq()) {

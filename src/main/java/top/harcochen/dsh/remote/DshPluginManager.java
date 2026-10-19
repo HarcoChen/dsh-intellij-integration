@@ -76,6 +76,63 @@ final class DshPluginManager {
                 if (!text.isJsonPrimitive() || !text.getAsJsonPrimitive().isString())
                     throw invalid();
         }
+        if (result.has("restartReason")
+                && !Set.of(
+                                "no-hmr",
+                                "package-moved",
+                                "host-module",
+                                "unmanaged-plugin",
+                                "module-comparison")
+                        .contains(DshJson.stringOr(result, "restartReason", ""))) throw invalid();
+        if (result.has("pendingBuilds")) {
+            if (!result.get("pendingBuilds").isJsonArray()
+                    || result.getAsJsonArray("pendingBuilds").size() > 1000) throw invalid();
+            for (JsonElement item : result.getAsJsonArray("pendingBuilds"))
+                if (!item.isJsonPrimitive()
+                        || !item.getAsJsonPrimitive().isString()
+                        || item.getAsString().isBlank()) throw invalid();
+        }
+        if (result.has("error")) {
+            if (!result.get("error").isJsonObject()) throw invalid();
+            JsonObject error = result.getAsJsonObject("error");
+            if (DshJson.strictString(error, "code") == null
+                    || (error.has("diagnostic")
+                            && DshJson.strictString(error, "diagnostic") == null)) throw invalid();
+            if (error.has("incompatible")) {
+                if (!error.get("incompatible").isJsonArray()) throw invalid();
+                for (JsonElement item : error.getAsJsonArray("incompatible")) {
+                    if (!item.isJsonObject()) throw invalid();
+                    JsonObject row = item.getAsJsonObject();
+                    for (String field : new String[] {"name", "version", "runtimeVersion"})
+                        if (DshJson.strictString(row, field) == null
+                                || DshJson.string(row, field).isBlank()) throw invalid();
+                    JsonElement requirements =
+                            row.has("requirements") ? row.get("requirements") : row.get("peers");
+                    if (requirements == null || !requirements.isJsonObject()) throw invalid();
+                    for (JsonElement requirement : requirements.getAsJsonObject().asMap().values())
+                        if (!requirement.isJsonPrimitive()
+                                || !requirement.getAsJsonPrimitive().isString()
+                                || requirement.getAsString().isBlank()) throw invalid();
+                }
+            }
+        }
+        if (result.has("packageResult")) {
+            if (!result.get("packageResult").isJsonObject()) throw invalid();
+            JsonObject output = result.getAsJsonObject("packageResult");
+            if (!output.has("exitCode")
+                    || !output.get("exitCode").isJsonPrimitive()
+                    || !output.getAsJsonPrimitive("exitCode").isNumber()
+                    || !Double.isFinite(output.get("exitCode").getAsDouble())
+                    || output.get("exitCode").getAsDouble()
+                            != Math.rint(output.get("exitCode").getAsDouble())
+                    || DshJson.strictString(output, "output") == null
+                    || DshJson.strictString(output, "logPath") == null
+                    || !output.has("truncated")
+                    || !output.get("truncated").isJsonPrimitive()
+                    || !output.getAsJsonPrimitive("truncated").isBoolean()
+                    || (output.has("kind") && DshJson.strictString(output, "kind") == null))
+                throw invalid();
+        }
         return result.deepCopy();
     }
 

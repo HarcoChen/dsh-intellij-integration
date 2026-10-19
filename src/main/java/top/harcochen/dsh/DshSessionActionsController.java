@@ -187,6 +187,178 @@ final class DshSessionActionsController {
         }
     }
 
+    private SessionCenter sessionCenter;
+
+    void close() {
+        ApplicationManager.getApplication()
+                .invokeLater(
+                        () -> {
+                            if (sessionCenter != null)
+                                sessionCenter.close(DialogWrapper.CANCEL_EXIT_CODE);
+                        });
+    }
+
+    void openSessionCenter() {
+        ApplicationManager.getApplication()
+                .invokeLater(
+                        () -> {
+                            if (sessionCenter != null) {
+                                sessionCenter.toFront();
+                                return;
+                            }
+                            sessionCenter = new SessionCenter();
+                            sessionCenter.show();
+                        });
+    }
+
+    private final class SessionCenter extends DialogWrapper {
+        private final javax.swing.JTextField search = new javax.swing.JTextField();
+        private final javax.swing.DefaultListModel<String> model =
+                new javax.swing.DefaultListModel<>();
+        private final JList<String> list = new JList<>(model);
+        private final List<String> ids = new ArrayList<>();
+        private final Consumer<DshRemoteState.Snapshot> listener =
+                ignored -> ApplicationManager.getApplication().invokeLater(this::render);
+        private boolean closed;
+
+        SessionCenter() {
+            super(project, false);
+            setModal(false);
+            setTitle(DshBundle.message("dsh.session.center.title"));
+            list.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+            search.getDocument()
+                    .addDocumentListener(
+                            new javax.swing.event.DocumentListener() {
+                                @Override
+                                public void insertUpdate(javax.swing.event.DocumentEvent event) {
+                                    render();
+                                }
+
+                                @Override
+                                public void removeUpdate(javax.swing.event.DocumentEvent event) {
+                                    render();
+                                }
+
+                                @Override
+                                public void changedUpdate(javax.swing.event.DocumentEvent event) {
+                                    render();
+                                }
+                            });
+            list.addMouseListener(
+                    new java.awt.event.MouseAdapter() {
+                        @Override
+                        public void mouseClicked(java.awt.event.MouseEvent event) {
+                            if (event.getClickCount() == 2) doOKAction();
+                        }
+                    });
+            init();
+            render();
+            remote.addListener(listener);
+        }
+
+        @Override
+        protected JComponent createCenterPanel() {
+            JPanel content = new JPanel(new BorderLayout(0, 8));
+            content.add(
+                    new JLabel(DshBundle.message("dsh.session.center.hint")), BorderLayout.NORTH);
+            JPanel body = new JPanel(new BorderLayout(0, 8));
+            body.add(search, BorderLayout.NORTH);
+            body.add(new JScrollPane(list), BorderLayout.CENTER);
+            content.add(body, BorderLayout.CENTER);
+            content.setPreferredSize(new Dimension(850, 460));
+            return content;
+        }
+
+        @Override
+        public JComponent getPreferredFocusedComponent() {
+            return search;
+        }
+
+        private void render() {
+            if (closed) return;
+            String selected =
+                    list.getSelectedIndex() < 0 || list.getSelectedIndex() >= ids.size()
+                            ? null
+                            : ids.get(list.getSelectedIndex());
+            String query = search.getText().strip().toLowerCase(Locale.ROOT);
+            List<JsonObject> rows = new ArrayList<>();
+            for (JsonElement raw : sessions.get()) {
+                if (!raw.isJsonObject()) continue;
+                JsonObject row = raw.getAsJsonObject();
+                if (DshJson.bool(row, "archived", false)
+                        || "subagent".equals(DshJson.string(row, "origin"))) continue;
+                if (row.toString().toLowerCase(Locale.ROOT).contains(query)) rows.add(row);
+            }
+            rows.sort(
+                    java.util.Comparator.comparingInt(this::priority)
+                            .thenComparing(
+                                    java.util.Comparator.comparingLong(
+                                                    (JsonObject row) ->
+                                                            DshJson.longValue(
+                                                                    row.get("updatedAt"), 0))
+                                            .reversed()));
+            ids.clear();
+            model.clear();
+            for (JsonObject row : rows) {
+                String id = DshJson.string(row, "sessionId");
+                if (id == null) continue;
+                ids.add(id);
+                String status =
+                        DshJson.bool(row, "attention", false)
+                                ? DshBundle.message("dsh.session.center.attention")
+                                : row.has("lastError")
+                                        ? DshBundle.message("dsh.session.center.error")
+                                        : DshJson.bool(row, "running", false)
+                                                ? DshBundle.message("dsh.session.center.running")
+                                                : DshBundle.message("dsh.session.center.idle");
+                model.addElement(
+                        DshJson.stringOr(row, "title", id)
+                                + " · "
+                                + DshJson.stringOr(
+                                        row,
+                                        "workspaceTitle",
+                                        DshBundle.message("dsh.session.center.ungrouped"))
+                                + " · "
+                                + status
+                                + ("migration-required".equals(DshJson.string(row, "formatStatus"))
+                                        ? " · " + DshBundle.message("dsh.session.center.migration")
+                                        : "")
+                                + " · "
+                                + DshJson.stringOr(row, "cwd", id));
+            }
+            int index = selected == null ? -1 : ids.indexOf(selected);
+            if (index >= 0) list.setSelectedIndex(index);
+            else if (!ids.isEmpty()) list.setSelectedIndex(0);
+        }
+
+        private int priority(JsonObject row) {
+            return DshJson.bool(row, "attention", false)
+                    ? 0
+                    : row.has("lastError") ? 1 : DshJson.bool(row, "running", false) ? 2 : 3;
+        }
+
+        @Override
+        protected void doOKAction() {
+            int index = list.getSelectedIndex();
+            if (index < 0 || index >= ids.size()) return;
+            String id = ids.get(index);
+            if (!remote.access().allows("session/follow", "session", id)) {
+                notifyUser(DshBundle.message("dsh.remote.access.denied"));
+                return;
+            }
+            selectSession.accept(id);
+            super.doOKAction();
+        }
+
+        @Override
+        protected void dispose() {
+            closed = true;
+            remote.removeListener(listener);
+            sessionCenter = null;
+            super.dispose();
+        }
+    }
+
     void search() {
         ApplicationManager.getApplication()
                 .invokeLater(

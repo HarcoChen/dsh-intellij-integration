@@ -29,9 +29,9 @@ Copyright (c) 2026 HanaAyane. Licensed under the MIT License.
 
 ## dsh-ide Webview bundle
 
-`src/main/resources/webview/main.js` and `main.css` are built artifacts from
+`src/main/resources/webview/main.js`, `main.css`, and `trace.js` are built artifacts from
 the MIT-licensed [dsh-ide](https://github.com/HarcoChen/dsh-vsc-integration)
-repository, version 0.10.2, commit `deb8d8f882586c42a20abfbb5609cb0643fac309`,
+repository, version 0.11.0, commit `96d3aaff973879617b82f9187d4b2d344a12f5ed`,
 with IntelliJ-specific menu, Schedule, and composer preference adapters. `scripts/sync-webview.mjs`
 rebuilds the artifacts from that pin and the companion checkout's npm dependencies.
 They are adapted at runtime through the JCEF bridge documented in `DshBridge.java`.
@@ -52,8 +52,8 @@ arguments using the quoting fix from companion commit
 `src/main/resources/runtime/helper.cjs` is the bundled artifact. Build instructions
 and local adaptations are documented in `runtime-helper/README.md`.
 
-The Remote contract and default-version pin follow Harness `dsh-v0.2.0-rc.2`,
-commit `639ed015397290b3745d163aafe02ffee4aa3f84`. The local-upgrade UI has been
+The Remote contract and default-version pin follow Harness `dsh-v0.2.1-rc.2`,
+commit `687f282e8625c6b8d11ff58211a90524be2e4317`. The local-upgrade UI has been
 adapted to the companion's official Desktop guidance; the recovery algorithms
 remain on the vendor baseline above. Runtime advertisement interoperability
 follows the companion's `src/runtimeAdvertisement.ts` schema.
@@ -75,3 +75,14 @@ calls a separately operated System One endpoint only when enabled.
 `debugProtocol.ts` supplies IDE-neutral type definitions; `runtime-helper/main.ts`
 connects this transport to IntelliJ's public debugger APIs through private stdin/stdout.
 The generated helper retains the license alongside the existing vendor distribution.
+
+## xterm.js
+
+The Runtime terminal view bundles `@xterm/xterm` 5.5.0 and `@xterm/addon-fit` 0.10.0
+from [xterm.js](https://github.com/xtermjs/xterm.js), under the MIT License.
+Their complete licenses ship in `src/main/resources/licenses/xterm-MIT.txt` and
+`xterm-addon-fit-MIT.txt`. The browser terminal has no direct Runtime credentials
+or network transport; Java owns its authenticated Remote connection.
+
+The recovery attribution text additionally follows companion `65a880b` (English
+source strings). Algorithmic recovery behavior retains the vendor baseline above.

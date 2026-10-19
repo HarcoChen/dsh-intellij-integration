@@ -5,15 +5,26 @@ An item is complete only after the host action, runtime protocol, projected stat
 
 Status: `[x]` implemented, `[-]` usable but not yet at VS Code parity, `[ ]` not implemented.
 
-## Current parity — dsh-ide v0.10.3 + Runtime quoting fix（2026-10-09）
+## Current parity — dsh-ide v0.11.0（2026-10-19）
 
-Target: companion `7e45c2b19d8d7c724fda824a88e78b4d448cf05d` and Harness
-`dsh-v0.2.0-rc.2`. The callable product features below are aligned; platform
-limits are explicit exceptions, rather than silently successful placeholders.
-Historical validation sections below retain their original coverage boundaries.
-The shared Webview has no changes since `deb8d8f` and keeps its existing pin.
-The new Jev package, packaging gate and Windows launch adapter are described in
-[the 0.10.3 sync report](DSH_IDE_0.10.3_SYNC.md).
+Target: companion `96d3aaff973879617b82f9187d4b2d344a12f5ed` and Harness
+`dsh-v0.2.1-rc.2` (`687f282e8625c6b8d11ff58211a90524be2e4317`).
+The Webview and Trace are rebuilt from that commit with IntelliJ adapters.
+The bundled Jev gitlink remains `e5d74c5`. See
+[the 0.11.0 sync report](DSH_IDE_0.11.0_SYNC.md) for scope and validation boundaries.
+
+- [x] Runtime terminal retention, duplex input acknowledgements, bounded queues,
+  screen restoration, native close cleanup, and legacy RC.2 follow/unary input.
+- [x] Official plugin package inspection/install/remove, build-script approval,
+  cancellable progress, request-id recovery, and detailed application results.
+- [x] Guided Web search/fetch settings and schema-defined custom-model reasoning.
+- [x] Current/historical working directories, metadata-backed filesystem diffs,
+  fail-safe turn capture on a mid-turn directory change, and Git subdirectory filters.
+- [x] Remote access stream/grants, guarded actions, reader subscriptions and revoked-history cleanup.
+- [x] Searchable live Session center, selected Problems attachments and `@diagnostics`.
+- [x] Durable Job lifecycle history, cache-only projection hints and migration labels.
+- [x] Ordered account notifications with titles, expiry/deduplication and account fences.
+- [x] Preserve Enter-to-send preference, IME handling and composer focus restoration.
 
 ### Completed differences
 
@@ -65,15 +76,10 @@ The new Jev package, packaging gate and Windows launch adapter are described in
   contracts, not IntelliJ extension points. JetBrains uses the tool window and editor
   FileEditor entry points above instead of duplicating VS Code-specific providers.
 
-### Shared upstream roadmap — not a difference from dsh-ide
-
-- [ ] Runtime Terminal retention, output restoration and input.
-- [ ] Plugin/Bundle installation and removal. Both integrations currently expose
-  inventory and enablement; the companion has no installation/removal product flow.
-  These are future feature work, not platform prohibitions.
-
-Harness Web/Desktop-only model search, Desktop command management and telemetry
-remain owned by those products.
+The Runtime terminal and official Plugin/Bundle installation/removal flows are now
+implemented. IDE terminal command/output context remains subject to the separate
+2024.3 API restriction above. Harness Web/Desktop-only model search, Desktop
+command management and telemetry remain owned by those products.
 
 ### Validation coverage
 
@@ -195,7 +201,7 @@ action validation, and the user-visible failure path are wired together.
 
 迁移范围、pin 与验证边界见 [RC.2 迁移报告](RPC_0.2.0_RC2_ADAPTATION.md)。
 
-上游仍计划后续实现的 Runtime Terminal、插件安装/卸载不在本次 0.10.2 UI 迁移中。
+Runtime Terminal 与插件安装/卸载已在后续 0.11.0 同步批次实现，见本文件顶部。
 
 Latest parity batch verified on 2026-09-14 against the pinned `0.1.2-rc.1` Runtime:
 

@@ -261,6 +261,16 @@ final class DshIdeContextController {
                 () -> {
                     JsonArray result = new JsonArray();
                     String normalized = query == null ? "" : query.trim().toLowerCase(Locale.ROOT);
+                    if (normalized.isBlank() || "diagnostics".contains(normalized)) {
+                        JsonObject diagnostic = new JsonObject();
+                        diagnostic.addProperty("kind", "diagnostics");
+                        diagnostic.addProperty("label", "diagnostics");
+                        diagnostic.addProperty("insertText", "@diagnostics");
+                        diagnostic.addProperty(
+                                "description",
+                                DshBundle.message("dsh.context.picker.attach.diagnostics"));
+                        result.add(diagnostic);
+                    }
                     String root = project.getBasePath();
                     if (root != null) {
                         Path base = Path.of(root);
@@ -496,7 +506,7 @@ final class DshIdeContextController {
                 });
     }
 
-    private void attachDiagnostics() {
+    void attachDiagnostics() {
         Editor editor = FileEditorManager.getInstance(project).getSelectedTextEditor();
         VirtualFile file =
                 editor == null
@@ -509,6 +519,31 @@ final class DshIdeContextController {
         String pathLabel = displayPath(file);
         Document document = editor.getDocument();
         List<String> lines = diagnostics(project, file);
+        if (lines.isEmpty()) {
+            notifyUser(DshBundle.message("dsh.context.no.diagnostics"));
+            return;
+        }
+        if (!lines.isEmpty()) {
+            javax.swing.JList<String> list = new javax.swing.JList<>(lines.toArray(new String[0]));
+            list.setSelectionInterval(0, lines.size() - 1);
+            javax.swing.JScrollPane scroll = new javax.swing.JScrollPane(list);
+            scroll.setPreferredSize(new java.awt.Dimension(850, 360));
+            com.intellij.openapi.ui.DialogWrapper picker =
+                    new com.intellij.openapi.ui.DialogWrapper(project) {
+                        {
+                            setTitle(DshBundle.message("dsh.context.diagnostics.choose"));
+                            init();
+                        }
+
+                        @Override
+                        protected javax.swing.JComponent createCenterPanel() {
+                            return scroll;
+                        }
+                    };
+            if (!picker.showAndGet()) return;
+            lines = list.getSelectedValuesList();
+            if (lines.isEmpty()) return;
+        }
         String full =
                 lines.isEmpty()
                         ? pathLabel + ": no diagnostics reported by the IDE."
@@ -727,7 +762,7 @@ final class DshIdeContextController {
                 });
     }
 
-    void openFileLocation(JsonObject action) {
+    void openFileLocation(JsonObject action, String directory) {
         String path = DshJson.string(action, "path");
         int line = DshJson.integer(action, "line", 1);
         int column = DshJson.integer(action, "column", 1);
@@ -739,7 +774,7 @@ final class DshIdeContextController {
                         () -> {
                             String resolved;
                             try {
-                                resolved = resolvePath(path);
+                                resolved = DshWorkingDirectory.resolve(path, directory);
                             } catch (RuntimeException error) {
                                 notifyUser(DshBundle.message("dsh.file.invalid.path", path));
                                 return;

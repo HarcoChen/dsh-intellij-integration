@@ -51,6 +51,16 @@ final class DshWebviewActionSanitizer {
         return true;
     }
 
+    private static boolean validSeq(JsonElement value) {
+        if (value == null || !value.isJsonPrimitive() || !value.getAsJsonPrimitive().isNumber())
+            return false;
+        double number = value.getAsDouble();
+        return Double.isFinite(number)
+                && number >= 0
+                && number <= 9_007_199_254_740_991d
+                && number == Math.floor(number);
+    }
+
     private static String stringAnswerField(JsonObject answer, String key) {
         JsonElement value = answer.get(key);
         return value != null && value.isJsonPrimitive() && value.getAsJsonPrimitive().isString()
@@ -231,7 +241,7 @@ final class DshWebviewActionSanitizer {
             return hasOnly(input, "type") ? input : null;
         }
         if ("openFileLocation".equals(type)) {
-            if (!hasOnly(input, "type", "path", "line", "column")) {
+            if (!hasOnly(input, "type", "path", "line", "column", "seq")) {
                 return null;
             }
             String path = DshJson.string(input, "path");
@@ -241,6 +251,7 @@ final class DshWebviewActionSanitizer {
                             && !path.isBlank()
                             && path.length() <= 8_192
                             && !path.contains("\0")
+                            && (!input.has("seq") || validSeq(input.get("seq")))
                             && line > 0
                             && line <= 1_000_000
                             && column > 0

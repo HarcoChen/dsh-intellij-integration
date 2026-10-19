@@ -580,7 +580,7 @@ final class DshTraceDialog extends DialogWrapper {
         }
 
         private void openFileLocation(JsonObject action) {
-            if (!hasOnly(action, "type", "path", "line", "column")) return;
+            if (!hasOnly(action, "type", "path", "line", "column", "rowId")) return;
             String value = string(action, "path");
             Long line = integer(action, "line");
             Long column = integer(action, "column");
@@ -589,13 +589,34 @@ final class DshTraceDialog extends DialogWrapper {
                     || line <= 0
                     || line > 99_999_999
                     || (column != null && (column <= 0 || column > 99_999_999))) return;
-            String root = project.getBasePath();
-            if (root == null) return;
+            JsonObject summary = null;
+            for (JsonElement item : remote.snapshot().catalog)
+                if (item.isJsonObject()
+                        && sessionId.equals(string(item.getAsJsonObject(), "sessionId")))
+                    summary = item.getAsJsonObject();
+            String original = DshWorkingDirectory.original(summary, project.getBasePath());
+            String rowId = action.has("rowId") ? string(action, "rowId") : selectedId;
+            DshTraceProjector.Row row =
+                    projection.rows().stream()
+                            .filter(
+                                    item ->
+                                            java.util.Objects.equals(
+                                                    rowId, string(item.view(), "id")))
+                            .findFirst()
+                            .orElse(null);
+            if (action.has("rowId") && row == null) return;
+            String root =
+                    row == null
+                            ? DshWorkingDirectory.current(
+                                    remote.snapshot().sessions.get(sessionId), summary)
+                            : DshWorkingDirectory.at(
+                                    history, DshJson.longValue(row.view().get("seq"), 0), original);
+            if (root == null) root = original;
+            if (root == null || original == null) return;
             try {
-                Path base = Path.of(root).toAbsolutePath().normalize();
-                Path path = Path.of(value);
+                Path base = Path.of(original).toAbsolutePath().normalize();
                 Path resolved =
-                        (path.isAbsolute() ? path : base.resolve(path))
+                        Path.of(DshWorkingDirectory.resolve(value, root))
                                 .toAbsolutePath()
                                 .normalize();
                 if (!resolved.startsWith(base)) return;

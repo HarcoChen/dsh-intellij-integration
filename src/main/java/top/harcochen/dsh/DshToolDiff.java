@@ -60,8 +60,10 @@ final class DshToolDiff {
     static final class CallDiffState {
         final DiffView view;
         final boolean settled;
+        final long seq;
 
-        private CallDiffState(DiffView view, boolean settled) {
+        private CallDiffState(DiffView view, boolean settled, long seq) {
+            this.seq = seq;
             this.view = view;
             this.settled = settled;
         }
@@ -256,8 +258,84 @@ final class DshToolDiff {
      * anchor on).
      */
     static DiffView storedDiffView(JsonObject call, JsonObject result) {
-        DiffView fromResult = parseDiffView(toolPresentation(result, "result"));
-        return fromResult != null ? fromResult : parseDiffView(toolPresentation(call, "call"));
+        JsonObject args = null;
+        String name = call == null ? null : DshJson.string(eventData(call), "name");
+        if ("write".equals(name) || "edit".equals(name)) {
+            JsonElement raw = eventData(call).get("arguments");
+            try {
+                if (raw != null && raw.isJsonPrimitive() && raw.getAsJsonPrimitive().isString())
+                    raw = com.google.gson.JsonParser.parseString(raw.getAsString());
+                if (raw != null
+                        && raw.isJsonObject()
+                        && DshJson.strictString(raw.getAsJsonObject(), "file_path") != null)
+                    args = raw.getAsJsonObject();
+            } catch (RuntimeException ignored) {
+                args = null;
+            }
+        }
+        if (result != null) {
+            JsonObject data = eventData(result);
+            JsonObject message =
+                    data.has("message") && data.get("message").isJsonObject()
+                            ? data.getAsJsonObject("message")
+                            : null;
+            if (DshJson.bool(message, "isError", false)
+                    || (data.has("error") && !data.get("error").isJsonNull())) return null;
+            DiffView presented = parseDiffView(toolPresentation(result, "result"));
+            if (presented != null) return presented;
+            JsonObject meta =
+                    data.has("meta") && data.get("meta").isJsonObject()
+                            ? data.getAsJsonObject("meta")
+                            : new JsonObject();
+            JsonObject card = new JsonObject();
+            card.addProperty("card", "diff");
+            if (meta.has("diffs")) card.add("diffs", meta.get("diffs"));
+            DiffView applied = parseDiffView(card);
+            if (applied != null) return applied;
+            if (args != null
+                    && "write".equals(name)
+                    && "create".equals(DshJson.string(meta, "operation"))
+                    && DshJson.strictString(meta, "path") != null
+                    && DshJson.strictString(args, "content") != null)
+                return new DiffView(
+                        null,
+                        List.of(
+                                new FileDiff(
+                                        DshJson.string(meta, "path"),
+                                        null,
+                                        DshJson.string(args, "content"))));
+            return null;
+        }
+        DiffView presented = parseDiffView(toolPresentation(call, "call"));
+        if (presented != null) return presented;
+        if (args == null) return null;
+        if ("write".equals(name) && DshJson.strictString(args, "content") != null)
+            return new DiffView(
+                    null,
+                    List.of(
+                            new FileDiff(
+                                    DshJson.string(args, "file_path"),
+                                    null,
+                                    DshJson.string(args, "content"))));
+        if ("edit".equals(name)
+                && DshJson.strictString(args, "old_string") != null
+                && DshJson.strictString(args, "new_string") != null) {
+            String old = DshJson.string(args, "old_string");
+            return new DiffView(
+                    null,
+                    List.of(
+                            new FileDiff(
+                                    DshJson.string(args, "file_path"),
+                                    old.isEmpty() ? null : old,
+                                    DshJson.string(args, "new_string"))));
+        }
+        return null;
+    }
+
+    private static long eventSeq(JsonObject entry) {
+        return entry == null
+                ? 0
+                : DshJson.longValue(DshWorkingDirectory.event(entry).get("seq"), 0);
     }
 
     private static String eventType(JsonObject entry) {
@@ -283,6 +361,16 @@ final class DshToolDiff {
         JsonObject data = eventData(entry);
         JsonElement callId = data.get("callId");
         if (callId != null && callId.isJsonPrimitive()) return callId.getAsString();
+        JsonObject message =
+                data.has("message") && data.get("message").isJsonObject()
+                        ? data.getAsJsonObject("message")
+                        : null;
+        JsonObject source =
+                message != null && message.has("source") && message.get("source").isJsonObject()
+                        ? message.getAsJsonObject("source")
+                        : null;
+        String messageCall = DshJson.string(source, "callId");
+        if (messageCall != null) return messageCall;
         // A tool/result may carry the id on its nested result block instead.
         JsonObject result =
                 data.has("result") && data.get("result").isJsonObject()
@@ -309,7 +397,8 @@ final class DshToolDiff {
      * session log's, which is the order the edits were applied, and that is what makes rewinding
      * one call at a time meaningful.
      */
-    static List<CallHunks> collectCallHunks(JsonObject history, String path) {
+    static List<CallHunks> collectCallHunks(
+            JsonObject history, String path, String originalDirectory, String targetCallId) {
         Map<String, JsonObject> calls = new LinkedHashMap<>();
         for (JsonObject entry : entries(history)) {
             if ("tool/call".equals(eventType(entry))) {
@@ -317,6 +406,10 @@ final class DshToolDiff {
                 if (callId != null) calls.put(callId, entry);
             }
         }
+        CallDiffState target = callDiffState(history, targetCallId);
+        String targetDirectory =
+                DshWorkingDirectory.at(history, target == null ? 0 : target.seq, originalDirectory);
+        String targetPath = DshWorkingDirectory.resolve(path, targetDirectory);
         List<CallHunks> result = new ArrayList<>();
         for (JsonObject entry : entries(history)) {
             if (!"tool/result".equals(eventType(entry))) continue;
@@ -326,7 +419,12 @@ final class DshToolDiff {
             if (view == null) continue;
             List<FileDiff> hunks = new ArrayList<>();
             for (FileDiff diff : view.diffs) {
-                if (diff.path.equals(path)) hunks.add(diff);
+                JsonObject call = calls.get(callId);
+                String directory =
+                        DshWorkingDirectory.at(
+                                history, eventSeq(call == null ? entry : call), originalDirectory);
+                if (DshWorkingDirectory.resolve(diff.path, directory).equals(targetPath))
+                    hunks.add(diff);
             }
             if (!hunks.isEmpty()) result.add(new CallHunks(callId, hunks));
         }
@@ -346,6 +444,8 @@ final class DshToolDiff {
             else if ("tool/result".equals(type) && callId.equals(callIdOf(entry))) result = entry;
         }
         DiffView view = storedDiffView(call, result);
-        return view == null ? null : new CallDiffState(view, result != null);
+        return view == null
+                ? null
+                : new CallDiffState(view, result != null, eventSeq(call == null ? result : call));
     }
 }
