@@ -62,14 +62,19 @@ Chat Participant/proposed provider API。日程编辑、删除和历史等操作
 选项按纯文本显示，提示可滚动，取消仍返回原有的 `-1` 语义。
 
 移除全部 `Messages.showChooseDialog` 调用，以项目 base path 计算资源相对位置，
-不再调用 `Project.getBaseDir()`。调试变量采集实现 `tooManyChildren(int, Runnable)`，
-在剩余变量未展示时完成当前有界快照，不调用续页回调，也不再多等一次超时。
+不再调用 `Project.getBaseDir()`。
 
-IC/PC 2024.3.6 的 Plugin Verifier 弃用使用数从各 23 处降为各 1 处。剩余的
-`XCompositeNode.tooManyChildren(int)` 在 243 SDK 中仍是抽象方法，新重载默认又调用
-旧方法，具体类无法直接删除旧实现；现仅保留向新重载转发的兼容桥。
+自动采集局部变量和参数值的功能已移除，包括 `computeChildren` 调用、变量呈现回调、
+值缓存和 `tooManyChildren` 兼容桥。`XCompositeNode` 官方说明不面向插件自行实现，
+且该方案需要覆写弃用的抽象方法，不再保留这一依赖。
 依据为 [243 版本 XCompositeNode 源码](https://github.com/JetBrains/intellij-community/blob/idea/243.26574.91/platform/xdebugger-api/src/com/intellij/xdebugger/frame/XCompositeNode.java)。
-未通过报告过滤、抑制验证或改用平台内部实现来隐藏该项。
+
+“解释调试状态”和 MCP `debug_context` 继续提供调用栈、当前源码与已有 IDE 诊断；
+输出和工具说明明确告知变量值未采集，需要用户手动附加。等待逻辑仅等待栈帧，不再
+等待变量回调，栈读取失败时也会完成等待。基础调试控制、断点、暂停线程及栈帧选择保留。
+
+IC/PC 2024.3.6 的 Plugin Verifier 弃用使用数从各 23 处降为 0；未通过报告过滤、
+抑制验证或平台内部实现隐藏警告。打包后的插件也确认不再包含变量采集类或相关接口引用。
 
 本批 `compileJava`、Spotless、Checkstyle、`buildPlugin` 和 IC/PC Plugin Verifier
 均通过；没有新增单元测试。搜索、键盘、IME、缩放和辅助功能的完整原生界面验收仍需
@@ -81,7 +86,7 @@ IC/PC 2024.3.6 的 Plugin Verifier 弃用使用数从各 23 处降为各 1 处�
 - Webview、Trace、Runtime helper、xterm 资源从固定源码重建。
 - Gradle `lint buildPlugin` 通过；84 个 Jev 资源校验通过。
 - IntelliJ Plugin Verifier 在 IC 243.26574.91 与 PC 243.26574.90 上判定 Compatible。
-  仍有既有类型的弃用 API 提示，以及可选 JCEF 模块未解析提示。
+  弃用 API 提示已清零；仍有可选 JCEF 模块未解析提示。
 - 运行上游现有 `verify-remote-runtime.mjs --workflow-controls --feature-controls`
   对接真实 0.2.1-rc.2：账号通知、授权撤销、终端屏幕/输入/保留、插件检查/安装/卸载/
   取消、目录改变和同名文件 Diff、schema 推理等级、搜索设置、历史 Jobs 及重连均通过。

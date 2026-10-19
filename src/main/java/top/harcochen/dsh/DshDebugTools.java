@@ -149,7 +149,7 @@ final class DshDebugTools implements AutoCloseable {
         tools.add(
                 tool(
                         "debug_context",
-                        "Read bounded/redacted stack, frame variables, source and diagnostics.",
+                        "Read bounded stack, source and diagnostics. Runtime variable values are not collected.",
                         """
                         {
                           "sessionId": {

@@ -33,9 +33,10 @@ The bundled Jev gitlink remains `e5d74c5`. See
 - [x] Searchable native single-choice dialogs for models, providers, presets, plugins,
   schedules, Harness Workspaces, templates and other existing choices. Filtering retains
   original row identities; keyboard navigation, cancellation and empty results are explicit.
-- [x] Replace deprecated choice dialogs and `Project.getBaseDir()`; implement the modern
-  XDebugger variable-pagination callback. IC/PC 2024.3.6 report one required deprecated
-  abstract-method override, down from 23 usages; see the sync report for the SDK contract.
+- [x] Replace deprecated choice dialogs and `Project.getBaseDir()`; remove automatic runtime
+  variable collection and its `XCompositeNode` compatibility bridge. Debug context retains
+  bounded stacks, source and diagnostics, with an explicit note that values must be attached manually.
+  IC/PC 2024.3.6 Plugin Verifier now reports zero deprecated API usages.
 
 ### Optional product improvements — separate from v0.11.0 parity
 
@@ -108,7 +109,7 @@ command management and telemetry remain owned by those products.
 - [x] Existing Gradle lint/build and IC/PyCharm Plugin Verifier.
 - [x] Real RC.2 Remote/Java regression with a loopback model and isolated DSH_HOME.
 - [x] Isolated IntelliJ IDEA 2024.3.6: real Java configuration, breakpoint/pause,
-  frame/variable/source context, stepping, MCP transport and real Harness MCP call,
+  frame/source context, stepping, MCP transport and real Harness MCP call,
   editor Tab registration and Runtime/helper/debug-server shutdown.
 - [x] Advertisement coexistence, bounded contention and legacy records unchanged.
 - [x] Wrapper exits before readiness while its Runtime continues serving: no
@@ -194,7 +195,8 @@ action validation, and the user-visible failure path are wired together.
   - [x] Render declared plan reviews with approve / continue-planning feedback, preserving the question protocol.
   - [x] Validate nested answer fields and refuse replies to unavailable or mismatched session interactions.
 - [x] IDE Provider management: configure endpoints, credentials, and models; discover models through `llm.listConfigurableProviders` and `llm.discoverModels`.
-- [x] Debug Context: attach a bounded, one-shot snapshot of the current XDebugger frame, stack, locals, source excerpt, and diagnostics.
+- [x] Debug Context: attach a bounded, one-shot snapshot of the current XDebugger frame,
+  stack, source excerpt and diagnostics. Automatic variable collection has been removed.
 - [x] Subagent timing: consume `subagentTiming` and show settled/active duration in the tree and preview.
   - [x] Use live control projections, including children outside the session catalog, and compare timing watermarks.
   - [x] Refresh duration and activity in both views; reject malformed, fractional, or unsafe integer durations.

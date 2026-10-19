@@ -81,8 +81,9 @@ IDE settings, including across IDE restarts; idle views do not overwrite edits.
 Enable **Allow Agent to control this IDE debugger** in plugin settings, then restart
 its locally owned Runtime. The Agent can start an existing Run/Debug configuration,
 manage source breakpoints, pause/resume/step, select paused threads and frames, and
-read bounded context through a local authenticated MCP endpoint. Source diagnostics
-reuse existing IDE highlights; sensitive variable values are redacted by name.
+read bounded call stacks, current source and diagnostics through a local authenticated MCP
+endpoint. Source diagnostics reuse existing IDE highlights. Runtime variable values are
+not collected; attach any values needed for analysis manually.
 The endpoint cannot create arbitrary launch configurations or evaluate expressions.
 Externally managed Runtimes retain their own integrations.
 
