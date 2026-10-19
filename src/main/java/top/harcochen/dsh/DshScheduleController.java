@@ -157,7 +157,7 @@ final class DshScheduleController {
             labels.add(title + "  ·  " + status + "  ·  " + owner);
         }
         int selected =
-                Messages.showChooseDialog(
+                DshChoiceDialog.show(
                         project,
                         DshBundle.message("dsh.schedule.choose"),
                         DshBundle.message("dsh.schedule.title"),
@@ -191,7 +191,7 @@ final class DshScheduleController {
                         + "  ·  "
                         + DshJson.stringOr(record, "scheduledAt", "");
         int selected =
-                Messages.showChooseDialog(
+                DshChoiceDialog.show(
                         project,
                         prompt,
                         DshBundle.message("dsh.schedule.title"),
@@ -255,7 +255,7 @@ final class DshScheduleController {
     private JsonObject chooseRule() {
         String[] kinds = {"at", "every", "daily", "weekly", "cron"};
         int selected =
-                Messages.showChooseDialog(
+                DshChoiceDialog.show(
                         project,
                         DshBundle.message("dsh.schedule.rule.choose"),
                         DshBundle.message("dsh.schedule.title"),

@@ -107,6 +107,8 @@ Optional Agent Teams show members, tasks, dependencies, and write-scope warnings
 
 The **Session center** offers live search with requests needing attention first, grouped by Harness Workspace. The chat header shows the current working directory; historical file links and tool diffs resolve against the directory at the time of the operation. Current-file Problems can be selected from the attachment menu or `@diagnostics`, and Jobs include read-only execution history.
 
+Native choice dialogs for models, providers, presets, plugins, schedules, Workspaces and templates support keyword filtering. Use the arrow keys to select a result and Enter to confirm; Escape cancels.
+
 Use **Open Runtime terminal** in the chat menu to create or reattach a Host PTY. It retains its identity across session switching, restores its screen after reconnecting, and closes the Host process when its view is closed. Pending input is discarded on disconnect. This terminal is separate from the IDE terminal context feature.
 
 **Install or remove plugins** uses the Runtime's official package manager, with package inspection, explicit install/removal confirmation, build-script approval, progress and cancellation. Settings now offer guided Web search/fetch configuration, and custom providers expose schema-defined model reasoning levels. Runtime access grants govern available actions; readers cannot submit prompts or answer interactive requests without the corresponding permissions.

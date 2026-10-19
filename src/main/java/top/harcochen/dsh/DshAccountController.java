@@ -230,7 +230,7 @@ final class DshAccountController {
                             DshBundle.message("dsh.account.sign.in")
                         };
         int action =
-                Messages.showChooseDialog(
+                DshChoiceDialog.show(
                         project,
                         summary,
                         DshBundle.message("dsh.account.title"),

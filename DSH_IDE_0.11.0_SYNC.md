@@ -54,6 +54,27 @@ IDE 终端上下文仍受 2024.3 公共 API 限制，与本次 Host PTY 功能�
 Chat Participant/proposed provider API。日程编辑、删除和历史等操作使用原生
 管理流程承接，共享 Webview 的只读摘要不代表相应 Host 功能缺失。
 
+## 原生选择器与弃用 API 维护
+
+模型、Provider、Preset、插件、日程、Harness Workspace、模板等现有单选入口统一使用
+`DshChoiceDialog`。支持不区分大小写的多关键词过滤、键盘上下选择、回车或双击确认，
+无结果时禁用确认；筛选使用原始索引，重复名称不会把操作路由到其他选项。提示和
+选项按纯文本显示，提示可滚动，取消仍返回原有的 `-1` 语义。
+
+移除全部 `Messages.showChooseDialog` 调用，以项目 base path 计算资源相对位置，
+不再调用 `Project.getBaseDir()`。调试变量采集实现 `tooManyChildren(int, Runnable)`，
+在剩余变量未展示时完成当前有界快照，不调用续页回调，也不再多等一次超时。
+
+IC/PC 2024.3.6 的 Plugin Verifier 弃用使用数从各 23 处降为各 1 处。剩余的
+`XCompositeNode.tooManyChildren(int)` 在 243 SDK 中仍是抽象方法，新重载默认又调用
+旧方法，具体类无法直接删除旧实现；现仅保留向新重载转发的兼容桥。
+依据为 [243 版本 XCompositeNode 源码](https://github.com/JetBrains/intellij-community/blob/idea/243.26574.91/platform/xdebugger-api/src/com/intellij/xdebugger/frame/XCompositeNode.java)。
+未通过报告过滤、抑制验证或改用平台内部实现来隐藏该项。
+
+本批 `compileJava`、Spotless、Checkstyle、`buildPlugin` 和 IC/PC Plugin Verifier
+均通过；没有新增单元测试。搜索、键盘、IME、缩放和辅助功能的完整原生界面验收仍需
+在安装后的 IDE 中完成。
+
 ## 验证
 
 - helper 与 terminal-view TypeScript strict/noEmit 检查通过。

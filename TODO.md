@@ -30,6 +30,23 @@ The bundled Jev gitlink remains `e5d74c5`. See
 - [x] Shared file navigation with historical directory resolution and optional Host opener.
 - [x] Trace revocation cleanup, canceled-stream terminal suppression, access rebaseline
   ordering and bounded terminal rendering with stale-frame fences.
+- [x] Searchable native single-choice dialogs for models, providers, presets, plugins,
+  schedules, Harness Workspaces, templates and other existing choices. Filtering retains
+  original row identities; keyboard navigation, cancellation and empty results are explicit.
+- [x] Replace deprecated choice dialogs and `Project.getBaseDir()`; implement the modern
+  XDebugger variable-pagination callback. IC/PC 2024.3.6 report one required deprecated
+  abstract-method override, down from 23 usages; see the sync report for the SDK contract.
+
+### Optional product improvements — separate from v0.11.0 parity
+
+These are feasible extensions, not implemented feature paths or current parity claims:
+
+- [ ] Attach selected text or the current screen from the Runtime-owned terminal as bounded,
+  explicit one-shot context. This does not require the newer IDE terminal API.
+- [ ] Add stop/restart controls to the optional debugger tools for existing IDE-launched
+  sessions, with process ownership and session identity checks.
+- [ ] Add preview and management actions directly to Session center, reusing the existing
+  rename/archive/pin/move flows rather than opening a separate session manager.
 
 ### Completed differences
 

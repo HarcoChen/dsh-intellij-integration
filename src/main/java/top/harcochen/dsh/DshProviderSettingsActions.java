@@ -332,7 +332,7 @@ final class DshProviderSettingsActions {
     private static int choose(Project project, String title, String prompt, String[] choices) {
         return DshPluginManagementController.ui(
                 () ->
-                        Messages.showChooseDialog(
+                        DshChoiceDialog.show(
                                 project,
                                 DshBundle.message(prompt),
                                 DshBundle.message(title),

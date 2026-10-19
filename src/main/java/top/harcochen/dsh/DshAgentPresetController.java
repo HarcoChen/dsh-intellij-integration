@@ -179,7 +179,7 @@ final class DshAgentPresetController {
 
     private void chooseAction(List<String> labels, List<JsonObject> rows, String defaultNamespace) {
         int selected =
-                Messages.showChooseDialog(
+                DshChoiceDialog.show(
                         project,
                         DshBundle.message("dsh.presets.dialog.message"),
                         DshBundle.message("dsh.presets.dialog.title"),
@@ -207,7 +207,7 @@ final class DshAgentPresetController {
         actionIds.add("cancel");
         String[] displayLabels = actionLabels.toArray(new String[0]);
         int chosen =
-                Messages.showChooseDialog(
+                DshChoiceDialog.show(
                         project,
                         DshJson.stringOr(preset, "name", id)
                                 + "\n"
@@ -345,7 +345,7 @@ final class DshAgentPresetController {
 
     private void choosePreset(String currentSession, List<String> labels, List<String> ids) {
         int selected =
-                Messages.showChooseDialog(
+                DshChoiceDialog.show(
                         project,
                         DshBundle.message("dsh.presets.select.message"),
                         DshBundle.message("dsh.presets.select.title"),

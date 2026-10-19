@@ -72,7 +72,7 @@ final class DshPluginManagementController {
                         int selected =
                                 ui(
                                         () ->
-                                                Messages.showChooseDialog(
+                                                DshChoiceDialog.show(
                                                         project,
                                                         DshBundle.message("dsh.plugins.choose"),
                                                         title(),

@@ -1871,7 +1871,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
             return;
         }
         int selected =
-                Messages.showChooseDialog(
+                DshChoiceDialog.show(
                         project,
                         DshBundle.message("dsh.outline.dialog.message"),
                         DshBundle.message("dsh.outline.dialog.title"),
@@ -1914,7 +1914,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
                                                                                 + template.relative)
                                                         .toArray(String[]::new);
                                         int selected =
-                                                Messages.showChooseDialog(
+                                                DshChoiceDialog.show(
                                                         project,
                                                         DshBundle.message(
                                                                 "dsh.prompt.template.choose.message"),

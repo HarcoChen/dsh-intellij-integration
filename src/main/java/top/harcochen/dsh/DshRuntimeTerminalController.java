@@ -100,7 +100,7 @@ final class DshRuntimeTerminalController implements AutoCloseable {
                             + " · "
                             + DshJson.string(info, "cwd"));
         int selected =
-                Messages.showChooseDialog(
+                DshChoiceDialog.show(
                         project,
                         DshBundle.message("dsh.terminal.choose"),
                         DshBundle.message("dsh.terminal.title"),

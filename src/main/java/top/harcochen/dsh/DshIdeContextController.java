@@ -344,7 +344,7 @@ final class DshIdeContextController {
                                                     "dsh.context.picker.enable.selection"));
                             actions.add("toggle-selection");
                             int selected =
-                                    Messages.showChooseDialog(
+                                    DshChoiceDialog.show(
                                             project,
                                             DshBundle.message("dsh.context.picker.dialog.message"),
                                             DshBundle.message("dsh.context.picker.dialog.title"),

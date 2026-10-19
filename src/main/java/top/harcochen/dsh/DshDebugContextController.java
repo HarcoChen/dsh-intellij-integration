@@ -471,11 +471,26 @@ final class DshDebugContextController {
             }
         }
 
+        /**
+         * The 243 public interface still requires this abstract method. Keep it as a compatibility
+         * bridge; modern producers use the overload with a continuation.
+         */
+        @Deprecated
         @Override
         public void tooManyChildren(int remaining) {
+            tooManyChildren(remaining, () -> {});
+        }
+
+        @Override
+        public void tooManyChildren(int remaining, Runnable addNextChildren) {
             synchronized (lines) {
-                lines.add("  … " + remaining + " more (not shown)");
+                lines.add(
+                        remaining < 0
+                                ? "  … more (not shown)"
+                                : "  … " + remaining + " more (not shown)");
             }
+            // This is a one-shot bounded snapshot, so never request another variable page.
+            done.countDown();
         }
 
         @Override

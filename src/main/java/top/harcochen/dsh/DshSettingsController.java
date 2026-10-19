@@ -463,7 +463,7 @@ final class DshSettingsController {
         }
         labels.add(DshBundle.message("dsh.providers.open.web.ui"));
         int selected =
-                Messages.showChooseDialog(
+                DshChoiceDialog.show(
                         project,
                         DshBundle.message("dsh.providers.dialog.message"),
                         DshBundle.message("dsh.providers.dialog.title"),
@@ -512,7 +512,7 @@ final class DshSettingsController {
                 DshJson.stringOr(
                         provider, "displayName", DshJson.stringOr(provider, "provider", "DSH"));
         int selected =
-                Messages.showChooseDialog(
+                DshChoiceDialog.show(
                         project,
                         DshBundle.message("dsh.providers.action.message", title),
                         DshBundle.message("dsh.providers.dialog.title"),
@@ -614,7 +614,7 @@ final class DshSettingsController {
         if ("llm-pi-ai".equals(namespace)) {
             String[] protocols = {"openai-completions", "openai-responses", "anthropic-messages"};
             int selected =
-                    Messages.showChooseDialog(
+                    DshChoiceDialog.show(
                             project,
                             DshBundle.message("dsh.providers.protocol.prompt"),
                             DshBundle.message("dsh.providers.configure.title", id),
