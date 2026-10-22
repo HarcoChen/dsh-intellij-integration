@@ -126,7 +126,10 @@
       type: "openFileLocation",
       path,
       line,
-      ...column === void 0 ? {} : { column }
+      ...column === void 0 ? {} : { column },
+      ...link?.closest("[data-row-id]")?.dataset.rowId === void 0 ? {} : {
+        rowId: link.closest("[data-row-id]").dataset.rowId
+      }
     });
     return true;
   }

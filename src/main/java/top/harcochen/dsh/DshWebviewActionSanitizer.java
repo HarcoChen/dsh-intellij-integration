@@ -51,6 +51,16 @@ final class DshWebviewActionSanitizer {
         return true;
     }
 
+    private static boolean validSeq(JsonElement value) {
+        if (value == null || !value.isJsonPrimitive() || !value.getAsJsonPrimitive().isNumber())
+            return false;
+        double number = value.getAsDouble();
+        return Double.isFinite(number)
+                && number >= 0
+                && number <= 9_007_199_254_740_991d
+                && number == Math.floor(number);
+    }
+
     private static String stringAnswerField(JsonObject answer, String key) {
         JsonElement value = answer.get(key);
         return value != null && value.isJsonPrimitive() && value.getAsJsonPrimitive().isString()
@@ -62,6 +72,32 @@ final class DshWebviewActionSanitizer {
         String type = DshJson.string(input, "type");
         if (type == null || type.length() > 64 || !type.matches("[A-Za-z][A-Za-z0-9]*")) {
             return null;
+        }
+        if ("insertEditorReference".equals(type) || "explainDebugState".equals(type))
+            return hasOnly(input, "type") ? input : null;
+        if ("prefillGitDiff".equals(type))
+            return hasOnly(input, "type", "kind")
+                            && Set.of("explain", "fix", "review", "docs")
+                                    .contains(DshJson.stringOr(input, "kind", ""))
+                            && strictString(input, "kind") != null
+                    ? input
+                    : null;
+        if ("askAboutResource".equals(type)) {
+            String path = strictString(input, "path");
+            return hasOnly(input, "type", "path", "isDirectory")
+                            && path != null
+                            && !path.isBlank()
+                            && path.length() <= 4096
+                            && path.chars().noneMatch(value -> value < 32 || value == 127)
+                            && !path.replace('\\', '/').startsWith("/")
+                            && !path.matches("^[A-Za-z]:.*")
+                            && !java.util.Arrays.asList(path.replace('\\', '/').split("/", -1))
+                                    .contains("..")
+                            && input.has("isDirectory")
+                            && input.get("isDirectory").isJsonPrimitive()
+                            && input.getAsJsonPrimitive("isDirectory").isBoolean()
+                    ? input
+                    : null;
         }
         if ("sendPrompt".equals(type)) {
             if (!hasOnly(input, "type", "text", "mode", "images", "files")) {
@@ -231,7 +267,7 @@ final class DshWebviewActionSanitizer {
             return hasOnly(input, "type") ? input : null;
         }
         if ("openFileLocation".equals(type)) {
-            if (!hasOnly(input, "type", "path", "line", "column")) {
+            if (!hasOnly(input, "type", "path", "line", "column", "seq")) {
                 return null;
             }
             String path = DshJson.string(input, "path");
@@ -241,6 +277,7 @@ final class DshWebviewActionSanitizer {
                             && !path.isBlank()
                             && path.length() <= 8_192
                             && !path.contains("\0")
+                            && (!input.has("seq") || validSeq(input.get("seq")))
                             && line > 0
                             && line <= 1_000_000
                             && column > 0

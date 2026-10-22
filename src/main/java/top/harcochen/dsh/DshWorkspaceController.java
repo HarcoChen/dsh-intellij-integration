@@ -82,7 +82,7 @@ final class DshWorkspaceController {
 
     private void chooseAction(List<String> labels, List<JsonObject> workspaces) {
         int selected =
-                Messages.showChooseDialog(
+                DshChoiceDialog.show(
                         project,
                         DshBundle.message("dsh.workspace.dialog.message"),
                         DshBundle.message("dsh.workspace.dialog.title"),
@@ -130,7 +130,7 @@ final class DshWorkspaceController {
         actionLabels.add(DshBundle.message("dsh.workspace.action.cancel"));
         String[] actionLabelsArray = actionLabels.toArray(new String[0]);
         int action =
-                Messages.showChooseDialog(
+                DshChoiceDialog.show(
                         project,
                         title + "\n" + DshJson.stringOr(workspace, "path", ""),
                         DshBundle.message("dsh.workspace.action.title"),
@@ -172,7 +172,7 @@ final class DshWorkspaceController {
                 .invokeLater(
                         () -> {
                             int picked =
-                                    Messages.showChooseDialog(
+                                    DshChoiceDialog.show(
                                             project,
                                             DshBundle.message(
                                                     "dsh.workspace.session.pick.message", title),
@@ -203,7 +203,7 @@ final class DshWorkspaceController {
                 .invokeLater(
                         () -> {
                             int move =
-                                    Messages.showChooseDialog(
+                                    DshChoiceDialog.show(
                                             project,
                                             DshBundle.message(
                                                     "dsh.workspace.session.move.message",

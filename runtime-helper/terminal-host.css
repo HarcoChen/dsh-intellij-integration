@@ -1,0 +1,4 @@
+html,body{margin:0;height:100%;overflow:hidden;background:#000;color:#ddd}
+body{display:flex;flex-direction:column}
+#status{font:12px sans-serif;padding:4px}
+#terminal{flex:1;min-height:0;padding:4px}

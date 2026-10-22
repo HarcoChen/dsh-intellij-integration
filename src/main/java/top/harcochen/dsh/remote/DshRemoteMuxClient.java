@@ -48,6 +48,10 @@ public final class DshRemoteMuxClient {
     public interface StreamHandle {
         /** Cancel the stream; at most one cancel frame is sent. */
         void cancel();
+
+        default boolean send(JsonObject value) {
+            return false;
+        }
     }
 
     private final Supplier<String> baseUrl;
@@ -130,6 +134,9 @@ public final class DshRemoteMuxClient {
         closed = true;
         dispatch.execute(
                 () -> {
+                    failAll(
+                            DshRemoteException.carrier(
+                                    DshRemoteContracts.MUX_PATH, "Remote mux disposed", null));
                     closeSocket("disposed");
                     http.shutdownNow();
                 });
@@ -145,8 +152,9 @@ public final class DshRemoteMuxClient {
         streams.put(streamId, stream);
         boolean sent = sendText(DshRemoteContracts.streamOpen(streamId, endpoint, args).toString());
         if (!sent) {
-            streams.remove(streamId);
-            handler.onTerminal(
+            finish(
+                    streamId,
+                    stream,
                     errorObject("carrier", "DSH remote mux socket is not open", new JsonObject()));
             return () -> {};
         }
@@ -176,6 +184,18 @@ public final class DshRemoteMuxClient {
 
         private Handle(String streamId) {
             this.streamId = streamId;
+        }
+
+        @Override
+        public boolean send(JsonObject value) {
+            OpenStream stream = streams.get(streamId);
+            if (cancelled || stream == null || stream.terminal || stream.cancelRequested)
+                return false;
+            JsonObject frame = new JsonObject();
+            frame.addProperty("type", "item");
+            frame.addProperty("streamId", streamId);
+            frame.add("value", value.deepCopy());
+            return sendText(frame.toString());
         }
 
         @Override
@@ -301,6 +321,7 @@ public final class DshRemoteMuxClient {
         }
         switch (type) {
             case "item" -> {
+                if (stream.cancelRequested) return;
                 JsonObject value =
                         frame.has("value") && frame.get("value").isJsonObject()
                                 ? frame.getAsJsonObject("value")
@@ -348,20 +369,15 @@ public final class DshRemoteMuxClient {
     private void failAll(Throwable error) {
         List<String> ids = new ArrayList<>(streams.keySet());
         for (String streamId : ids) {
-            OpenStream stream = streams.remove(streamId);
+            OpenStream stream = streams.get(streamId);
             if (stream == null || stream.terminal) continue;
-            stream.terminal = true;
-            try {
-                stream.handler.onTerminal(
-                        errorObject(
-                                "carrier",
-                                error.getMessage() == null
-                                        ? String.valueOf(error)
-                                        : error.getMessage(),
-                                new JsonObject()));
-            } catch (RuntimeException failure) {
-                diagnostic.accept("Remote stream failure handler threw: " + failure);
-            }
+            finish(
+                    streamId,
+                    stream,
+                    errorObject(
+                            "carrier",
+                            error.getMessage() == null ? String.valueOf(error) : error.getMessage(),
+                            new JsonObject()));
         }
     }
 

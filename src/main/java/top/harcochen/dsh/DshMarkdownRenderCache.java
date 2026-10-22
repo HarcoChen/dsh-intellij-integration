@@ -21,6 +21,11 @@ final class DshMarkdownRenderCache {
     private final LinkedHashMap<String, Entry> entries = new LinkedHashMap<>();
     private final Map<String, Map<String, String>> codeByRenderId = new LinkedHashMap<>();
 
+    synchronized void clear() {
+        entries.clear();
+        codeByRenderId.clear();
+    }
+
     synchronized JsonArray render(JsonArray source, String scope) {
         JsonArray result = source.deepCopy();
         for (JsonElement element : result) {

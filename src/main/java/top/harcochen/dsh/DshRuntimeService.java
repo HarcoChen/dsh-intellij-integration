@@ -95,6 +95,10 @@ public final class DshRuntimeService implements Disposable {
         return status;
     }
 
+    public String runtimeVersion() {
+        return launchedVersion;
+    }
+
     public String getUrl() {
         return baseUrl;
     }
@@ -229,11 +233,20 @@ public final class DshRuntimeService implements Disposable {
                         ? DshRuntimeEndpoint.normalizeUrl(settings.serverUrl)
                         : configuredEndpoint.baseUrl;
         if (configuredUrl != null) {
+            if (!configuredUrl.equals(baseUrl)) launchedVersion = null;
             setRuntimeEndpoint(
                     configuredEndpoint == null
                             ? DshRuntimeEndpoint.ofBase(configuredUrl)
                             : configuredEndpoint);
             if (isRemoteHealthy(configuredUrl)) {
+                DshRuntimeEndpoint local = DshRuntimeEndpoint.parse(configuredUrl, true);
+                String advertisedUrl = local == null ? configuredUrl : local.baseUrl;
+                for (DshRuntimeEndpoint advertised : advertisements.read()) {
+                    if (advertisedUrl.equals(advertised.baseUrl)) {
+                        launchedVersion = advertised.runtimeVersion;
+                        break;
+                    }
+                }
                 setStatus(
                         new RuntimeStatus(
                                 RuntimeState.RUNNING,
@@ -327,6 +340,7 @@ public final class DshRuntimeService implements Disposable {
                 if (stopping || System.nanoTime() >= deadline) break;
                 setRuntimeEndpoint(candidate);
                 if (isRemoteHealthy(candidate.baseUrl)) {
+                    launchedVersion = candidate.runtimeVersion;
                     settled = true;
                     return candidate;
                 }
@@ -1177,6 +1191,10 @@ public final class DshRuntimeService implements Disposable {
                 LOG.warn("DSH status listener failed", error);
             }
         }
+    }
+
+    void logIntegration(String line) {
+        appendLog(line);
     }
 
     private void appendLog(String line) {

@@ -55,11 +55,23 @@ final class DshSettingsController {
         this.errorSink = errorSink;
     }
 
+    void clearPanel() {
+        generation.incrementAndGet();
+        pluginInventoryGeneration.incrementAndGet();
+        panel = null;
+        pluginMutation = null;
+        synchronized (namespaces) {
+            namespaces.clear();
+        }
+    }
+
     JsonObject panel() {
         JsonObject current = panel;
-        if (current == null || pluginMutation == null || !current.has("pluginInventory"))
-            return current;
+        if (current == null) return null;
         current = current.deepCopy();
+        current.addProperty(
+                "canManagePlugins", remote.access().allows("pluginManager/installBundle"));
+        if (pluginMutation == null || !current.has("pluginInventory")) return current;
         current.getAsJsonObject("pluginInventory").add("mutation", pluginMutation.deepCopy());
         return current;
     }
@@ -105,8 +117,10 @@ final class DshSettingsController {
                         mutation.addProperty(
                                 "message",
                                 DshBundle.message(
-                                        "dsh.plugin.change."
-                                                + DshJson.string(result, "application")));
+                                                "dsh.plugin.change."
+                                                        + DshJson.string(result, "application"))
+                                        + "\n"
+                                        + DshPluginManagementController.details(result));
                     } catch (Exception error) {
                         mutation.addProperty("message", DshJson.message(error));
                         mutation.addProperty("failed", true);
@@ -372,12 +386,29 @@ final class DshSettingsController {
                 });
     }
 
+    void configureWebSearch() {
+        operations.execute(
+                () -> {
+                    try {
+                        DshProviderSettingsActions.webSearch(
+                                project, runtime, remote, this::notifyUser);
+                    } catch (RuntimeException error) {
+                        providerError(error);
+                    }
+                });
+    }
+
     void manageProviders() {
         operations.execute(
                 () -> {
                     try {
+                        String endpoint = runtime.getUrl();
                         JsonArray providers = remote.providers();
                         JsonObject settings = remote.describeSettings();
+                        if (endpoint == null || !endpoint.equals(runtime.getUrl()))
+                            throw new IllegalStateException(
+                                    DshBundle.message("dsh.runtime.changed"));
+                        settings.addProperty("ideRuntimeEndpoint", endpoint);
                         JsonObject catalog;
                         try {
                             catalog = remote.modelCatalog();
@@ -432,7 +463,7 @@ final class DshSettingsController {
         }
         labels.add(DshBundle.message("dsh.providers.open.web.ui"));
         int selected =
-                Messages.showChooseDialog(
+                DshChoiceDialog.show(
                         project,
                         DshBundle.message("dsh.providers.dialog.message"),
                         DshBundle.message("dsh.providers.dialog.title"),
@@ -464,6 +495,9 @@ final class DshSettingsController {
                                 DshBundle.message("dsh.providers.action.discover"),
                                 DshBundle.message("dsh.providers.action.models"),
                                 DshBundle.message("dsh.providers.action.detail")));
+        if ("llm-pi-ai".equals(DshJson.string(provider, "settingsNs"))
+                && DshJson.bool(settings, "writable", false))
+            actions.add(DshBundle.message("dsh.reasoning.title"));
         if (ref != null && !ref.isBlank()) {
             actions.add(
                     DshBundle.message(
@@ -478,7 +512,7 @@ final class DshSettingsController {
                 DshJson.stringOr(
                         provider, "displayName", DshJson.stringOr(provider, "provider", "DSH"));
         int selected =
-                Messages.showChooseDialog(
+                DshChoiceDialog.show(
                         project,
                         DshBundle.message("dsh.providers.action.message", title),
                         DshBundle.message("dsh.providers.dialog.title"),
@@ -494,6 +528,16 @@ final class DshSettingsController {
             showProviderModels(provider, catalog);
         } else if (selected == 3) {
             showProvider(provider, settings, catalog);
+        } else if (actions.get(selected).equals(DshBundle.message("dsh.reasoning.title"))) {
+            operations.execute(
+                    () -> {
+                        try {
+                            DshProviderSettingsActions.reasoning(
+                                    project, runtime, remote, provider, settings, this::notifyUser);
+                        } catch (RuntimeException error) {
+                            providerError(error);
+                        }
+                    });
         } else if (actions.get(selected)
                 .equals(DshBundle.message("dsh.providers.action.document"))) {
             openDocument();
@@ -570,7 +614,7 @@ final class DshSettingsController {
         if ("llm-pi-ai".equals(namespace)) {
             String[] protocols = {"openai-completions", "openai-responses", "anthropic-messages"};
             int selected =
-                    Messages.showChooseDialog(
+                    DshChoiceDialog.show(
                             project,
                             DshBundle.message("dsh.providers.protocol.prompt"),
                             DshBundle.message("dsh.providers.configure.title", id),

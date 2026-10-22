@@ -65,7 +65,13 @@ final class DshDiffController {
                         if (state == null) {
                             throw new IllegalStateException("This diff is no longer available.");
                         }
-                        Path absolute = resolveAgainstProject(path);
+                        String original = originalDirectory(current);
+                        Path absolute =
+                                Path.of(
+                                        DshWorkingDirectory.resolve(
+                                                path,
+                                                DshWorkingDirectory.at(
+                                                        history, state.seq, original)));
                         FileContents file = readFile(absolute, path, state.settled);
                         List<DshToolDiff.FileDiff> hunks = new ArrayList<>();
                         for (DshToolDiff.FileDiff diff : state.view.diffs) {
@@ -78,7 +84,8 @@ final class DshDiffController {
                                     "This diff no longer covers " + path + ".");
                         }
                         DiffSides sides =
-                                reconstructSides(history, callId, path, state, file, hunks);
+                                reconstructSides(
+                                        history, callId, path, state, file, hunks, original);
                         showTextDiff(
                                 path + (state.settled ? " (tool edit)" : " (proposed edit)"),
                                 sides.before(),
@@ -115,7 +122,8 @@ final class DshDiffController {
             String path,
             DshToolDiff.CallDiffState state,
             FileContents file,
-            List<DshToolDiff.FileDiff> hunks) {
+            List<DshToolDiff.FileDiff> hunks,
+            String original) {
         if (!state.settled) {
             String proposed = DshToolDiff.applyProposedHunks(file.contents(), hunks);
             if (proposed == null) {
@@ -128,7 +136,9 @@ final class DshDiffController {
         }
         DshToolDiff.Rewind rewound =
                 DshToolDiff.rewindAround(
-                        file.contents(), DshToolDiff.collectCallHunks(history, path), callId);
+                        file.contents(),
+                        DshToolDiff.collectCallHunks(history, path, original, callId),
+                        callId);
         if (rewound == null) {
             throw new IllegalStateException(
                     "“"
@@ -227,15 +237,13 @@ final class DshDiffController {
         return false;
     }
 
-    private Path resolveAgainstProject(String path) {
-        Path candidate = Path.of(path);
-        if (candidate.isAbsolute()) {
-            return candidate;
+    private String originalDirectory(String current) {
+        for (JsonElement raw : sessions.get()) {
+            if (raw.isJsonObject()
+                    && current.equals(DshJson.string(raw.getAsJsonObject(), "sessionId")))
+                return DshWorkingDirectory.original(raw.getAsJsonObject(), project.getBasePath());
         }
-        String base = project.getBasePath();
-        return base == null
-                ? candidate.toAbsolutePath()
-                : Path.of(base).resolve(candidate).normalize();
+        return project.getBasePath();
     }
 
     private void showTextDiff(

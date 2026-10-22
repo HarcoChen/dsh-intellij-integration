@@ -154,6 +154,12 @@ final class DshPromptController {
 
     void send(JsonObject action) {
         String text = DshJson.stringOr(action, "text", "");
+        java.util.regex.Pattern diagnostics =
+                java.util.regex.Pattern.compile("(^|\\s)@diagnostics(?=\\s|$)");
+        if (diagnostics.matcher(text).find()) {
+            if (!DshPluginManagementController.ui(ideContext::attachDiagnostics)) return;
+            text = diagnostics.matcher(text).replaceAll("$1").trim();
+        }
         JsonArray images =
                 action.has("images") && action.get("images").isJsonArray()
                         ? action.getAsJsonArray("images").deepCopy()

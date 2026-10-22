@@ -5,15 +5,48 @@ An item is complete only after the host action, runtime protocol, projected stat
 
 Status: `[x]` implemented, `[-]` usable but not yet at VS Code parity, `[ ]` not implemented.
 
-## Current parity — dsh-ide v0.10.3 + Runtime quoting fix（2026-10-09）
+## Current parity — dsh-ide v0.11.0（2026-10-19）
 
-Target: companion `7e45c2b19d8d7c724fda824a88e78b4d448cf05d` and Harness
-`dsh-v0.2.0-rc.2`. The callable product features below are aligned; platform
-limits are explicit exceptions, rather than silently successful placeholders.
-Historical validation sections below retain their original coverage boundaries.
-The shared Webview has no changes since `deb8d8f` and keeps its existing pin.
-The new Jev package, packaging gate and Windows launch adapter are described in
-[the 0.10.3 sync report](DSH_IDE_0.10.3_SYNC.md).
+Target: companion `96d3aaff973879617b82f9187d4b2d344a12f5ed` and Harness
+`dsh-v0.2.1-rc.2` (`687f282e8625c6b8d11ff58211a90524be2e4317`).
+The Webview and Trace are rebuilt from that commit with IntelliJ adapters.
+The bundled Jev gitlink remains `e5d74c5`. Scope and validation boundaries are tracked below.
+
+- [x] Runtime terminal retention, duplex input acknowledgements, bounded queues,
+  screen restoration, native close cleanup, and legacy RC.2 follow/unary input.
+- [x] Official plugin package inspection/install/remove, build-script approval,
+  cancellable progress, request-id recovery, and detailed application results.
+- [x] Guided Web search/fetch settings and schema-defined custom-model reasoning.
+- [x] Current/historical working directories, metadata-backed filesystem diffs,
+  fail-safe turn capture on a mid-turn directory change, and Git subdirectory filters.
+- [x] Remote access stream/grants, guarded actions, reader subscriptions and revoked-history cleanup.
+- [x] Searchable live Session center, selected Problems attachments and `@diagnostics`.
+- [x] Durable Job lifecycle history, cache-only projection hints and migration labels.
+- [x] Ordered account notifications with titles, expiry/deduplication and account fences.
+- [x] Preserve Enter-to-send preference, IME handling and composer focus restoration.
+- [x] Native Find Action entries for Runtime terminal, diagnostics, plugin manager and
+  Session center; local restart/credential actions work before Remote authorization.
+- [x] Shared file navigation with historical directory resolution and optional Host opener.
+- [x] Trace revocation cleanup, canceled-stream terminal suppression, access rebaseline
+  ordering and bounded terminal rendering with stale-frame fences.
+- [x] Searchable native single-choice dialogs for models, providers, presets, plugins,
+  schedules, Harness Workspaces, templates and other existing choices. Filtering retains
+  original row identities; keyboard navigation, cancellation and empty results are explicit.
+- [x] Replace deprecated choice dialogs and `Project.getBaseDir()`; remove automatic runtime
+  variable collection and its `XCompositeNode` compatibility bridge. Debug context retains
+  bounded stacks, source and diagnostics, with an explicit note that values must be attached manually.
+  IC/PC 2024.3.6 Plugin Verifier now reports zero deprecated API usages.
+
+### Optional product improvements — separate from v0.11.0 parity
+
+These are feasible extensions, not implemented feature paths or current parity claims:
+
+- [ ] Attach selected text or the current screen from the Runtime-owned terminal as bounded,
+  explicit one-shot context. This does not require the newer IDE terminal API.
+- [ ] Add stop/restart controls to the optional debugger tools for existing IDE-launched
+  sessions, with process ownership and session identity checks.
+- [ ] Add preview and management actions directly to Session center, reusing the existing
+  rename/archive/pin/move flows rather than opening a separate session manager.
 
 ### Completed differences
 
@@ -65,22 +98,17 @@ The new Jev package, packaging gate and Windows launch adapter are described in
   contracts, not IntelliJ extension points. JetBrains uses the tool window and editor
   FileEditor entry points above instead of duplicating VS Code-specific providers.
 
-### Shared upstream roadmap — not a difference from dsh-ide
-
-- [ ] Runtime Terminal retention, output restoration and input.
-- [ ] Plugin/Bundle installation and removal. Both integrations currently expose
-  inventory and enablement; the companion has no installation/removal product flow.
-  These are future feature work, not platform prohibitions.
-
-Harness Web/Desktop-only model search, Desktop command management and telemetry
-remain owned by those products.
+The Runtime terminal and official Plugin/Bundle installation/removal flows are now
+implemented. IDE terminal command/output context remains subject to the separate
+2024.3 API restriction above. Harness Web/Desktop-only model search, Desktop
+command management and telemetry remain owned by those products.
 
 ### Validation coverage
 
 - [x] Existing Gradle lint/build and IC/PyCharm Plugin Verifier.
 - [x] Real RC.2 Remote/Java regression with a loopback model and isolated DSH_HOME.
 - [x] Isolated IntelliJ IDEA 2024.3.6: real Java configuration, breakpoint/pause,
-  frame/variable/source context, stepping, MCP transport and real Harness MCP call,
+  frame/source context, stepping, MCP transport and real Harness MCP call,
   editor Tab registration and Runtime/helper/debug-server shutdown.
 - [x] Advertisement coexistence, bounded contention and legacy records unchanged.
 - [x] Wrapper exits before readiness while its Runtime continues serving: no
@@ -166,7 +194,8 @@ action validation, and the user-visible failure path are wired together.
   - [x] Render declared plan reviews with approve / continue-planning feedback, preserving the question protocol.
   - [x] Validate nested answer fields and refuse replies to unavailable or mismatched session interactions.
 - [x] IDE Provider management: configure endpoints, credentials, and models; discover models through `llm.listConfigurableProviders` and `llm.discoverModels`.
-- [x] Debug Context: attach a bounded, one-shot snapshot of the current XDebugger frame, stack, locals, source excerpt, and diagnostics.
+- [x] Debug Context: attach a bounded, one-shot snapshot of the current XDebugger frame,
+  stack, source excerpt and diagnostics. Automatic variable collection has been removed.
 - [x] Subagent timing: consume `subagentTiming` and show settled/active duration in the tree and preview.
   - [x] Use live control projections, including children outside the session catalog, and compare timing watermarks.
   - [x] Refresh duration and activity in both views; reject malformed, fractional, or unsafe integer durations.
@@ -195,7 +224,7 @@ action validation, and the user-visible failure path are wired together.
 
 迁移范围、pin 与验证边界见 [RC.2 迁移报告](RPC_0.2.0_RC2_ADAPTATION.md)。
 
-上游仍计划后续实现的 Runtime Terminal、插件安装/卸载不在本次 0.10.2 UI 迁移中。
+Runtime Terminal 与插件安装/卸载已在后续 0.11.0 同步批次实现，见本文件顶部。
 
 Latest parity batch verified on 2026-09-14 against the pinned `0.1.2-rc.1` Runtime:
 

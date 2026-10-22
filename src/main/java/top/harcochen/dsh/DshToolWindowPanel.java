@@ -94,6 +94,8 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
     private final DshChangeReviewStore changeReviews;
     private final DshFeedbackController feedback;
     private final DshJobsController jobs;
+    private final DshPluginManagementController pluginManagement;
+    private final DshRuntimeTerminalController runtimeTerminals;
     private final DshRuntimeWorkspaceBrowser runtimeFiles;
 
     private DshBridge bridge;
@@ -170,6 +172,8 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
     private volatile DshMessageProjector.Projection projection;
 
     /** Keeps visible text briefly so copy actions survive a stream-to-history projection race. */
+    private long accessRevision = -1;
+
     private final Map<String, String> copyableMessageTexts = new LinkedHashMap<>();
 
     private volatile String lastError;
@@ -188,10 +192,17 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
                             return thread;
                         });
         this.sessionState = new DshSessionStateStore(markdownRenderCache);
+        this.runtimeTerminals =
+                new DshRuntimeTerminalController(
+                        project,
+                        DshRemoteService.getInstance(project),
+                        runtime,
+                        operations,
+                        this::notify);
         this.jobs = new DshJobsController(remote, this::postStateLater);
         this.runtimeFiles =
                 new DshRuntimeWorkspaceBrowser(project, runtime, remote, operations, this::notify);
-        this.changeReviews = new DshChangeReviewStore(operations, this::postStateLater);
+        this.changeReviews = new DshChangeReviewStore(this::postStateLater);
         this.ideContext =
                 new DshIdeContextController(
                         project,
@@ -263,6 +274,14 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
                         this::notify,
                         error -> lastError = error,
                         this::postStateLater);
+        this.pluginManagement =
+                new DshPluginManagementController(
+                        project,
+                        runtime,
+                        remote,
+                        operations,
+                        () -> runtimeSettings.refreshPluginInventory(),
+                        this::notify);
         this.agentPresets =
                 new DshAgentPresetController(
                         project,
@@ -385,11 +404,44 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
         if (disposed) return;
         DshRemoteState.Snapshot current = snapshot;
         if (current == null) return;
+        long nextAccessRevision = remote.access().revision();
+        if (accessRevision != nextAccessRevision) {
+            accessRevision = nextAccessRevision;
+            markdownRenderCache.clear();
+            synchronized (copyableMessageTexts) {
+                copyableMessageTexts.clear();
+            }
+            sessionState.prune(Set.of());
+            projectedEvents = null;
+            projectedAssistantStream = null;
+            projectedCursor = Long.MIN_VALUE;
+            featureCatalogEpoch = null;
+            sessionActions.invalidateModelCatalog();
+            subagents.clearPreview();
+        }
         if (DshRemoteService.PHASE_STOPPED.equals(current.phase)) {
             jobs.close();
             releaseFollowedSession();
             messages = new JsonArray();
             projection = null;
+            postStateLater();
+            return;
+        }
+        if (remote.access().available()
+                && sessionId != null
+                && !remote.access().allows("session/follow", "session", sessionId)) {
+            releaseFollowedSession();
+            messages = new JsonArray();
+            projection = null;
+            projectedEvents = null;
+            projectedAssistantStream = null;
+            projectedCursor = Long.MIN_VALUE;
+            subagents.clearPreview();
+            jobs.select(null);
+            runtimeSettings.clearPanel();
+            feedback.prune(Set.of());
+            sessionState.prune(Set.of());
+            changeReviews.retain(Set.of());
             postStateLater();
             return;
         }
@@ -466,7 +518,10 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
                 messages = cached.messages();
                 feedback.refresh(selected, false);
                 rememberCopyableMessages(selected, messages);
-                changeReviews.observe(selected, project.getBasePath(), history);
+                changeReviews.observe(
+                        selected,
+                        DshWorkingDirectory.original(sessionRow(selected), project.getBasePath()),
+                        history);
                 prompts.refreshCatalogs(selected);
                 sessionActions.refreshModelCatalog(selected);
                 projectedCursor = cursor;
@@ -634,6 +689,47 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
         if (action == null) return;
         String type = string(action, "type");
         if (type == null || type.isBlank()) return;
+        if (!remote.access().available()
+                && !DshRemoteService.PHASE_CONNECTED.equals(remote.phase())
+                && Set.of(
+                                "openRuntimeTerminal",
+                                "managePlugins",
+                                "manageProviders",
+                                "configureWebSearch",
+                                "manageAgentPresets",
+                                "manageAccount",
+                                "manageSchedules",
+                                "manageWorkspaces",
+                                "manageSessions",
+                                "openSessionCenter")
+                        .contains(type)) {
+            String selected = sessionId;
+            operations.execute(
+                    () -> {
+                        try {
+                            remote.startAndAwait();
+                            ApplicationManager.getApplication()
+                                    .invokeLater(
+                                            () -> {
+                                                if (!disposed
+                                                        && java.util.Objects.equals(
+                                                                selected, sessionId))
+                                                    receiveAction(action);
+                                            });
+                        } catch (Exception unavailable) {
+                            notify(DshJson.message(unavailable));
+                        }
+                    });
+            return;
+        }
+        if ("openRuntimeTerminal".equals(type) && sessionId == null) {
+            notify(DshBundle.message("dsh.terminal.no.session"));
+            return;
+        }
+        if (!DshActionAccess.allows(remote.access(), action, sessionId)) {
+            notify(DshBundle.message("dsh.remote.access.denied"));
+            return;
+        }
         if ("ready".equals(type)) {
             webviewReady = true;
             postStateLater();
@@ -669,6 +765,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
                 subagents.refresh(sessionId);
             }
             case "searchSession" -> sessionActions.search();
+            case "openSessionCenter" -> sessionActions.openSessionCenter();
             case "manageSessions" -> sessionActions.manageSessions();
             case "renameSession" -> sessionActions.rename();
             case "forkSession" -> sessionActions.fork();
@@ -700,6 +797,10 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
             case "refreshRuntimeFile" -> runtimeFiles.refresh();
             case "showWhatsNew" -> DshWhatsNew.show(project, true);
             case "openInEditor" -> DshChatEditorProvider.open(project);
+            case "openRuntimeTerminal" -> {
+                if (sessionId == null) notify(DshBundle.message("dsh.terminal.no.session"));
+                else runtimeTerminals.open(sessionId);
+            }
             case "openTerminalCommandPicker" ->
                     notify(DshBundle.message("dsh.terminal.context.unavailable"));
             case "openBrowser" -> openBrowser();
@@ -752,6 +853,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
                                         postStateLater();
                                     });
             case "manageSettings" -> runtimeSettings.togglePanel();
+            case "managePlugins" -> pluginManagement.manage();
             case "refreshPluginInventory" -> runtimeSettings.refreshPluginInventory();
             case "setPluginEnabled" ->
                     runtimeSettings.setPluginEnabled(
@@ -766,6 +868,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
             case "configureApiKey" -> runtimeSettings.configureApiKey();
             case "configureJevApiKey" -> runtimeSettings.configureJevApiKey();
             case "manageProviders" -> runtimeSettings.manageProviders();
+            case "configureWebSearch" -> runtimeSettings.configureWebSearch();
             case "manageAgentPresets" -> agentPresets.manage();
             case "selectAgentPreset" -> agentPresets.select(string(action, "agentPreset"));
             case "manageWorkspaces" -> workspaces.manage();
@@ -773,6 +876,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
             case "manageSchedules" -> schedules.manage();
             case "openSettingsDocument" -> runtimeSettings.openDocument();
             case "openIdeContextPicker" -> ideContext.openPicker();
+            case "openDiagnosticsPicker" -> ideContext.attachDiagnostics();
             case "toggleSelection" -> ideContext.toggleSelection();
             case "loadImage" -> prompts.loadImage(string(action, "attachmentId"));
             case "captureAppShot" -> ideContext.captureAppShot();
@@ -783,7 +887,32 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
             case "fileReferenceQuery" ->
                     ideContext.fileReferenceQuery(stringOr(action, "query", ""));
             case "removeContext" -> ideContext.removeContext(string(action, "id"));
-            case "openFileLocation" -> ideContext.openFileLocation(action);
+            case "openFileLocation" -> {
+                String original =
+                        DshWorkingDirectory.original(sessionRow(sessionId), project.getBasePath());
+                String directory =
+                        action.has("seq")
+                                ? DshWorkingDirectory.at(
+                                        remote.history(sessionId),
+                                        DshJson.longValue(action.get("seq"), 0),
+                                        original)
+                                : DshWorkingDirectory.current(
+                                        sessionView(sessionId), sessionRow(sessionId));
+                String selected = sessionId;
+                DshFileNavigation.open(
+                        project,
+                        remote,
+                        runtime,
+                        operations,
+                        action,
+                        directory == null ? original : directory,
+                        () ->
+                                !disposed
+                                        && java.util.Objects.equals(selected, sessionId)
+                                        && remote.access()
+                                                .allows("session/follow", "session", selected),
+                        this::notify);
+            }
             case "retryPrompt" -> prompts.retry(stringOr(action, "id", ""));
             case "selectModel" -> sessionActions.selectModel();
             case "selectReasoningEffort" ->
@@ -1307,6 +1436,36 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
         JsonObject panel = runtimeSettings.panel();
         if (panel != null) state.add("settings", panel.deepCopy());
         state.addProperty("selectionEnabled", ideContext.isSelectionEnabled());
+        JsonObject accessView = new JsonObject();
+        accessView.addProperty("available", remote.access().available());
+        accessView.addProperty("owner", remote.access().owner());
+        accessView.addProperty(
+                "canSend",
+                sessionId == null
+                        ? remote.access().allows("session/create")
+                        : remote.access().allows("session/prompt", "session", sessionId));
+        accessView.addProperty(
+                "canCancel",
+                sessionId != null
+                        && remote.access().allows("session/cancel", "session", sessionId));
+        accessView.addProperty("canConfigure", remote.access().allows("settings/mutate"));
+        accessView.addProperty(
+                "canSelectModel",
+                sessionId != null
+                        && remote.access().allows("session/selectModel", "session", sessionId));
+        accessView.addProperty(
+                "canRunCommands",
+                sessionId != null
+                        && remote.access().allows("commands/execute", "session", sessionId));
+        accessView.addProperty(
+                "canSelectPreset",
+                sessionId != null
+                        && remote.access().allows("agentPresets/select", "session", sessionId));
+        accessView.addProperty(
+                "canReadSession",
+                sessionId != null
+                        && remote.access().allows("session/follow", "session", sessionId));
+        state.add("access", accessView);
         state.addProperty("enterToSend", DshSettingsState.getInstance(project).enterToSend);
         state.addProperty("modeSelectionEnabled", agentPresets.modeSelectionEnabled());
         JsonObject status = new JsonObject();
@@ -1333,6 +1492,9 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
         state.addProperty("cancelling", prompts.isCancelling());
         state.addProperty("focusMode", focusMode);
         state.addProperty("workspaceName", project.getName());
+        String operationDirectory =
+                DshWorkingDirectory.current(sessionView(sessionId), sessionRow(sessionId));
+        if (operationDirectory != null) state.addProperty("workingDirectory", operationDirectory);
         JsonObject currentWorkspace = new JsonObject();
         JsonObject registration = currentWorkspaceRegistration;
         if (registration != null) {
@@ -1388,7 +1550,13 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
         state.add("queue", view == null ? new JsonArray() : view.queue);
         JsonArray liveJobs = jobs.view(sessionId);
         state.add(
-                "jobs", liveJobs == null ? (view == null ? new JsonArray() : view.jobs) : liveJobs);
+                "jobs",
+                DshJobHistory.merge(
+                        sessionId,
+                        remote.history(sessionId),
+                        liveJobs == null
+                                ? (view == null ? new JsonArray() : view.jobs)
+                                : liveJobs));
         JsonObject team =
                 top.harcochen.dsh.remote.DshTeamProjection.normalize(
                         cellValue(sessionId, "agentTeam"));
@@ -1609,7 +1777,12 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
                             });
             if (dirtyFiles.isEmpty()) return List.of();
 
-            String root = project.getBasePath();
+            String root =
+                    DshWorkingDirectory.at(
+                            history,
+                            state.seq,
+                            DshWorkingDirectory.original(
+                                    sessionRow(session), project.getBasePath()));
             List<String> matches = new ArrayList<>();
             for (String path : diffPaths) {
                 String absolute = resolveDiffPath(root, path);
@@ -1706,7 +1879,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
             return;
         }
         int selected =
-                Messages.showChooseDialog(
+                DshChoiceDialog.show(
                         project,
                         DshBundle.message("dsh.outline.dialog.message"),
                         DshBundle.message("dsh.outline.dialog.title"),
@@ -1749,7 +1922,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
                                                                                 + template.relative)
                                                         .toArray(String[]::new);
                                         int selected =
-                                                Messages.showChooseDialog(
+                                                DshChoiceDialog.show(
                                                         project,
                                                         DshBundle.message(
                                                                 "dsh.prompt.template.choose.message"),
@@ -1882,6 +2055,8 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
     public void dispose() {
         disposed = true;
         for (ChatMirror mirror : List.copyOf(mirrors)) mirror.dispose();
+        runtimeTerminals.close();
+        sessionActions.close();
         jobs.close();
         runtimeFiles.close();
         runtime.removeStatusListener(runtimeStatusListener);

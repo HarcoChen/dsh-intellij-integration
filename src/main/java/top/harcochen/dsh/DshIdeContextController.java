@@ -12,7 +12,6 @@ import com.intellij.openapi.fileChooser.FileChooser;
 import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.fileEditor.FileEditorManager;
-import com.intellij.openapi.fileEditor.OpenFileDescriptor;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.vfs.LocalFileSystem;
@@ -261,6 +260,16 @@ final class DshIdeContextController {
                 () -> {
                     JsonArray result = new JsonArray();
                     String normalized = query == null ? "" : query.trim().toLowerCase(Locale.ROOT);
+                    if (normalized.isBlank() || "diagnostics".contains(normalized)) {
+                        JsonObject diagnostic = new JsonObject();
+                        diagnostic.addProperty("kind", "diagnostics");
+                        diagnostic.addProperty("label", "diagnostics");
+                        diagnostic.addProperty("insertText", "@diagnostics");
+                        diagnostic.addProperty(
+                                "description",
+                                DshBundle.message("dsh.context.picker.attach.diagnostics"));
+                        result.add(diagnostic);
+                    }
                     String root = project.getBasePath();
                     if (root != null) {
                         Path base = Path.of(root);
@@ -335,7 +344,7 @@ final class DshIdeContextController {
                                                     "dsh.context.picker.enable.selection"));
                             actions.add("toggle-selection");
                             int selected =
-                                    Messages.showChooseDialog(
+                                    DshChoiceDialog.show(
                                             project,
                                             DshBundle.message("dsh.context.picker.dialog.message"),
                                             DshBundle.message("dsh.context.picker.dialog.title"),
@@ -496,7 +505,7 @@ final class DshIdeContextController {
                 });
     }
 
-    private void attachDiagnostics() {
+    boolean attachDiagnostics() {
         Editor editor = FileEditorManager.getInstance(project).getSelectedTextEditor();
         VirtualFile file =
                 editor == null
@@ -504,15 +513,34 @@ final class DshIdeContextController {
                         : FileDocumentManager.getInstance().getFile(editor.getDocument());
         if (editor == null || file == null) {
             notifyUser(DshBundle.message("dsh.context.no.diagnostics"));
-            return;
+            return false;
         }
         String pathLabel = displayPath(file);
-        Document document = editor.getDocument();
         List<String> lines = diagnostics(project, file);
-        String full =
-                lines.isEmpty()
-                        ? pathLabel + ": no diagnostics reported by the IDE."
-                        : String.join("\n", lines);
+        if (lines.isEmpty()) {
+            notifyUser(DshBundle.message("dsh.context.no.diagnostics"));
+            return false;
+        }
+        javax.swing.JList<String> list = new javax.swing.JList<>(lines.toArray(new String[0]));
+        list.setSelectionInterval(0, lines.size() - 1);
+        javax.swing.JScrollPane scroll = new javax.swing.JScrollPane(list);
+        scroll.setPreferredSize(new java.awt.Dimension(850, 360));
+        com.intellij.openapi.ui.DialogWrapper picker =
+                new com.intellij.openapi.ui.DialogWrapper(project) {
+                    {
+                        setTitle(DshBundle.message("dsh.context.diagnostics.choose"));
+                        init();
+                    }
+
+                    @Override
+                    protected javax.swing.JComponent createCenterPanel() {
+                        return scroll;
+                    }
+                };
+        if (!picker.showAndGet()) return false;
+        lines = list.getSelectedValuesList();
+        if (lines.isEmpty()) return false;
+        String full = String.join("\n", lines);
         String content = limitContext(full);
         JsonObject item = new JsonObject();
         item.addProperty("id", java.util.UUID.randomUUID().toString());
@@ -523,6 +551,7 @@ final class DshIdeContextController {
         item.addProperty("byteLength", content.getBytes(StandardCharsets.UTF_8).length);
         item.addProperty("truncated", content.length() < full.length());
         replaceContextItem(item);
+        return true;
     }
 
     private void attachFolder() {
@@ -725,49 +754,6 @@ final class DshIdeContextController {
                                         "dsh.context.git.diff.failed", DshJson.message(error)));
                     }
                 });
-    }
-
-    void openFileLocation(JsonObject action) {
-        String path = DshJson.string(action, "path");
-        int line = DshJson.integer(action, "line", 1);
-        int column = DshJson.integer(action, "column", 1);
-        if (path == null || path.isBlank()) {
-            return;
-        }
-        ApplicationManager.getApplication()
-                .invokeLater(
-                        () -> {
-                            String resolved;
-                            try {
-                                resolved = resolvePath(path);
-                            } catch (RuntimeException error) {
-                                notifyUser(DshBundle.message("dsh.file.invalid.path", path));
-                                return;
-                            }
-                            VirtualFile file =
-                                    LocalFileSystem.getInstance().findFileByPath(resolved);
-                            if (file != null) {
-                                new OpenFileDescriptor(
-                                                project,
-                                                file,
-                                                Math.max(0, line - 1),
-                                                Math.max(0, column - 1))
-                                        .navigate(true);
-                            } else {
-                                notifyUser(DshBundle.message("dsh.file.not.found", path));
-                            }
-                        });
-    }
-
-    private String resolvePath(String path) {
-        Path candidate = Path.of(path);
-        if (candidate.isAbsolute()) {
-            return candidate.normalize().toString();
-        }
-        String root = project.getBasePath();
-        return root == null
-                ? candidate.normalize().toString()
-                : Path.of(root).resolve(candidate).normalize().toString();
     }
 
     private String displayPath(VirtualFile file) {

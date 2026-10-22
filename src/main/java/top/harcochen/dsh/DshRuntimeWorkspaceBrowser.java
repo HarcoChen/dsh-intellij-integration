@@ -104,7 +104,7 @@ final class DshRuntimeWorkspaceBrowser implements AutoCloseable {
                                                     return;
                                                 }
                                                 choice.complete(
-                                                        Messages.showChooseDialog(
+                                                        DshChoiceDialog.show(
                                                                 project,
                                                                 DshBundle.message(
                                                                         DshJson.bool(

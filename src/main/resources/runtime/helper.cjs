@@ -1520,7 +1520,7 @@ var VariantEngine = class {
         category: "transient",
         confidence: "medium",
         culpritIds: [],
-        humanSummary: "\u539F\u59CB\u7EC4\u5408\u5728\u6C99\u7BB1\u4E2D\u6062\u590D\u5065\u5EB7\uFF0C\u6545\u969C\u66F4\u63A5\u8FD1\u77AC\u6001\u542F\u52A8\u5931\u8D25\u3002"
+        humanSummary: t("The original composition recovered in the sandbox; the fault looks like a transient startup failure.")
       };
     }
     if (variant.kind === "v4-extension-overlays-removed") {
@@ -1528,14 +1528,17 @@ var VariantEngine = class {
         category: "extension-overlay",
         confidence: "high",
         culpritIds: variant.removedOverlayPaths ?? [],
-        humanSummary: "\u79FB\u9664\u6269\u5C55\u9644\u52A0\u5C42\u540E\u6C99\u7BB1\u901A\u8FC7\u5065\u5EB7\u63A2\u9488\u3002"
+        humanSummary: t("The sandbox passed its health probe once the extension overlay was removed.")
       };
     }
     return {
       category: "bundle",
       confidence: variant.candidateFix?.targetIds.length === 1 ? "high" : "medium",
       culpritIds: variant.candidateFix?.targetIds ?? [],
-      humanSummary: `\u6536\u7F29 bundle \u7EC4\u5408\u540E\u6C99\u7BB1\u901A\u8FC7\u5065\u5EB7\u63A2\u9488\uFF1A${variant.candidateFix?.targetIds.join(", ") || "\u7EC4\u5408\u4EA4\u4E92"}`
+      humanSummary: t(
+        "The sandbox passed its health probe after shrinking the bundle set: {targets}",
+        { targets: variant.candidateFix?.targetIds.join(", ") || t("bundle interaction") }
+      )
     };
   }
 };

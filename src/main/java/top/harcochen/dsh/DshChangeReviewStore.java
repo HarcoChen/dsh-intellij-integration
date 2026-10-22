@@ -44,6 +44,7 @@ final class DshChangeReviewStore {
     /** The private index and object directory one review's Git commands run against. */
     private static final class GitContext {
         private final Path cwd;
+        private String pathPrefix = "";
         private final Path tempRoot;
         private final Map<String, String> env;
 
@@ -72,6 +73,8 @@ final class DshChangeReviewStore {
     private static final class ChangeReview {
         private final int turn;
         private String state = "capturing";
+        private String operationDirectory;
+        private Long endSeq;
         private List<ChangeFile> files = new ArrayList<>();
         private boolean restored;
         private String error;
@@ -108,8 +111,14 @@ final class DshChangeReviewStore {
     private final Runnable onUpdate;
     private volatile boolean disposed;
 
-    DshChangeReviewStore(ExecutorService operations, Runnable onUpdate) {
-        this.operations = operations;
+    DshChangeReviewStore(Runnable onUpdate) {
+        this.operations =
+                java.util.concurrent.Executors.newSingleThreadExecutor(
+                        runnable -> {
+                            Thread thread = new Thread(runnable, "dsh-change-capture");
+                            thread.setDaemon(true);
+                            return thread;
+                        });
         this.onUpdate = onUpdate;
     }
 
@@ -142,6 +151,27 @@ final class DshChangeReviewStore {
                             ? entry.getAsJsonObject("event")
                             : entry;
             String type = string(event, "type");
+            if ("working-directory/change".equals(type)) {
+                synchronized (this) {
+                    if (!session.seen.add(number(event, "seq") + ":" + type) || !session.baselined)
+                        continue;
+                    String directory = DshWorkingDirectory.at(history, number(event, "seq"), cwd);
+                    for (ChangeReview review : session.reviews.values()) {
+                        if ("capturing".equals(review.state)
+                                && review.endSeq == null
+                                && !java.util.Objects.equals(
+                                        directory, review.operationDirectory)) {
+                            failReview(
+                                    sessionId,
+                                    review.turn,
+                                    new IllegalStateException(
+                                            DshBundle.message(
+                                                    "dsh.change.review.directory.changed")));
+                        }
+                    }
+                }
+                continue;
+            }
             if (!"turn/start".equals(type) && !"turn/end".equals(type)) continue;
             JsonObject data =
                     event.has("data") && event.get("data").isJsonObject()
@@ -156,7 +186,12 @@ final class DshChangeReviewStore {
                 if (!session.seen.add(key)) continue;
                 if (!session.baselined) continue;
                 start = "turn/start".equals(type);
-                if (start) session.reviews.put(turn, new ChangeReview(turn));
+                if (start) {
+                    ChangeReview review = new ChangeReview(turn);
+                    review.operationDirectory = DshWorkingDirectory.at(history, seq, cwd);
+                    session.reviews.put(turn, review);
+                } else if (session.reviews.containsKey(turn))
+                    session.reviews.get(turn).endSeq = seq;
             }
             onUpdate.run();
             operations.execute(
@@ -306,6 +341,7 @@ final class DshChangeReviewStore {
     }
 
     void dispose() {
+        operations.shutdownNow();
         disposed = true;
         Set<Path> roots;
         synchronized (this) {
@@ -342,7 +378,11 @@ final class DshChangeReviewStore {
             review = session == null ? null : session.reviews.get(turn);
             if (session == null || review == null || !"capturing".equals(review.state)) return;
         }
-        GitContext git = createGitContext(session.cwd);
+        GitContext git =
+                createGitContext(
+                        review.operationDirectory == null || review.operationDirectory.isBlank()
+                                ? session.cwd
+                                : review.operationDirectory);
         if (git == null) {
             // Not a repository: there is nothing to diff against, and an empty
             // review would claim the turn changed nothing.
@@ -354,6 +394,7 @@ final class DshChangeReviewStore {
         }
         String beforeTree = captureTree(git);
         synchronized (this) {
+            if (!"capturing".equals(review.state)) return;
             review.git = git;
             review.beforeTree = beforeTree;
         }
@@ -376,6 +417,7 @@ final class DshChangeReviewStore {
                         List.of(
                                 "diff",
                                 "--raw",
+                                "--relative",
                                 "-z",
                                 "-M",
                                 "--no-abbrev",
@@ -513,7 +555,13 @@ final class DshChangeReviewStore {
         env.put("GIT_INDEX_FILE", tempRoot.resolve("index").toString());
         env.put("GIT_OBJECT_DIRECTORY", objectDirectory.toString());
         env.put("GIT_ALTERNATE_OBJECT_DIRECTORIES", alternateObjects.toString());
-        return new GitContext(realCwd, tempRoot, env);
+        GitContext result = new GitContext(realCwd, tempRoot, env);
+        result.pathPrefix =
+                new String(
+                                runGitIn(realCwd, Map.of(), List.of("rev-parse", "--show-prefix")),
+                                StandardCharsets.UTF_8)
+                        .trim();
+        return result;
     }
 
     private void failReview(String sessionId, int turn, Exception error) {
@@ -680,7 +728,9 @@ final class DshChangeReviewStore {
                             List.of(
                                     "cat-file",
                                     "--filters",
-                                    "--path=" + (file.oldPath == null ? file.path : file.oldPath),
+                                    "--path="
+                                            + review.git.pathPrefix
+                                            + (file.oldPath == null ? file.path : file.oldPath),
                                     file.oldBlob)));
         }
         return contents;

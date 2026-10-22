@@ -60,6 +60,10 @@ public final class DshRemoteService implements Disposable {
     public static final String PHASE_CONNECTED = "connected";
     public static final String PHASE_RECONNECTING = "reconnecting";
 
+    public DshRemoteAccess access() {
+        return connection.access;
+    }
+
     public long settingsEpoch() {
         return connection.settingsEpoch();
     }
@@ -71,6 +75,15 @@ public final class DshRemoteService implements Disposable {
     private final DshRemoteUnaryClient unary;
     private final DshRemoteConnection connection;
     private final ExecutorService operations;
+    private final java.util.concurrent.CopyOnWriteArrayList<
+                    java.util.function.BiConsumer<String, JsonArray>>
+            featureListeners = new java.util.concurrent.CopyOnWriteArrayList<>();
+
+    public AutoCloseable onFeatureEvent(java.util.function.BiConsumer<String, JsonArray> listener) {
+        featureListeners.add(listener);
+        return () -> featureListeners.remove(listener);
+    }
+
     private final List<Consumer<DshRemoteState.Snapshot>> listeners = new ArrayList<>();
     private final Object listenerLock = new Object();
     private volatile JsonArray permissionOptions;
@@ -89,7 +102,8 @@ public final class DshRemoteService implements Disposable {
     }
 
     private void refreshPermissions(DshRemoteState.Snapshot next) {
-        if (!PHASE_CONNECTED.equals(next.phase)) return;
+        if (!PHASE_CONNECTED.equals(next.phase) || !access().allows("permissionPresets/catalog"))
+            return;
         String key = next.generation + ":" + connection.settingsEpoch();
         if (key.equals(permissionEpoch)) return;
         permissionEpoch = key;
@@ -167,7 +181,8 @@ public final class DshRemoteService implements Disposable {
                         unary,
                         auth::headers,
                         new ConnectionCallbacks(),
-                        message -> LOG.debug(message));
+                        message -> LOG.debug(message),
+                        runtime::runtimeVersion);
         runtime.addStatusListener(statusListener);
         if (runtime.getStatus().state == DshRuntimeService.RuntimeState.RUNNING
                 && runtime.getUrl() != null) {
@@ -329,6 +344,56 @@ public final class DshRemoteService implements Disposable {
     // unary domain API (blocking; only call from background executors)
     // ---------------------------------------------------------------------------
 
+    public JsonObject history(String sessionId) {
+        JsonObject result = new JsonObject();
+        DshRemoteState.FollowView follow = snapshot.follows.get("session:" + sessionId);
+        result.add("events", follow == null ? new JsonArray() : follow.events);
+        return result;
+    }
+
+    public void startAndAwait() {
+        runtime.startAsync().join();
+        CompletableFuture<Void> ready = new CompletableFuture<>();
+        Consumer<DshRemoteState.Snapshot> listener =
+                value -> {
+                    if (PHASE_CONNECTED.equals(value.phase)) ready.complete(null);
+                };
+        addListener(listener);
+        try {
+            listener.accept(snapshot);
+            ready.get(20, java.util.concurrent.TimeUnit.SECONDS);
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            throw DshRemoteException.carrier(
+                    "remote", "Interrupted while connecting to the Runtime", interrupted);
+        } catch (Exception unavailable) {
+            throw DshRemoteException.carrier(
+                    "remote", "The Runtime connection is not ready", unavailable);
+        } finally {
+            removeListener(listener);
+        }
+    }
+
+    public boolean canOpenWorkspacePath() {
+        JsonElement value = unary.call("session/canOpenWorkspacePath", new JsonObject());
+        if (value == null || !value.isJsonPrimitive() || !value.getAsJsonPrimitive().isBoolean())
+            throw DshRemoteException.protocol(
+                    "session/canOpenWorkspacePath", "Invalid Host path capability", null);
+        return value.getAsBoolean();
+    }
+
+    public void openWorkspacePath(String path) {
+        JsonObject request = new JsonObject();
+        request.addProperty("path", path);
+        JsonElement value =
+                unary.call("session/openWorkspacePath", DshRemoteContracts.withRequest(request));
+        if (value == null
+                || !value.isJsonObject()
+                || !DshJson.bool(value.getAsJsonObject(), "opened", false))
+            throw DshRemoteException.protocol(
+                    "session/openWorkspacePath", "Invalid Host path-open response", null);
+    }
+
     public JsonElement callFeature(String endpoint, JsonObject args) throws DshRemoteException {
         return unary.call(endpoint, args);
     }
@@ -351,6 +416,21 @@ public final class DshRemoteService implements Disposable {
             throw DshRemoteException.protocol(
                     "session/projections", "Invalid Team projection", null);
         return team;
+    }
+
+    public interface FeatureStream extends AutoCloseable {
+        void send(JsonObject item);
+
+        @Override
+        void close();
+    }
+
+    public FeatureStream duplexFeature(
+            String endpoint,
+            JsonObject args,
+            Consumer<JsonObject> items,
+            Consumer<JsonObject> terminal) {
+        return connection.duplexStream(endpoint, args, items, terminal);
     }
 
     public AutoCloseable watchFeature(
@@ -959,6 +1039,55 @@ public final class DshRemoteService implements Disposable {
         return value;
     }
 
+    public JsonArray pluginBundles() {
+        return DshPluginManager.rows(
+                unary.call("pluginManager/listBundles", new JsonObject()), true);
+    }
+
+    public JsonObject normalizePluginChange(JsonElement value) {
+        String target =
+                value != null && value.isJsonObject()
+                        ? DshJson.strictString(value.getAsJsonObject(), "target")
+                        : null;
+        if (target == null || target.isBlank())
+            throw DshRemoteException.protocol("pluginManager", "Invalid plugin target", null);
+        return DshPluginManager.change(value, target);
+    }
+
+    public JsonObject pluginChange(String endpoint, JsonObject args) {
+        return normalizePluginChange(unary.call(endpoint, args));
+    }
+
+    public JsonObject inspectPlugin(JsonObject args) {
+        JsonElement raw = unary.call("pluginManager/inspect", args);
+        if (!raw.isJsonObject())
+            throw DshRemoteException.protocol(
+                    "pluginManager/inspect", "Invalid inspection response", null);
+        JsonObject value = raw.getAsJsonObject();
+        String status = DshJson.strictString(value, "status");
+        boolean valid =
+                "refused".equals(status)
+                        ? DshJson.strictString(value, "problem") != null
+                                && DshJson.strictString(value, "reason") != null
+                        : "accepted".equals(status)
+                                && DshJson.strictString(value, "kind") != null
+                                && value.has("bundle")
+                                && (value.get("bundle").isJsonNull()
+                                        || (value.get("bundle").isJsonPrimitive()
+                                                && value.getAsJsonPrimitive("bundle").isBoolean()));
+        if ("accepted".equals(status)) {
+            if (!value.has("registry")
+                    || (!value.get("registry").isJsonNull()
+                            && DshJson.strictString(value, "registry") == null)) valid = false;
+            for (String field : new String[] {"name", "version", "description", "host"})
+                if (value.has(field) && DshJson.strictString(value, field) == null) valid = false;
+        }
+        if (!valid)
+            throw DshRemoteException.protocol(
+                    "pluginManager/inspect", "Invalid inspection response", null);
+        return value.deepCopy();
+    }
+
     public JsonObject setPluginEnabled(String id, boolean enabled, boolean bundle) {
         JsonObject args = new JsonObject();
         args.addProperty(bundle ? "name" : "id", id);
@@ -1263,6 +1392,17 @@ public final class DshRemoteService implements Disposable {
         @Override
         public void onAuthFailure(DshRemoteException error) {
             LOG.warn("DSH Runtime authentication failed: " + error.display());
+        }
+
+        @Override
+        public void onFeatureEvent(String event, JsonArray args) {
+            for (var listener : featureListeners) {
+                try {
+                    listener.accept(event, args);
+                } catch (RuntimeException failure) {
+                    LOG.debug("Remote feature event listener failed", failure);
+                }
+            }
         }
 
         @Override

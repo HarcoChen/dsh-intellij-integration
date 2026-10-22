@@ -1,6 +1,5 @@
 package top.harcochen.dsh;
 
-import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.intellij.ide.BrowserUtil;
@@ -127,52 +126,93 @@ final class DshAccountController {
         if (!values.isEmpty()) summary.append("\n").append(label).append(": ").append(values);
     }
 
+    private final java.util.concurrent.atomic.AtomicBoolean drainingBonuses =
+            new java.util.concurrent.atomic.AtomicBoolean();
+
     private void showBonuses(JsonObject client) {
+        if (!drainingBonuses.compareAndSet(false, true)) return;
+        String endpoint = runtime.getUrl();
         try {
-            JsonElement value = remote.accountBonuses(client);
-            if (!value.isJsonObject()) return;
-            JsonObject batch = value.getAsJsonObject();
-            String accountId = DshJson.string(batch, "accountId");
-            JsonArray bonuses =
-                    batch.has("bonuses") && batch.get("bonuses").isJsonArray()
-                            ? batch.getAsJsonArray("bonuses")
-                            : new JsonArray();
-            for (JsonElement candidate : bonuses) {
-                if (!candidate.isJsonObject() || accountId == null) continue;
-                JsonObject bonus = candidate.getAsJsonObject();
-                String orderId = DshJson.string(bonus, "orderId");
-                String message = DshJson.string(bonus, "message");
-                if (orderId == null || message == null) continue;
-                ApplicationManager.getApplication()
-                        .invokeLater(
-                                () -> {
-                                    Messages.showInfoMessage(
-                                            project,
-                                            message,
-                                            DshBundle.message("dsh.account.bonus"));
-                                    operations.execute(
-                                            () -> {
-                                                try {
-                                                    JsonElement acknowledged =
-                                                            remote.acknowledgeAccountBonus(
-                                                                    accountId, orderId, client);
-                                                    if (!acknowledged.isJsonPrimitive()
-                                                            || !acknowledged
-                                                                    .getAsJsonPrimitive()
-                                                                    .isBoolean()) {
-                                                        throw new IllegalStateException(
-                                                                "Invalid bonus acknowledgement from Runtime");
-                                                    }
-                                                } catch (Exception error) {
-                                                    errorSink.accept(DshJson.message(error));
-                                                }
-                                            });
-                                });
-                break;
+            JsonObject batch = bonusBatch(remote.accountBonuses(client));
+            if (batch == null) return;
+            String accountId = DshJson.strictString(batch, "accountId");
+            java.util.Set<String> seen = new java.util.HashSet<>();
+            for (JsonElement raw : batch.getAsJsonArray("bonuses")) {
+                JsonObject original = raw.getAsJsonObject();
+                String orderId = DshJson.strictString(original, "orderId");
+                if (!seen.add(orderId) || !java.util.Objects.equals(endpoint, runtime.getUrl()))
+                    continue;
+                JsonObject current = bonusBatch(remote.accountBonuses(client));
+                if (current == null
+                        || !accountId.equals(DshJson.strictString(current, "accountId"))) return;
+                JsonObject notice = null;
+                for (JsonElement item : current.getAsJsonArray("bonuses"))
+                    if (orderId.equals(DshJson.strictString(item.getAsJsonObject(), "orderId")))
+                        notice = item.getAsJsonObject();
+                if (notice == null) continue;
+                String expiresAt = DshJson.strictString(notice, "expiresAt");
+                try {
+                    if (!expiresAt.isBlank()
+                            && !java.time.Instant.parse(expiresAt).isAfter(java.time.Instant.now()))
+                        continue;
+                } catch (java.time.format.DateTimeParseException ignored) {
+                    /* An unspecified expiration does not expire the notice. */
+                }
+                JsonObject displayed = notice;
+                DshPluginManagementController.ui(
+                        () -> {
+                            if (java.util.Objects.equals(endpoint, runtime.getUrl()))
+                                Messages.showInfoMessage(
+                                        project,
+                                        DshJson.strictString(displayed, "message"),
+                                        DshJson.stringOr(
+                                                displayed,
+                                                "title",
+                                                DshBundle.message("dsh.account.bonus")));
+                            return null;
+                        });
+                if (!java.util.Objects.equals(endpoint, runtime.getUrl())) return;
+                JsonObject latest = bonusBatch(remote.accountBonuses(client));
+                if (latest == null || !accountId.equals(DshJson.strictString(latest, "accountId")))
+                    return;
+                JsonElement acknowledged =
+                        remote.acknowledgeAccountBonus(accountId, orderId, client);
+                if (!acknowledged.isJsonPrimitive()
+                        || !acknowledged.getAsJsonPrimitive().isBoolean())
+                    throw new IllegalStateException("Invalid bonus acknowledgement from Runtime");
+                if (!acknowledged.getAsBoolean()) return;
             }
-        } catch (Exception ignored) {
-            // Bonus notifications are optional; account management remains available.
+        } catch (DshRemoteException missing) {
+            if (!missing.isCapabilityMissing()) errorSink.accept(DshJson.message(missing));
+        } catch (RuntimeException error) {
+            errorSink.accept(DshJson.message(error));
+        } finally {
+            drainingBonuses.set(false);
         }
+    }
+
+    private static JsonObject bonusBatch(JsonElement value) {
+        if (value == null || value.isJsonNull()) return null;
+        if (!value.isJsonObject())
+            throw new IllegalArgumentException("Invalid account notifications");
+        JsonObject batch = value.getAsJsonObject();
+        if (DshJson.strictString(batch, "accountId") == null
+                || !batch.has("bonuses")
+                || !batch.get("bonuses").isJsonArray()
+                || batch.getAsJsonArray("bonuses").size() > 1000)
+            throw new IllegalArgumentException("Invalid account notifications");
+        for (JsonElement raw : batch.getAsJsonArray("bonuses")) {
+            if (!raw.isJsonObject())
+                throw new IllegalArgumentException("Invalid account notification");
+            JsonObject item = raw.getAsJsonObject();
+            if (DshJson.strictString(item, "orderId") == null
+                    || DshJson.string(item, "orderId").isBlank()
+                    || DshJson.strictString(item, "message") == null
+                    || DshJson.strictString(item, "expiresAt") == null
+                    || (item.has("title") && DshJson.strictString(item, "title") == null))
+                throw new IllegalArgumentException("Invalid account notification");
+        }
+        return batch;
     }
 
     private void choose(String status, String summary, JsonObject links, JsonObject client) {
@@ -190,7 +230,7 @@ final class DshAccountController {
                             DshBundle.message("dsh.account.sign.in")
                         };
         int action =
-                Messages.showChooseDialog(
+                DshChoiceDialog.show(
                         project,
                         summary,
                         DshBundle.message("dsh.account.title"),

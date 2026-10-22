@@ -1093,7 +1093,7 @@
             var dispatcher = resolveDispatcher();
             return dispatcher.useReducer(reducer, initialArg, init);
           }
-          function useRef12(initialValue) {
+          function useRef13(initialValue) {
             var dispatcher = resolveDispatcher();
             return dispatcher.useRef(initialValue);
           }
@@ -1887,7 +1887,7 @@
           exports.useLayoutEffect = useLayoutEffect5;
           exports.useMemo = useMemo6;
           exports.useReducer = useReducer;
-          exports.useRef = useRef12;
+          exports.useRef = useRef13;
           exports.useState = useState22;
           exports.useSyncExternalStore = useSyncExternalStore;
           exports.useTransition = useTransition;
@@ -23599,13 +23599,91 @@
     "Browse Runtime workspace files": "\u6D4F\u89C8 Runtime \u5DE5\u4F5C\u533A\u6587\u4EF6",
     "Configure Jev API key": "\u914D\u7F6E Jev API Key",
     "What\u2019s new": "\u66F4\u65B0\u8BF4\u660E",
-    "Enable the Schedule bundle in plugin settings to use reminders.": "\u8BF7\u5728\u63D2\u4EF6\u8BBE\u7F6E\u4E2D\u542F\u7528 Schedule bundle \u4EE5\u4F7F\u7528\u63D0\u9192\u3002",
+    "Schedule is unavailable in this Runtime version or disabled in plugin settings.": "\u5F53\u524D Runtime \u7248\u672C\u4E0D\u652F\u6301\u65E5\u7A0B\uFF0C\u6216\u5DF2\u5728\u63D2\u4EF6\u8BBE\u7F6E\u4E2D\u7981\u7528\u3002",
     "Open chat in editor tab": "\u5728\u7F16\u8F91\u5668\u6807\u7B7E\u9875\u6253\u5F00\u804A\u5929",
     "Enter to send; Shift+Enter for a new line.": "Enter \u53D1\u9001\uFF0CShift+Enter \u6362\u884C\u3002",
+    "DSH Session center": "DSH \u4F1A\u8BDD\u4E2D\u5FC3",
+    "Open Runtime terminal": "\u6253\u5F00 Runtime \u7EC8\u7AEF",
+    "Attach Problems": "\u9644\u52A0\u95EE\u9898",
+    "Manage Runtime plugins": "\u7BA1\u7406 Runtime \u63D2\u4EF6",
+    "Install or remove plugins": "\u5B89\u88C5\u6216\u5378\u8F7D\u63D2\u4EF6",
+    "Problems from current file": "\u5F53\u524D\u6587\u4EF6\u7684\u95EE\u9898",
+    "Choose diagnostics to attach once": "\u9009\u62E9\u8BCA\u65AD\uFF0C\u9644\u52A0\u5230\u4E0B\u4E00\u6761\u6D88\u606F",
+    "Attach Problems from the current file": "\u9644\u52A0\u5F53\u524D\u6587\u4EF6\u7684\u95EE\u9898",
+    "Choose the diagnostics to attach to your next message": "\u9009\u62E9\u8981\u9644\u52A0\u5230\u4E0B\u4E00\u6761\u6D88\u606F\u7684\u8BCA\u65AD",
+    "No diagnostics reported for the current file.": "\u5F53\u524D\u6587\u4EF6\u6CA1\u6709\u8BCA\u65AD\u95EE\u9898\u3002",
+    "Current directory: {path}": "\u5F53\u524D\u76EE\u5F55\uFF1A{path}",
+    "Open the source Session to complete migration before forking.": "\u8BF7\u5148\u6253\u5F00\u539F\u4F1A\u8BDD\u5B8C\u6210\u8FC1\u79FB\uFF0C\u518D\u5206\u53C9\u3002",
+    "Open the source Session to complete migration before reading its live state.": "\u8BF7\u5148\u6253\u5F00\u539F\u4F1A\u8BDD\u5B8C\u6210\u8FC1\u79FB\uFF0C\u518D\u8BFB\u53D6\u5B9E\u65F6\u72B6\u6001\u3002",
+    "The working directory changed during this turn. Use individual tool diffs to review its changes.": "\u672C\u8F6E\u6267\u884C\u671F\u95F4\u5DE5\u4F5C\u76EE\u5F55\u53D1\u751F\u53D8\u5316\uFF0C\u8BF7\u901A\u8FC7\u9010\u6B21\u5DE5\u5177 Diff \u5BA1\u67E5\u6539\u52A8\u3002",
+    "The connected Runtime changed. Open a new Runtime terminal.": "\u8FDE\u63A5\u7684 Runtime \u5DF2\u6539\u53D8\uFF0C\u8BF7\u91CD\u65B0\u6253\u5F00 Runtime \u7EC8\u7AEF\u3002",
+    "Runtime terminal retention ended. Reopen the terminal to reconnect.": "Runtime \u7EC8\u7AEF\u4FDD\u7559\u8FDE\u63A5\u5DF2\u7ED3\u675F\uFF0C\u8BF7\u91CD\u65B0\u6253\u5F00\u7EC8\u7AEF\u4EE5\u91CD\u8FDE\u3002",
+    "Runtime terminal disconnected: {message}": "Runtime \u7EC8\u7AEF\u8FDE\u63A5\u65AD\u5F00\uFF1A{message}",
+    "Terminal input exceeds the Runtime limit. Send smaller chunks.": "\u7EC8\u7AEF\u8F93\u5165\u8D85\u8FC7 Runtime \u9650\u5236\uFF0C\u8BF7\u5206\u6BB5\u53D1\u9001\u3002",
+    "New Runtime terminal": "\u65B0\u5EFA Runtime \u7EC8\u7AEF",
+    "Runtime terminals": "Runtime \u7EC8\u7AEF",
+    "Open a retained terminal or start a new user shell": "\u6253\u5F00\u4FDD\u7559\u7684\u7EC8\u7AEF\uFF0C\u6216\u542F\u52A8\u65B0\u7684\u7528\u6237 Shell",
+    "This Runtime does not expose interactive terminals. Use a compatible Web profile.": "\u5F53\u524D Runtime \u672A\u63D0\u4F9B\u4EA4\u4E92\u7EC8\u7AEF\uFF0C\u8BF7\u4F7F\u7528\u517C\u5BB9\u7684 Web \u914D\u7F6E\u3002",
+    "This Runtime does not expose plugin management. Open its Web UI to manage plugins.": "\u5F53\u524D Runtime \u672A\u63D0\u4F9B\u63D2\u4EF6\u7BA1\u7406\uFF0C\u8BF7\u5728\u5176 Web UI \u4E2D\u7BA1\u7406\u63D2\u4EF6\u3002",
+    "Install a plugin bundle": "\u5B89\u88C5\u63D2\u4EF6\u7EC4\u5408\u5305",
+    "Install a package or remove an installed bundle": "\u5B89\u88C5\u8F6F\u4EF6\u5305\u6216\u5378\u8F7D\u5DF2\u6709\u7EC4\u5408\u5305",
+    "Remove bundle": "\u5378\u8F7D\u7EC4\u5408\u5305",
+    "Remove {name} from the connected Runtime profile?": "\u4ECE\u5F53\u524D\u8FDE\u63A5\u7684 Runtime \u914D\u7F6E\u4E2D\u5378\u8F7D {name}\uFF1F",
+    "Removing {name}": "\u6B63\u5728\u5378\u8F7D {name}",
+    "Enter an npm package spec, Git repository, tarball URL, or a path on the Runtime host": "\u8F93\u5165 npm \u5305\u89C4\u683C\u3001Git \u4ED3\u5E93\u3001\u5F52\u6863 URL \u6216 Runtime \u4E3B\u673A\u4E0A\u7684\u8DEF\u5F84",
+    "Enter a valid package spec": "\u8BF7\u8F93\u5165\u6709\u6548\u7684\u5305\u89C4\u683C",
+    "Inspecting plugin package": "\u6B63\u5728\u68C0\u67E5\u63D2\u4EF6\u5305",
+    "This package does not declare a DSH bundle.": "\u8BE5\u8F6F\u4EF6\u5305\u672A\u58F0\u660E DSH \u7EC4\u5408\u5305\u3002",
+    "Install and enable": "\u5B89\u88C5\u5E76\u542F\u7528",
+    "Runtime default registry": "Runtime \u9ED8\u8BA4 Registry",
+    "Install and enable {name} on the connected Runtime? Plugins can execute code on its host.": "\u5728\u5F53\u524D\u8FDE\u63A5\u7684 Runtime \u4E2D\u5B89\u88C5\u5E76\u542F\u7528 {name}\uFF1F\u63D2\u4EF6\u53EF\u4EE5\u5728\u8BE5\u4E3B\u673A\u4E0A\u6267\u884C\u4EE3\u7801\u3002",
+    "The package's bundle and compatibility are checked during installation.": "\u5B89\u88C5\u8FC7\u7A0B\u4E2D\u4F1A\u68C0\u67E5\u8BE5\u5305\u7684\u7EC4\u5408\u5305\u58F0\u660E\u548C\u7248\u672C\u517C\u5BB9\u6027\u3002",
+    "Approve build scripts and retry": "\u6279\u51C6\u6784\u5EFA\u811A\u672C\u5E76\u91CD\u8BD5",
+    "These packages require build script approval: {packages}": "\u4EE5\u4E0B\u5305\u7684\u6784\u5EFA\u811A\u672C\u9700\u8981\u6279\u51C6\uFF1A{packages}",
+    "Installing plugin bundle": "\u6B63\u5728\u5B89\u88C5\u63D2\u4EF6\u7EC4\u5408\u5305",
+    "Plugin change: {target} \xB7 {state}": "\u63D2\u4EF6\u53D8\u66F4\uFF1A{target} \xB7 {state}",
+    "Restart the owning Runtime to apply this change.": "\u8BF7\u91CD\u542F\u6240\u5C5E Runtime \u4EE5\u4F7F\u6B64\u53D8\u66F4\u751F\u6548\u3002",
+    "Read only": "\u53EA\u8BFB",
     "Ready": "\u5C31\u7EEA",
     "Provisioning": "\u6B63\u5728\u521B\u5EFA",
     "Required by plugin management": "\u63D2\u4EF6\u7BA1\u7406\u529F\u80FD\u5FC5\u9700",
     "This row cannot be addressed by the profile patch": "\u914D\u7F6E\u8865\u4E01\u65E0\u6CD5\u5B9A\u4F4D\u6B64\u63D2\u4EF6\u884C",
+    "Add custom models before editing their reasoning levels.": "\u8BF7\u5148\u6DFB\u52A0\u81EA\u5B9A\u4E49\u6A21\u578B\uFF0C\u518D\u7F16\u8F91\u5176\u63A8\u7406\u7EA7\u522B\u3002",
+    "Edit model reasoning levels": "\u7F16\u8F91\u6A21\u578B\u63A8\u7406\u7EA7\u522B",
+    "Configure offered levels and their protocol values for a custom model": "\u914D\u7F6E\u81EA\u5B9A\u4E49\u6A21\u578B\u63D0\u4F9B\u7684\u63A8\u7406\u7EA7\u522B\u53CA\u534F\u8BAE\u503C",
+    "Inherit model reasoning levels": "\u7EE7\u627F\u6A21\u578B\u63A8\u7406\u7EA7\u522B",
+    "Disable model reasoning": "\u5173\u95ED\u6A21\u578B\u63A8\u7406",
+    "Configure model reasoning levels": "\u914D\u7F6E\u6A21\u578B\u63A8\u7406\u7EA7\u522B",
+    "The Runtime does not expose editable reasoning levels.": "Runtime \u672A\u63D0\u4F9B\u53EF\u7F16\u8F91\u7684\u63A8\u7406\u7EA7\u522B\u3002",
+    "Select reasoning levels": "\u9009\u62E9\u63A8\u7406\u7EA7\u522B",
+    "Select at least one reasoning level, or disable reasoning.": "\u8BF7\u81F3\u5C11\u9009\u62E9\u4E00\u4E2A\u63A8\u7406\u7EA7\u522B\uFF0C\u6216\u5173\u95ED\u63A8\u7406\u3002",
+    "Protocol value; leave empty only for the off level": "\u534F\u8BAE\u53C2\u6570\u503C\uFF1B\u4EC5 off \u7EA7\u522B\u53EF\u7559\u7A7A",
+    "Enter a protocol value.": "\u8BF7\u8F93\u5165\u534F\u8BAE\u53C2\u6570\u503C\u3002",
+    "Web search settings are unavailable or read-only.": "\u7F51\u9875\u641C\u7D22\u8BBE\u7F6E\u4E0D\u53EF\u7528\u6216\u4E3A\u53EA\u8BFB\u3002",
+    "DeepSeek Search and Fetch API": "DeepSeek \u641C\u7D22\u4E0E\u6293\u53D6 API",
+    "Direct search and Markdown fetch; separate API billing": "\u76F4\u63A5\u641C\u7D22\u5E76\u6293\u53D6 Markdown\uFF1BAPI \u5355\u72EC\u8BA1\u8D39",
+    "Messages search and local HTTP fetch": "Messages \u641C\u7D22\u4E0E\u672C\u5730 HTTP \u6293\u53D6",
+    "Search through an auxiliary model request": "\u901A\u8FC7\u8F85\u52A9\u6A21\u578B\u8BF7\u6C42\u641C\u7D22",
+    "Web search and fetch": "\u7F51\u9875\u641C\u7D22\u4E0E\u6293\u53D6",
+    "Web search API endpoint": "\u7F51\u9875\u641C\u7D22 API \u7AEF\u70B9",
+    "API base URL including path prefix; leave empty to inherit": "\u5305\u542B\u8DEF\u5F84\u524D\u7F00\u7684 API \u57FA\u7840\u5730\u5740\uFF1B\u7559\u7A7A\u4EE5\u7EE7\u627F",
+    "Leave empty to inherit the Messages search endpoint": "\u7559\u7A7A\u4EE5\u7EE7\u627F Messages \u641C\u7D22\u7AEF\u70B9",
+    "Enter a valid HTTP(S) endpoint.": "\u8BF7\u8F93\u5165\u6709\u6548\u7684 HTTP(S) \u7AEF\u70B9\u3002",
+    "Search result count": "\u641C\u7D22\u7ED3\u679C\u6570",
+    "Enter an integer from 1 to 50.": "\u8BF7\u8F93\u5165 1 \u5230 50 \u4E4B\u95F4\u7684\u6574\u6570\u3002",
+    "Include original question": "\u9644\u5E26\u539F\u59CB\u95EE\u9898",
+    "Send search query only": "\u4EC5\u53D1\u9001\u641C\u7D22\u8BCD",
+    "Send up to 128 characters of the user question with search requests": "\u641C\u7D22\u8BF7\u6C42\u662F\u5426\u9644\u5E26\u7528\u6237\u95EE\u9898\u7684\u524D 128 \u4E2A\u5B57\u7B26",
+    "The connected Runtime changed. Try again.": "\u8FDE\u63A5\u7684 Runtime \u5DF2\u53D8\u5316\uFF0C\u8BF7\u91CD\u8BD5\u3002",
+    "Web search settings saved. They apply to the next operation.": "\u7F51\u9875\u641C\u7D22\u8BBE\u7F6E\u5DF2\u4FDD\u5B58\uFF0C\u5C06\u4ECE\u4E0B\u6B21\u64CD\u4F5C\u8D77\u751F\u6548\u3002",
+    "This action is unavailable with your Runtime permissions.": "\u5F53\u524D Runtime \u6743\u9650\u4E0D\u5141\u8BB8\u6B64\u64CD\u4F5C\u3002",
+    "Shared Runtime access \xB7 actions depend on your permissions": "\u5171\u4EAB Runtime \u8BBF\u95EE \xB7 \u53EF\u7528\u64CD\u4F5C\u7531\u6388\u6743\u51B3\u5B9A",
+    "Runtime permissions unavailable \xB7 waiting for access": "Runtime \u6743\u9650\u4E0D\u53EF\u7528 \xB7 \u6B63\u5728\u7B49\u5F85\u6388\u6743",
+    "Read-only Runtime access": "Runtime \u53EA\u8BFB\u8BBF\u95EE",
+    "Job Center \xB7 live output and history": "\u4EFB\u52A1\u4E2D\u5FC3 \xB7 \u5B9E\u65F6\u8F93\u51FA\u4E0E\u5386\u53F2",
+    "History \xB7 read-only": "\u5386\u53F2\u8BB0\u5F55 \xB7 \u53EA\u8BFB",
+    "No live execution": "\u65E0\u5B9E\u65F6\u6267\u884C\u72B6\u6001",
+    "Schedule is unavailable or access was denied. DSH 0.2.1 includes Schedule by default; check the connected profile and permissions. On 0.2.0, enable @deepseek-ai/dsh-experimental-schedule-bundle and restart the Runtime.": "Schedule \u4E0D\u53EF\u7528\u6216\u672A\u83B7\u6388\u6743\u3002DSH 0.2.1 \u9ED8\u8BA4\u5185\u7F6E Schedule\uFF0C\u8BF7\u68C0\u67E5\u8FDE\u63A5\u7684\u914D\u7F6E\u4E0E\u6743\u9650\u3002\u4F7F\u7528 0.2.0 \u65F6\uFF0C\u8BF7\u542F\u7528 @deepseek-ai/dsh-experimental-schedule-bundle \u5E76\u91CD\u542F Runtime\u3002",
     "Job Center \xB7 live output": "\u4EFB\u52A1\u4E2D\u5FC3 \xB7 \u5B9E\u65F6\u8F93\u51FA",
     "Cancel job": "\u53D6\u6D88\u4EFB\u52A1",
     "Unowned job": "\u65E0\u6240\u5C5E\u4F1A\u8BDD\u7684\u4EFB\u52A1",
@@ -23670,6 +23748,19 @@
     "Manage providers": "\u7BA1\u7406\u63D0\u4F9B\u5546",
     "Manage plugin settings": "\u7BA1\u7406\u63D2\u4EF6\u8BBE\u7F6E",
     "Plugin settings": "\u63D2\u4EF6\u8BBE\u7F6E",
+    "Plugins": "\u63D2\u4EF6\u7BA1\u7406",
+    "Manage plugins and their configuration": "\u7BA1\u7406\u63D2\u4EF6\u4E0E\u914D\u7F6E",
+    "Back to conversation": "\u8FD4\u56DE\u5BF9\u8BDD",
+    "Plugin views": "\u63D2\u4EF6\u89C6\u56FE",
+    "Plugin configuration": "\u53C2\u6570\u8BBE\u7F6E",
+    "Runtime plugins": "Runtime \u63D2\u4EF6",
+    "Manage": "\u7BA1\u7406",
+    "Configure the plugins available in this Runtime": "\u8C03\u6574\u5F53\u524D Runtime \u7684\u63D2\u4EF6\u53C2\u6570",
+    "Plugin configuration will appear here when available.": "\u63D2\u4EF6\u63D0\u4F9B\u7684\u53EF\u914D\u7F6E\u53C2\u6570\u4F1A\u663E\u793A\u5728\u8FD9\u91CC\u3002",
+    "Advanced configuration": "\u9AD8\u7EA7\u914D\u7F6E",
+    "Add a plugin bundle to extend your Runtime.": "\u5B89\u88C5\u63D2\u4EF6\u7EC4\u5408\u5305\uFF0C\u4E3A Runtime \u6DFB\u52A0\u66F4\u591A\u80FD\u529B\u3002",
+    "Clear search": "\u6E05\u7A7A\u641C\u7D22",
+    "Ctrl / \u2318 + Enter to send": "Ctrl / \u2318 + Enter \u53D1\u9001",
     "Plugin inventory": "\u63D2\u4EF6\u6E05\u5355",
     "Read-only plugin inventory": "\u53EA\u8BFB\u63D2\u4EF6\u6E05\u5355",
     "Refresh plugin inventory": "\u5237\u65B0\u63D2\u4EF6\u6E05\u5355",
@@ -24376,6 +24467,18 @@
   function SearchIcon({ size = 14 }) {
     return /* @__PURE__ */ import_react2.default.createElement("svg", { ...base(size) }, /* @__PURE__ */ import_react2.default.createElement("circle", { cx: "7", cy: "7", r: "4" }), /* @__PURE__ */ import_react2.default.createElement("path", { d: "M10.2 10.2 14 14" }));
   }
+  function PluginIcon({ size = 16 }) {
+    return /* @__PURE__ */ import_react2.default.createElement("svg", { ...base(size) }, /* @__PURE__ */ import_react2.default.createElement("path", { d: "M6 2.5H2.5V6H4a2 2 0 1 1 0 4H2.5v3.5H6V12a2 2 0 1 1 4 0v1.5h3.5V10H12a2 2 0 1 1 0-4h1.5V2.5H10V4a2 2 0 1 1-4 0Z" }));
+  }
+  function RefreshIcon({ size = 16 }) {
+    return /* @__PURE__ */ import_react2.default.createElement("svg", { ...base(size) }, /* @__PURE__ */ import_react2.default.createElement("path", { d: "M13.5 6A5.5 5.5 0 0 0 3.3 4L1.5 6M1.5 2.5V6H5M2.5 10a5.5 5.5 0 0 0 10.2 2l1.8-2M11 10h3.5v3.5" }));
+  }
+  function ExternalLinkIcon({ size = 14 }) {
+    return /* @__PURE__ */ import_react2.default.createElement("svg", { ...base(size) }, /* @__PURE__ */ import_react2.default.createElement("path", { d: "M9 2.5h4.5V7M13.5 2.5 7 9M6.5 2.5H4A1.5 1.5 0 0 0 2.5 4v8A1.5 1.5 0 0 0 4 13.5h8a1.5 1.5 0 0 0 1.5-1.5V9.5" }));
+  }
+  function FolderIcon({ size = 14 }) {
+    return /* @__PURE__ */ import_react2.default.createElement("svg", { ...base(size) }, /* @__PURE__ */ import_react2.default.createElement("path", { d: "M1.5 5V3.5A1 1 0 0 1 2.5 2.5H6L8 5h5.5a1 1 0 0 1 1 1v6.5a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1Z" }));
+  }
   function MoreIcon({ size = 14 }) {
     return /* @__PURE__ */ import_react2.default.createElement("svg", { ...base(size), fill: "currentColor", stroke: "none" }, /* @__PURE__ */ import_react2.default.createElement("circle", { cx: "3.5", cy: "8", r: "1.4" }), /* @__PURE__ */ import_react2.default.createElement("circle", { cx: "8", cy: "8", r: "1.4" }), /* @__PURE__ */ import_react2.default.createElement("circle", { cx: "12.5", cy: "8", r: "1.4" }));
   }
@@ -24421,6 +24524,7 @@
     draftWorkspaceId,
     draftWorkspaceTitle,
     focusMode,
+    settingsOpen,
     pendingRequestCount
   }) {
     const [menuOpen, setMenuOpen] = (0, import_react3.useState)(false);
@@ -24468,6 +24572,7 @@
       { key: "fork", label: t("Fork session"), action: { type: "forkSession" }, disabled: !hasSession },
       { key: "archive", label: t("Archive session"), action: { type: "archiveSession" }, disabled: !hasSession },
       { key: "trace", label: t("Open session trace"), action: { type: "openTrace" }, disabled: !hasSession },
+      { key: "terminal", label: t("Open Runtime terminal"), action: { type: "openRuntimeTerminal" }, disabled: !hasSession },
       { key: "feedback", label: t("Submit feedback"), action: { type: "openSessionFeedback" }, disabled: !hasSession },
       {
         key: "runtime",
@@ -24479,6 +24584,7 @@
       { key: "logs", label: t("Open runtime logs"), action: { type: "openLogs" } },
       { key: "browser", label: t("Open in browser"), action: { type: "openBrowser" } },
       { key: "sessions", label: t("Manage sessions"), action: { type: "manageSessions" }, separatorBefore: true },
+      { key: "center", label: t("DSH Session center"), action: { type: "openSessionCenter" } },
       { key: "editorTab", label: t("Open chat in editor tab"), action: { type: "openInEditor" } },
       { key: "account", label: t("Manage DeepSeek account"), action: { type: "manageAccount" } },
       { key: "schedules", label: t("Manage schedules"), action: { type: "manageSchedules" } },
@@ -24489,6 +24595,7 @@
       { key: "presets", label: t("Manage agent presets"), action: { type: "manageAgentPresets" } },
       { key: "providers", label: t("Manage providers"), action: { type: "manageProviders" } },
       { key: "settings", label: t("Manage plugin settings"), action: { type: "manageSettings" } },
+      { key: "plugins", label: t("Install or remove plugins"), action: { type: "managePlugins" } },
       { key: "key", label: t("Configure API key"), action: { type: "configureApiKey" } },
       {
         key: "focus",
@@ -24512,6 +24619,7 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
       {
         className: "dsh-session-select",
         title: t("Switch session"),
+        "aria-label": t("Switch session"),
         value: sessionId ?? "",
         disabled: sessions.length === 0 && !currentWorkspace,
         onChange: (event) => {
@@ -24536,8 +24644,20 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
       "button",
       {
         type: "button",
+        className: `dsh-icon-button${settingsOpen ? " active" : ""}`,
+        title: t("Manage plugin settings"),
+        "aria-label": t("Manage plugin settings"),
+        "aria-pressed": settingsOpen,
+        onClick: () => postAction({ type: "manageSettings" })
+      },
+      /* @__PURE__ */ import_react3.default.createElement(PluginIcon, null)
+    ), /* @__PURE__ */ import_react3.default.createElement(
+      "button",
+      {
+        type: "button",
         className: "dsh-icon-button",
         title: t("Search sessions"),
+        "aria-label": t("Search sessions"),
         onClick: () => postAction({ type: "searchSession" })
       },
       /* @__PURE__ */ import_react3.default.createElement(SearchIcon, { size: 16 })
@@ -24592,7 +24712,10 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
         type: "openFileLocation",
         path: file.dataset.filePath,
         line,
-        ...column === void 0 ? {} : { column }
+        ...column === void 0 ? {} : { column },
+        ...file.closest("[data-message-seq]")?.dataset.messageSeq === void 0 ? {} : {
+          seq: Number(file.closest("[data-message-seq]").dataset.messageSeq)
+        }
       });
       return true;
     }
@@ -25442,6 +25565,7 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
   }
   var MessageList = import_react9.default.memo(function MessageList2({
     messages,
+    visible = true,
     submitting,
     agentStatusLabel,
     autoOpenReasoning,
@@ -25451,16 +25575,19 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
     const listRef = (0, import_react9.useRef)(null);
     const stickToBottomRef = (0, import_react9.useRef)(true);
     const pendingRevealRef = (0, import_react9.useRef)([]);
+    const visibleRef = (0, import_react9.useRef)(visible);
+    visibleRef.current = visible;
     const stableMessages = useStableMessages(messages);
     (0, import_react9.useEffect)(() => subscribeRevealMessage((seq) => {
       const target = listRef.current?.querySelector(`[data-message-seq="${seq}"]`);
-      if (target) {
+      if (target && visibleRef.current) {
         target.scrollIntoView({ behavior: "smooth", block: "center" });
       } else {
         pendingRevealRef.current.push(seq);
       }
     }), []);
     (0, import_react9.useLayoutEffect)(() => {
+      if (!visible) return;
       const list = listRef.current;
       if (list && stickToBottomRef.current) {
         list.scrollTop = list.scrollHeight;
@@ -25469,8 +25596,9 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
       for (const seq of pending) {
         listRef.current?.querySelector(`[data-message-seq="${seq}"]`)?.scrollIntoView({ behavior: "smooth", block: "center" });
       }
-    }, [stableMessages]);
+    }, [stableMessages, visible]);
     const onScroll = () => {
+      if (!visibleRef.current) return;
       const list = listRef.current;
       if (!list) return;
       stickToBottomRef.current = list.scrollHeight - list.scrollTop - list.clientHeight < 60;
@@ -26006,7 +26134,7 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
       const timer = window.setInterval(() => setNow(Date.now()), 1e3);
       return () => window.clearInterval(timer);
     }, [hasLiveJob]);
-    return /* @__PURE__ */ import_react14.default.createElement("div", null, /* @__PURE__ */ import_react14.default.createElement("div", { className: "dsh-card-detail" }, t("Job Center \xB7 live output")), jobs.map((job) => /* @__PURE__ */ import_react14.default.createElement("div", { className: "dsh-job-row", key: job.id }, /* @__PURE__ */ import_react14.default.createElement("div", { className: "dsh-job-label" }, job.label), /* @__PURE__ */ import_react14.default.createElement("div", { className: "dsh-job-meta" }, job.kind, " \xB7 ", t({ running: "Running", stopping: "Stopping...", completed: "Completed", killed: "Cancelled", failed: "Failed" }[job.status]), " \xB7 ", job.id, " \xB7 ", formatJobDuration((job.finishedAt ?? now) - job.startedAt), job.progress ? ` \xB7 ${job.progress}` : ""), /* @__PURE__ */ import_react14.default.createElement("div", { className: "dsh-job-owner" }, job.ownerSessionId ? t("owner {owner}", { owner: job.ownerSessionId }) : t("Unowned job")), job.outputSummary ? /* @__PURE__ */ import_react14.default.createElement("div", { className: "dsh-job-summary" }, job.outputSummary) : null, job.streamError ? /* @__PURE__ */ import_react14.default.createElement("div", { className: "dsh-card-error" }, job.streamError) : null, job.outputText ? /* @__PURE__ */ import_react14.default.createElement("pre", { tabIndex: 0, className: "dsh-job-output" }, job.outputGap ? "\u2026 " : "", job.outputText) : null, job.canKill ? /* @__PURE__ */ import_react14.default.createElement(
+    return /* @__PURE__ */ import_react14.default.createElement("div", null, /* @__PURE__ */ import_react14.default.createElement("div", { className: "dsh-card-detail" }, t("Job Center \xB7 live output and history")), jobs.map((job) => /* @__PURE__ */ import_react14.default.createElement("div", { className: "dsh-job-row", key: job.id }, /* @__PURE__ */ import_react14.default.createElement("div", { className: "dsh-job-label" }, job.label), /* @__PURE__ */ import_react14.default.createElement("div", { className: "dsh-job-meta" }, job.historical ? `${t("History \xB7 read-only")} \xB7 ` : "", job.kind, " \xB7 ", t({ running: "Running", stopping: "Stopping...", completed: "Completed", killed: "Cancelled", failed: "Failed", unavailable: "No live execution" }[job.status]), " \xB7 ", job.id, " \xB7 ", formatJobDuration((job.finishedAt ?? (job.historical ? job.startedAt : now)) - job.startedAt), job.progress ? ` \xB7 ${job.progress}` : ""), /* @__PURE__ */ import_react14.default.createElement("div", { className: "dsh-job-owner" }, job.ownerSessionId ? t("owner {owner}", { owner: job.ownerSessionId }) : t("Unowned job")), job.outputSummary ? /* @__PURE__ */ import_react14.default.createElement("div", { className: "dsh-job-summary" }, job.outputSummary) : null, job.streamError ? /* @__PURE__ */ import_react14.default.createElement("div", { className: "dsh-card-error" }, job.streamError) : null, job.outputText ? /* @__PURE__ */ import_react14.default.createElement("pre", { tabIndex: 0, className: "dsh-job-output" }, job.outputGap ? "\u2026 " : "", job.outputText) : null, job.canKill ? /* @__PURE__ */ import_react14.default.createElement(
       "button",
       {
         type: "button",
@@ -26091,7 +26219,7 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
     return t("One-time");
   }
   function SchedulePanel({ schedule, catalog: catalog2 }) {
-    return /* @__PURE__ */ import_react17.default.createElement("div", { className: "dsh-schedule", "aria-label": t("Active reminders") }, /* @__PURE__ */ import_react17.default.createElement("button", { type: "button", className: "dsh-button dsh-button-secondary", onClick: () => postAction({ type: "manageSchedules" }) }, t("Manage schedules")), catalog2?.status === "unavailable" ? /* @__PURE__ */ import_react17.default.createElement("div", { className: "dsh-card-detail" }, t("Enable the Schedule bundle in plugin settings to use reminders.")) : null, /* @__PURE__ */ import_react17.default.createElement("ul", { className: "dsh-schedule-items" }, (schedule ?? []).map((item) => /* @__PURE__ */ import_react17.default.createElement("li", { className: "dsh-schedule-item", key: item.id }, /* @__PURE__ */ import_react17.default.createElement("div", { className: "dsh-schedule-prompt" }, item.prompt), /* @__PURE__ */ import_react17.default.createElement("div", { className: "dsh-schedule-meta" }, timing(item), " \xB7 ", t("Next at {time}", { time: new Date(item.scheduledAt).toLocaleString() })), /* @__PURE__ */ import_react17.default.createElement("div", { className: "dsh-schedule-id" }, t("ID {id}", { id: item.id }))))));
+    return /* @__PURE__ */ import_react17.default.createElement("div", { className: "dsh-schedule", "aria-label": t("Active reminders") }, /* @__PURE__ */ import_react17.default.createElement("button", { type: "button", className: "dsh-button dsh-button-secondary", onClick: () => postAction({ type: "manageSchedules" }) }, t("Manage schedules")), catalog2?.status === "unavailable" ? /* @__PURE__ */ import_react17.default.createElement("div", { className: "dsh-card-detail" }, t("Schedule is unavailable in this Runtime version or disabled in plugin settings.")) : null, /* @__PURE__ */ import_react17.default.createElement("ul", { className: "dsh-schedule-items" }, (schedule ?? []).map((item) => /* @__PURE__ */ import_react17.default.createElement("li", { className: "dsh-schedule-item", key: item.id }, /* @__PURE__ */ import_react17.default.createElement("div", { className: "dsh-schedule-prompt" }, item.prompt), /* @__PURE__ */ import_react17.default.createElement("div", { className: "dsh-schedule-meta" }, timing(item), " \xB7 ", t("Next at {time}", { time: new Date(item.scheduledAt).toLocaleString() })), /* @__PURE__ */ import_react17.default.createElement("div", { className: "dsh-schedule-id" }, t("ID {id}", { id: item.id }))))));
   }
 
   // webview/src/components/dock/SubagentsPanel.tsx
@@ -27091,7 +27219,7 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
     const width = tokens === void 0 ? 0 : Math.min(100, Math.max(2, tokens / maximum * 100));
     return /* @__PURE__ */ import_react30.default.createElement("div", { className: "dsh-token-chart-row", title }, /* @__PURE__ */ import_react30.default.createElement("span", { className: "dsh-token-chart-label" }, label), /* @__PURE__ */ import_react30.default.createElement("span", { className: "dsh-token-chart-track" }, /* @__PURE__ */ import_react30.default.createElement("span", { className: `dsh-token-chart-fill ${kind}`, style: { width: `${width}%` } })), /* @__PURE__ */ import_react30.default.createElement("span", { className: "dsh-token-chart-value" }, tokens === void 0 ? "--" : compactTokens(tokens), suffix ? /* @__PURE__ */ import_react30.default.createElement("small", null, suffix) : null));
   }
-  function TokenUsageBar({ usage }) {
+  function TokenUsageBar({ usage, canSelectModel }) {
     const [hovered, setHovered] = (0, import_react30.useState)(false);
     const [focused, setFocused] = (0, import_react30.useState)(false);
     const anchorRef = (0, import_react30.useRef)(null);
@@ -27280,6 +27408,7 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
       {
         type: "button",
         className: "dsh-usage-model",
+        disabled: canSelectModel === false,
         title: t("Select the current session model"),
         onClick: () => postAction({ type: "selectModel" })
       },
@@ -27351,6 +27480,7 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
   var SLASH_MENU_ID = "dsh-slash-completion";
   var SKILL_MENU_ID = "dsh-skill-completion";
   function useSlashCompletion({
+    access,
     text,
     setText,
     skills,
@@ -27364,6 +27494,12 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
     const resetSlashIndex = (0, import_react31.useCallback)(() => setSlashIndex(0), []);
     const available = (0, import_react31.useMemo)(() => mergeSlashCommands(commands, modeSelectionEnabled), [commands, modeSelectionEnabled]);
     const executeSlashCommand = (0, import_react31.useCallback)((name) => {
+      const command = available.find((entry) => entry.name === name.toLowerCase().split(/\s+/u)[0]);
+      const action = command?.action?.type;
+      if (command?.origin === "host" && (access?.canSend === false || access?.canRunCommands === false)) return true;
+      if ((action === "selectModel" || command?.name === "/effort") && access?.canSelectModel === false) return true;
+      if (action === "selectAgentPreset" && access?.canSelectPreset === false) return true;
+      if (action === "openTrace" && access?.canReadSession === false) return true;
       const handled = runSlashCommand(name, {
         reasoningEffortAvailable: !!reasoningEffort?.options.length,
         onShowEffort,
@@ -27373,7 +27509,7 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
       setText("");
       setSlashIndex(0);
       return true;
-    }, [reasoningEffort, onShowEffort, setText, available]);
+    }, [access, reasoningEffort, onShowEffort, setText, available]);
     const slashQuery = text.match(/^\/(\S*)$/u)?.[1]?.toLowerCase();
     const slashMatches = slashQuery === void 0 ? [] : available.filter((command) => command.name.slice(1).startsWith(slashQuery));
     const slashSkillMatches = slashQuery === void 0 ? [] : skills.filter(
@@ -27398,6 +27534,7 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
         setText(`${text.slice(0, start)}/${name} `);
         setSlashIndex(0);
       } else if (/^\/\S*$/u.test(text)) {
+        if (access?.canSend === false) return;
         postAction({ type: "sendPrompt", text: `/${name}`, mode: "queue" });
         setText("");
         setSlashIndex(0);
@@ -27405,7 +27542,7 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
         return;
       }
       window.requestAnimationFrame(focusTextarea);
-    }, [text, setText, focusTextarea]);
+    }, [access?.canSend, text, setText, focusTextarea]);
     const handleCompletionKeyDown = (event) => {
       if (skillMatches.length) {
         if (event.key === "ArrowDown") {
@@ -27535,6 +27672,8 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
   var MIN_HEIGHT = 56;
   var MAX_HEIGHT = 180;
   var Composer = import_react33.default.memo(function Composer2({
+    access,
+    visible = true,
     context,
     selection,
     selectionEnabled,
@@ -27568,7 +27707,7 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
     const imageDrafts = useImageDrafts(imageLimits);
     const fileDrafts = useFileDrafts();
     const planActive = plan !== void 0 && (plan.pending ? !plan.active : plan.active);
-    const planCommandAvailable = canTogglePlan(commands);
+    const planCommandAvailable = canTogglePlan(commands) && access?.canRunCommands !== false;
     const togglePlan = (0, import_react33.useCallback)(() => {
       if (!planCommandAvailable) return;
       const next = !(planToggleTargetRef.current ?? planActive);
@@ -27592,6 +27731,7 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
     }, []);
     const onShowEffort = (0, import_react33.useCallback)(() => setEffortVisible(true), []);
     const completion = useSlashCompletion({
+      access,
       text,
       setText,
       skills,
@@ -27629,8 +27769,8 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
       textarea.style.height = `${Math.min(MAX_HEIGHT, Math.max(MIN_HEIGHT, textarea.scrollHeight))}px`;
     }, [reasoningEffort]);
     (0, import_react33.useEffect)(() => {
-      autoGrow();
-    }, [text, autoGrow]);
+      if (visible) autoGrow();
+    }, [text, autoGrow, visible]);
     (0, import_react33.useEffect)(() => {
       return subscribeInsertText((insertion) => {
         const textarea = textareaRef.current;
@@ -27661,7 +27801,7 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
       });
     }, [completion.resetSlashIndex]);
     const send = (0, import_react33.useCallback)(() => {
-      if (submitting) return;
+      if (submitting || access?.canSend === false) return;
       const value = textareaRef.current?.value ?? text;
       const attached = imageDrafts.images.length > 0 || fileDrafts.files.length > 0;
       if (!value.trim() && !attached) return;
@@ -27676,7 +27816,7 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
       setText("");
       imageDrafts.clear();
       fileDrafts.clear();
-    }, [completion.executeSlashCommand, imageDrafts, fileDrafts, busy, submitting, promptMode, text]);
+    }, [access?.canSend, completion.executeSlashCommand, imageDrafts, fileDrafts, busy, submitting, promptMode, text]);
     const sendLabel = t("Send");
     const quotedReferenceMatch = text.match(/(?:^|\s)@"([^"]*)$/u);
     const plainReferenceMatch = text.match(/(?:^|\s)@([^\s@]*)$/u);
@@ -27701,6 +27841,13 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
     const chooseFileReference = (candidate) => {
       const referenceStart = text.length - referenceQuery.length - (referenceQuoted ? 2 : 1);
       const prefix = text.slice(0, Math.max(0, referenceStart));
+      if (candidate.kind === "diagnostics") {
+        setText(prefix);
+        postAction({ type: "openDiagnosticsPicker" });
+        setDismissedReferenceKey(referenceContextKey);
+        window.requestAnimationFrame(focusTextarea);
+        return;
+      }
       const suffix = candidate.kind === "directory" ? "" : " ";
       setText(prefix + candidate.insertText + suffix);
       setReferenceIndex(0);
@@ -27751,7 +27898,7 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
       ReasoningEffortControl,
       {
         control: reasoningEffort,
-        submitting,
+        submitting: submitting || access?.canSelectModel === false,
         busy,
         onDismiss: () => setEffortVisible(false)
       }
@@ -27812,9 +27959,10 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
           type: "button",
           className: "dsh-icon-button dsh-add-context",
           title: t("Add attachment"),
+          "aria-label": t("Add attachment"),
           "aria-expanded": attachmentMenuVisible,
           disabled: submitting,
-          onClick: () => setAttachmentMenuVisible((visible) => !visible)
+          onClick: () => setAttachmentMenuVisible((visible2) => !visible2)
         },
         /* @__PURE__ */ import_react33.default.createElement(PlusIcon, null)
       ), attachmentMenuVisible ? (
@@ -27843,7 +27991,10 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
           },
           /* @__PURE__ */ import_react33.default.createElement(TerminalIcon, null),
           t("Recent terminal command")
-        ), /* @__PURE__ */ import_react33.default.createElement(
+        ), /* @__PURE__ */ import_react33.default.createElement("button", { type: "button", className: "dsh-menu-item", onClick: () => {
+          setAttachmentMenuVisible(false);
+          postAction({ type: "openDiagnosticsPicker" });
+        } }, t("Problems from current file")), /* @__PURE__ */ import_react33.default.createElement(
           "button",
           {
             type: "button",
@@ -27917,7 +28068,7 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
           className: "dsh-prompt",
           placeholder: t(planActive ? "Describe your task to generate a plan" : "Describe a task; use @ for files, $ for skills..."),
           value: text,
-          disabled: submitting,
+          readOnly: submitting,
           rows: 2,
           title: t(enterToSend ? "Enter to send; Shift+Enter for a new line." : "Ctrl/Cmd + Enter to send."),
           "aria-expanded": activeMenuId !== void 0,
@@ -27977,8 +28128,8 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
         {
           type: "button",
           className: `dsh-send-button${busy ? " dsh-button-secondary" : ""}`,
-          title: busy ? t("Stop") : sendLabel,
-          disabled: busy ? cancelling : submitting || !text.trim() && imageDrafts.images.length === 0 && fileDrafts.files.length === 0,
+          title: access?.canSend === false && !busy ? t("Read-only Runtime access") : busy ? t("Stop") : sendLabel,
+          disabled: busy ? cancelling || access?.canCancel === false : access?.canSend === false || submitting || !text.trim() && imageDrafts.images.length === 0 && fileDrafts.files.length === 0,
           onClick: () => {
             if (busy) {
               postAction({ type: "cancel" });
@@ -27989,7 +28140,8 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
         },
         busy ? /* @__PURE__ */ import_react33.default.createElement(StopIcon, null) : /* @__PURE__ */ import_react33.default.createElement(SendIcon, null),
         busy ? cancelling ? t("Stopping...") : t("Stop") : sendLabel
-      )
+      ),
+      /* @__PURE__ */ import_react33.default.createElement("span", { className: "dsh-composer-shortcut", "aria-hidden": "true" }, t(enterToSend ? "Enter to send; Shift+Enter for a new line." : "Ctrl/Cmd + Enter to send."))
     ), /* @__PURE__ */ import_react33.default.createElement("div", { className: "dsh-composer-footer" }, planActive || planCommandAvailable ? /* @__PURE__ */ import_react33.default.createElement(
       "button",
       {
@@ -28007,9 +28159,9 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
       PermissionModeChip,
       {
         permissions,
-        switchable: canSwitchPermissions(commands)
+        switchable: canSwitchPermissions(commands) && access?.canRunCommands !== false
       }
-    ), /* @__PURE__ */ import_react33.default.createElement(TokenUsageBar, { usage: tokenUsage }), /* @__PURE__ */ import_react33.default.createElement(SessionStats, { stats: sessionStats })));
+    ), /* @__PURE__ */ import_react33.default.createElement(TokenUsageBar, { usage: tokenUsage, canSelectModel: access?.canSelectModel }), /* @__PURE__ */ import_react33.default.createElement(SessionStats, { stats: sessionStats })));
   });
 
   // webview/src/components/SettingsPanel.tsx
@@ -28029,6 +28181,7 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
   }
   function readOnlyLabel(reason) {
     if (reason === "management-required") return t("Required by plugin management");
+    if (reason === "permission-denied") return t("This action is unavailable with your Runtime permissions.");
     if (reason === "unaddressable") return t("This row cannot be addressed by the profile patch");
     return reason;
   }
@@ -28148,7 +28301,7 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
       bundle.enabled ? t("Deselect bundle") : t("Select bundle")
     ));
   }
-  function PluginInventoryPanel({ inventory }) {
+  function PluginInventoryPanel({ inventory, canManagePackages }) {
     const [query, setQuery] = (0, import_react34.useState)("");
     const [selectedPresetId, setSelectedPresetId] = (0, import_react34.useState)();
     const presets = inventory.agentPresets ?? [];
@@ -28184,30 +28337,27 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
     );
     const matchingBundles = bundles.filter((bundle) => matches(bundle.name, null, normalizedQuery));
     const hasMatches = failedEntries.length > 0 || regularEntries.length > 0 || selectedRows.length > 0 || otherMatchCount > 0 || matchingBundles.length > 0;
-    if (inventory.loading) {
-      return /* @__PURE__ */ import_react34.default.createElement("section", { className: "dsh-plugin-inventory" }, /* @__PURE__ */ import_react34.default.createElement("div", { className: "dsh-settings-loading" }, t("Reading plugins...")));
-    }
-    if (inventory.error) {
-      return /* @__PURE__ */ import_react34.default.createElement("section", { className: "dsh-plugin-inventory" }, /* @__PURE__ */ import_react34.default.createElement("div", { className: "dsh-settings-error" }, inventory.error), /* @__PURE__ */ import_react34.default.createElement("button", { type: "button", onClick: () => postAction({ type: "refreshPluginInventory" }) }, t("Retry")));
-    }
-    return /* @__PURE__ */ import_react34.default.createElement("section", { className: "dsh-plugin-inventory", "aria-label": t("Plugin inventory") }, /* @__PURE__ */ import_react34.default.createElement("div", { className: "dsh-plugin-inventory-head" }, /* @__PURE__ */ import_react34.default.createElement("div", null, /* @__PURE__ */ import_react34.default.createElement("strong", null, t("Plugin inventory")), /* @__PURE__ */ import_react34.default.createElement("small", null, t("Enable or disable Runtime plugins and bundles"))), /* @__PURE__ */ import_react34.default.createElement(
-      "button",
-      {
-        type: "button",
-        disabled: inventory.loading,
-        title: t("Refresh plugin inventory"),
-        onClick: () => postAction({ type: "refreshPluginInventory" })
-      },
-      t("Refresh")
-    )), inventory.mutation?.pending ? /* @__PURE__ */ import_react34.default.createElement("div", { className: "dsh-card-detail" }, t("Applying plugin change...")) : null, inventory.mutation?.message ? /* @__PURE__ */ import_react34.default.createElement("div", { role: "status", className: inventory.mutation.failed ? "dsh-settings-error" : "dsh-card-detail" }, inventory.mutation.message) : null, inventory.mutation?.restartRequired ? /* @__PURE__ */ import_react34.default.createElement("button", { type: "button", className: "dsh-button", onClick: () => postAction({ type: "restartRuntime" }) }, t("Restart Runtime")) : null, /* @__PURE__ */ import_react34.default.createElement("label", { className: "dsh-plugin-inventory-search" }, /* @__PURE__ */ import_react34.default.createElement("span", null, t("Search plugins")), /* @__PURE__ */ import_react34.default.createElement(
+    return /* @__PURE__ */ import_react34.default.createElement("section", { className: "dsh-plugin-inventory", "aria-label": t("Plugin inventory") }, /* @__PURE__ */ import_react34.default.createElement("div", { className: "dsh-plugin-inventory-toolbar" }, /* @__PURE__ */ import_react34.default.createElement("label", { className: "dsh-plugin-inventory-search" }, /* @__PURE__ */ import_react34.default.createElement(SearchIcon, { size: 15 }), /* @__PURE__ */ import_react34.default.createElement(
       "input",
       {
         type: "search",
         value: query,
+        "aria-label": t("Search plugins"),
         placeholder: t("Search plugins"),
         onChange: (event) => setQuery(event.target.value)
       }
-    )), inventory.entries.length === 0 && presets.length === 0 && bundles.length === 0 ? /* @__PURE__ */ import_react34.default.createElement("div", { className: "dsh-settings-empty" }, t("No plugins are available.")) : null, normalizedQuery && !hasMatches ? /* @__PURE__ */ import_react34.default.createElement("div", { className: "dsh-settings-empty" }, t("No matching plugins.")) : null, matchingBundles.length > 0 ? /* @__PURE__ */ import_react34.default.createElement("details", { className: "dsh-plugin-group", open: true }, /* @__PURE__ */ import_react34.default.createElement("summary", null, /* @__PURE__ */ import_react34.default.createElement("strong", null, t("Runtime bundles")), /* @__PURE__ */ import_react34.default.createElement("span", null, t("{count} bundles", { count: matchingBundles.length }))), /* @__PURE__ */ import_react34.default.createElement("small", null, t("Choose the bundles used by this Runtime profile")), /* @__PURE__ */ import_react34.default.createElement("ul", { className: "dsh-plugin-cards" }, matchingBundles.map((bundle) => bundleCard(bundle, inventory.mutation)))) : null, selectedPreset ? /* @__PURE__ */ import_react34.default.createElement("details", { className: "dsh-plugin-group", open: true }, /* @__PURE__ */ import_react34.default.createElement("summary", null, /* @__PURE__ */ import_react34.default.createElement("strong", null, t("Session plugins")), /* @__PURE__ */ import_react34.default.createElement("span", null, t("{count} plugins", { count: selectedRows.length }))), /* @__PURE__ */ import_react34.default.createElement("div", { className: "dsh-plugin-group-head" }, /* @__PURE__ */ import_react34.default.createElement("small", null, t("Composed per session by agent presets")), /* @__PURE__ */ import_react34.default.createElement(
+    )), /* @__PURE__ */ import_react34.default.createElement(
+      "button",
+      {
+        type: "button",
+        className: "dsh-icon-button dsh-plugin-refresh",
+        disabled: inventory.loading,
+        title: t("Refresh plugin inventory"),
+        "aria-label": t("Refresh plugin inventory"),
+        onClick: () => postAction({ type: "refreshPluginInventory" })
+      },
+      /* @__PURE__ */ import_react34.default.createElement(RefreshIcon, null)
+    )), inventory.mutation?.pending ? /* @__PURE__ */ import_react34.default.createElement("div", { className: "dsh-card-detail" }, t("Applying plugin change...")) : null, inventory.mutation?.message ? /* @__PURE__ */ import_react34.default.createElement("div", { role: "status", className: inventory.mutation.failed ? "dsh-settings-error" : "dsh-card-detail" }, inventory.mutation.message) : null, inventory.mutation?.restartRequired ? /* @__PURE__ */ import_react34.default.createElement("button", { type: "button", className: "dsh-button", onClick: () => postAction({ type: "restartRuntime" }) }, t("Restart Runtime")) : null, inventory.loading ? /* @__PURE__ */ import_react34.default.createElement("div", { className: "dsh-settings-loading", role: "status" }, t("Reading plugins...")) : null, inventory.error ? /* @__PURE__ */ import_react34.default.createElement("div", { className: "dsh-settings-error", role: "alert" }, /* @__PURE__ */ import_react34.default.createElement("span", null, inventory.error), /* @__PURE__ */ import_react34.default.createElement("button", { type: "button", className: "dsh-button dsh-button-secondary", disabled: inventory.loading, onClick: () => postAction({ type: "refreshPluginInventory" }) }, t("Retry"))) : null, !inventory.loading && !inventory.error ? /* @__PURE__ */ import_react34.default.createElement(import_react34.default.Fragment, null, !normalizedQuery && inventory.entries.length === 0 && presets.length === 0 && bundles.length === 0 ? /* @__PURE__ */ import_react34.default.createElement("div", { className: "dsh-settings-empty-state" }, /* @__PURE__ */ import_react34.default.createElement("span", { className: "dsh-settings-empty-icon" }, /* @__PURE__ */ import_react34.default.createElement(PluginIcon, { size: 24 })), /* @__PURE__ */ import_react34.default.createElement("strong", null, t("No plugins are available.")), /* @__PURE__ */ import_react34.default.createElement("p", null, t("Add a plugin bundle to extend your Runtime.")), /* @__PURE__ */ import_react34.default.createElement("button", { type: "button", className: "dsh-button dsh-button-secondary", disabled: canManagePackages === false, onClick: () => postAction({ type: "managePlugins" }) }, t("Install or remove plugins"))) : null, normalizedQuery && !hasMatches ? /* @__PURE__ */ import_react34.default.createElement("div", { className: "dsh-settings-empty-state", role: "status" }, /* @__PURE__ */ import_react34.default.createElement("span", { className: "dsh-settings-empty-icon" }, /* @__PURE__ */ import_react34.default.createElement(SearchIcon, { size: 24 })), /* @__PURE__ */ import_react34.default.createElement("strong", null, t("No matching plugins.")), /* @__PURE__ */ import_react34.default.createElement("button", { type: "button", className: "dsh-button dsh-button-secondary", onClick: () => setQuery("") }, t("Clear search"))) : null, matchingBundles.length > 0 ? /* @__PURE__ */ import_react34.default.createElement("details", { className: "dsh-plugin-group", open: true }, /* @__PURE__ */ import_react34.default.createElement("summary", null, /* @__PURE__ */ import_react34.default.createElement("strong", null, t("Runtime bundles")), /* @__PURE__ */ import_react34.default.createElement("span", null, t("{count} bundles", { count: matchingBundles.length }))), /* @__PURE__ */ import_react34.default.createElement("small", null, t("Choose the bundles used by this Runtime profile")), /* @__PURE__ */ import_react34.default.createElement("ul", { className: "dsh-plugin-cards" }, matchingBundles.map((bundle) => bundleCard(bundle, inventory.mutation)))) : null, selectedPreset ? /* @__PURE__ */ import_react34.default.createElement("details", { className: "dsh-plugin-group", open: true }, /* @__PURE__ */ import_react34.default.createElement("summary", null, /* @__PURE__ */ import_react34.default.createElement("strong", null, t("Session plugins")), /* @__PURE__ */ import_react34.default.createElement("span", null, t("{count} plugins", { count: selectedRows.length }))), /* @__PURE__ */ import_react34.default.createElement("div", { className: "dsh-plugin-group-head" }, /* @__PURE__ */ import_react34.default.createElement("small", null, t("Composed per session by agent presets")), /* @__PURE__ */ import_react34.default.createElement(
       "select",
       {
         "aria-label": t("Choose agent preset"),
@@ -28215,7 +28365,7 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
         onChange: (event) => setSelectedPresetId(event.target.value)
       },
       presets.map((preset) => /* @__PURE__ */ import_react34.default.createElement("option", { key: preset.id, value: preset.id }, presetLabel(preset)))
-    )), selectedPreset.broken !== void 0 ? /* @__PURE__ */ import_react34.default.createElement("div", { className: "dsh-plugin-broken", role: "alert" }, selectedPreset.broken) : null, selectedRows.length > 0 ? /* @__PURE__ */ import_react34.default.createElement("ul", { className: "dsh-plugin-cards" }, selectedRows.map((row, index) => presetRowCard(selectedPreset, row, index))) : null, otherMatchCount > 0 ? /* @__PURE__ */ import_react34.default.createElement("div", { className: "dsh-plugin-hint" }, t("{count} more matches in other presets", { count: otherMatchCount }), otherPresetMatches.map((preset) => /* @__PURE__ */ import_react34.default.createElement("button", { type: "button", key: preset.id, onClick: () => setSelectedPresetId(preset.id) }, presetName(preset)))) : null) : null, inventory.entries.length > 0 ? /* @__PURE__ */ import_react34.default.createElement("details", { className: "dsh-plugin-group", open: !selectedPreset }, /* @__PURE__ */ import_react34.default.createElement("summary", null, /* @__PURE__ */ import_react34.default.createElement("strong", null, t("Global plugins")), /* @__PURE__ */ import_react34.default.createElement("span", null, t("{count} plugins", { count: failedEntries.length + regularEntries.length }))), /* @__PURE__ */ import_react34.default.createElement("small", null, t("Shared by the system and every session")), failedEntries.length + regularEntries.length > 0 ? /* @__PURE__ */ import_react34.default.createElement("ul", { className: "dsh-plugin-cards" }, failedEntries.map((entry) => globalEntryCard(entry, enabledIn.get(entry.moduleName), managedById.get(entry.entryId), inventory.mutation)), regularEntries.map((entry) => globalEntryCard(entry, enabledIn.get(entry.moduleName), managedById.get(entry.entryId), inventory.mutation))) : null) : null);
+    )), selectedPreset.broken !== void 0 ? /* @__PURE__ */ import_react34.default.createElement("div", { className: "dsh-plugin-broken", role: "alert" }, selectedPreset.broken) : null, selectedRows.length > 0 ? /* @__PURE__ */ import_react34.default.createElement("ul", { className: "dsh-plugin-cards" }, selectedRows.map((row, index) => presetRowCard(selectedPreset, row, index))) : null, otherMatchCount > 0 ? /* @__PURE__ */ import_react34.default.createElement("div", { className: "dsh-plugin-hint" }, t("{count} more matches in other presets", { count: otherMatchCount }), otherPresetMatches.map((preset) => /* @__PURE__ */ import_react34.default.createElement("button", { type: "button", key: preset.id, onClick: () => setSelectedPresetId(preset.id) }, presetName(preset)))) : null) : null, inventory.entries.length > 0 ? /* @__PURE__ */ import_react34.default.createElement("details", { className: "dsh-plugin-group", open: !selectedPreset }, /* @__PURE__ */ import_react34.default.createElement("summary", null, /* @__PURE__ */ import_react34.default.createElement("strong", null, t("Global plugins")), /* @__PURE__ */ import_react34.default.createElement("span", null, t("{count} plugins", { count: failedEntries.length + regularEntries.length }))), /* @__PURE__ */ import_react34.default.createElement("small", null, t("Shared by the system and every session")), failedEntries.length + regularEntries.length > 0 ? /* @__PURE__ */ import_react34.default.createElement("ul", { className: "dsh-plugin-cards" }, failedEntries.map((entry) => globalEntryCard(entry, enabledIn.get(entry.moduleName), managedById.get(entry.entryId), inventory.mutation)), regularEntries.map((entry) => globalEntryCard(entry, enabledIn.get(entry.moduleName), managedById.get(entry.entryId), inventory.mutation))) : null) : null) : null);
   }
 
   // webview/src/components/SettingsPanel.tsx
@@ -28315,7 +28465,16 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
     ))) : null);
   }
   function SettingsPanel({ settings }) {
-    return /* @__PURE__ */ import_react35.default.createElement("section", { className: "dsh-settings-panel", "aria-label": t("Plugin settings") }, /* @__PURE__ */ import_react35.default.createElement("div", { className: "dsh-settings-panel-head" }, /* @__PURE__ */ import_react35.default.createElement("div", null, /* @__PURE__ */ import_react35.default.createElement("strong", null, t("Plugin settings")), /* @__PURE__ */ import_react35.default.createElement("small", null, t("Public Harness settings namespaces"))), /* @__PURE__ */ import_react35.default.createElement("button", { type: "button", onClick: () => postAction({ type: "manageSettings" }) }, t("Close"))), settings.loading ? /* @__PURE__ */ import_react35.default.createElement("div", { className: "dsh-settings-loading" }, t("Loading...")) : null, settings.error ? /* @__PURE__ */ import_react35.default.createElement("div", { className: "dsh-settings-error" }, settings.error) : null, settings.pluginInventory ? /* @__PURE__ */ import_react35.default.createElement(PluginInventoryPanel, { inventory: settings.pluginInventory }) : null, !settings.loading && !settings.error && settings.cards.length === 0 ? /* @__PURE__ */ import_react35.default.createElement("div", { className: "dsh-settings-empty" }, t("No plugin settings exposed")) : null, /* @__PURE__ */ import_react35.default.createElement("div", { className: "dsh-settings-cards" }, settings.cards.map((card) => /* @__PURE__ */ import_react35.default.createElement(SettingsCard, { key: card.ns, card, writable: settings.writable }))), /* @__PURE__ */ import_react35.default.createElement("button", { type: "button", className: "dsh-settings-document", onClick: () => postAction({ type: "openBrowser" }) }, t("Open advanced configuration in the dsh Web UI")));
+    const [view, setView] = (0, import_react35.useState)("plugins");
+    const closeRef = (0, import_react35.useRef)(null);
+    (0, import_react35.useEffect)(() => {
+      const previousFocus = document.activeElement;
+      closeRef.current?.focus();
+      return () => {
+        if (previousFocus instanceof HTMLElement && previousFocus.isConnected) previousFocus.focus();
+      };
+    }, []);
+    return /* @__PURE__ */ import_react35.default.createElement("section", { className: "dsh-settings-panel", "aria-label": t("Plugin settings") }, /* @__PURE__ */ import_react35.default.createElement("div", { className: "dsh-settings-panel-head" }, /* @__PURE__ */ import_react35.default.createElement("span", { className: "dsh-settings-heading-icon" }, /* @__PURE__ */ import_react35.default.createElement(PluginIcon, { size: 20 })), /* @__PURE__ */ import_react35.default.createElement("div", { className: "dsh-settings-heading" }, /* @__PURE__ */ import_react35.default.createElement("h2", null, t("Plugins")), /* @__PURE__ */ import_react35.default.createElement("small", null, t("Manage plugins and their configuration"))), /* @__PURE__ */ import_react35.default.createElement("button", { ref: closeRef, type: "button", className: "dsh-icon-button", title: t("Back to conversation"), "aria-label": t("Back to conversation"), onClick: () => postAction({ type: "manageSettings" }) }, /* @__PURE__ */ import_react35.default.createElement(CloseIcon, { size: 16 }))), /* @__PURE__ */ import_react35.default.createElement("div", { className: "dsh-settings-views", role: "group", "aria-label": t("Plugin views") }, /* @__PURE__ */ import_react35.default.createElement("button", { type: "button", id: "dsh-plugin-inventory-view", "aria-pressed": view === "plugins", "aria-controls": "dsh-plugin-inventory-content", onClick: () => setView("plugins") }, t("Plugin inventory")), /* @__PURE__ */ import_react35.default.createElement("button", { type: "button", id: "dsh-plugin-configuration-view", "aria-pressed": view === "configuration", "aria-controls": "dsh-plugin-configuration-content", onClick: () => setView("configuration") }, t("Plugin configuration"), settings.cards.length > 0 ? /* @__PURE__ */ import_react35.default.createElement("span", { className: "dsh-settings-count" }, settings.cards.length) : null)), /* @__PURE__ */ import_react35.default.createElement("div", { className: "dsh-settings-content" }, /* @__PURE__ */ import_react35.default.createElement("section", { id: "dsh-plugin-inventory-content", "aria-labelledby": "dsh-plugin-inventory-view", hidden: view !== "plugins" }, /* @__PURE__ */ import_react35.default.createElement("div", { className: "dsh-settings-section-head" }, /* @__PURE__ */ import_react35.default.createElement("div", null, /* @__PURE__ */ import_react35.default.createElement("h3", null, t("Runtime plugins")), /* @__PURE__ */ import_react35.default.createElement("p", null, t("Enable or disable Runtime plugins and bundles"))), /* @__PURE__ */ import_react35.default.createElement("button", { type: "button", className: "dsh-button dsh-settings-install", disabled: settings.canManagePlugins === false, title: t("Install or remove plugins"), onClick: () => postAction({ type: "managePlugins" }) }, /* @__PURE__ */ import_react35.default.createElement(PlusIcon, null), t("Manage"))), settings.pluginInventory ? /* @__PURE__ */ import_react35.default.createElement(PluginInventoryPanel, { inventory: settings.pluginInventory, canManagePackages: settings.canManagePlugins }) : /* @__PURE__ */ import_react35.default.createElement("div", { className: settings.loading ? "dsh-settings-loading" : "dsh-settings-empty", role: "status" }, t(settings.loading ? "Reading plugins..." : "Plugins are temporarily unavailable."))), /* @__PURE__ */ import_react35.default.createElement("section", { id: "dsh-plugin-configuration-content", "aria-labelledby": "dsh-plugin-configuration-view", hidden: view !== "configuration" }, /* @__PURE__ */ import_react35.default.createElement("div", { className: "dsh-settings-section-head" }, /* @__PURE__ */ import_react35.default.createElement("div", null, /* @__PURE__ */ import_react35.default.createElement("h3", null, t("Plugin settings")), /* @__PURE__ */ import_react35.default.createElement("p", null, t("Configure the plugins available in this Runtime"))), /* @__PURE__ */ import_react35.default.createElement("button", { type: "button", className: "dsh-button", disabled: !settings.writable, onClick: () => postAction({ type: "configureWebSearch" }) }, t("Web search and fetch"))), settings.loading ? /* @__PURE__ */ import_react35.default.createElement("div", { className: "dsh-settings-loading", role: "status" }, t("Loading...")) : null, !settings.loading && !settings.error && settings.cards.length === 0 ? /* @__PURE__ */ import_react35.default.createElement("div", { className: "dsh-settings-empty-state" }, /* @__PURE__ */ import_react35.default.createElement("span", { className: "dsh-settings-empty-icon" }, /* @__PURE__ */ import_react35.default.createElement(PluginIcon, { size: 24 })), /* @__PURE__ */ import_react35.default.createElement("strong", null, t("No plugin settings exposed")), /* @__PURE__ */ import_react35.default.createElement("p", null, t("Plugin configuration will appear here when available."))) : null, /* @__PURE__ */ import_react35.default.createElement("div", { className: "dsh-settings-cards" }, settings.cards.map((card) => /* @__PURE__ */ import_react35.default.createElement(SettingsCard, { key: card.ns, card, writable: settings.writable })))), settings.error ? /* @__PURE__ */ import_react35.default.createElement("div", { className: "dsh-settings-error", role: "alert" }, settings.error) : null), /* @__PURE__ */ import_react35.default.createElement("div", { className: "dsh-settings-panel-footer" }, /* @__PURE__ */ import_react35.default.createElement("span", null, "dsh Web UI"), /* @__PURE__ */ import_react35.default.createElement("button", { type: "button", className: "dsh-settings-document", title: t("Open advanced configuration in the dsh Web UI"), onClick: () => postAction({ type: "openBrowser" }) }, t("Advanced configuration"), /* @__PURE__ */ import_react35.default.createElement(ExternalLinkIcon, null))));
   }
 
   // webview/src/components/StatusBanner.tsx
@@ -28502,6 +28661,7 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
   // webview/src/App.tsx
   function App() {
     const state = useHostState();
+    const settingsOpen = !state.focusMode && Boolean(state.settings?.open);
     return /* @__PURE__ */ import_react38.default.createElement("div", { className: `dsh-shell${state.focusMode ? " dsh-focus-mode" : ""}` }, /* @__PURE__ */ import_react38.default.createElement(
       Header,
       {
@@ -28513,11 +28673,13 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
         draftWorkspaceId: state.draftWorkspaceId,
         draftWorkspaceTitle: state.draftWorkspaceTitle,
         focusMode: state.focusMode,
+        settingsOpen,
         pendingRequestCount: state.interactions.filter((interaction) => interaction.status === "pending").length
       }
-    ), /* @__PURE__ */ import_react38.default.createElement(StatusBanner, { status: state.status, sessionStatus: state.sessionStatus }), /* @__PURE__ */ import_react38.default.createElement(SessionFeedbackDialog, { feedback: state.sessionFeedback }), !state.focusMode && state.settings ? /* @__PURE__ */ import_react38.default.createElement(SettingsPanel, { settings: state.settings }) : null, /* @__PURE__ */ import_react38.default.createElement(
+    ), /* @__PURE__ */ import_react38.default.createElement(StatusBanner, { status: state.status, sessionStatus: state.sessionStatus }), state.workingDirectory ? /* @__PURE__ */ import_react38.default.createElement("div", { className: "dsh-directory-bar", title: t("Current directory: {path}", { path: state.workingDirectory }) }, /* @__PURE__ */ import_react38.default.createElement(FolderIcon, null), /* @__PURE__ */ import_react38.default.createElement("span", null, state.workingDirectory)) : null, /* @__PURE__ */ import_react38.default.createElement(SessionFeedbackDialog, { feedback: state.sessionFeedback }), /* @__PURE__ */ import_react38.default.createElement("div", { className: "dsh-conversation", hidden: settingsOpen }, /* @__PURE__ */ import_react38.default.createElement(
       MessageList,
       {
+        visible: !settingsOpen,
         messages: state.messages,
         submitting: state.submitting,
         agentStatusLabel: state.agentStatusLabel,
@@ -28551,9 +28713,11 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
         agentPresetLabel: state.agentPresetLabel,
         autoOpenReasoning: state.autoOpenReasoning
       }
-    ) : null, /* @__PURE__ */ import_react38.default.createElement(
+    ) : null, state.access && !state.access.owner ? /* @__PURE__ */ import_react38.default.createElement("div", { className: "dsh-card-detail", role: "status" }, t(state.access.available ? "Shared Runtime access \xB7 actions depend on your permissions" : "Runtime permissions unavailable \xB7 waiting for access")) : null, /* @__PURE__ */ import_react38.default.createElement(
       Composer,
       {
+        access: state.access,
+        visible: !settingsOpen,
         context: state.context,
         selection: state.selection,
         selectionEnabled: state.selectionEnabled,
@@ -28573,7 +28737,7 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
         cancelling: state.cancelling,
         sessionId: state.sessionId
       }
-    ));
+    )), settingsOpen && state.settings ? /* @__PURE__ */ import_react38.default.createElement(SettingsPanel, { settings: state.settings }) : null);
   }
 
   // webview/src/main.tsx

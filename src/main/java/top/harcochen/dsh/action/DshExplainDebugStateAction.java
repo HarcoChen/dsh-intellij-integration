@@ -9,8 +9,8 @@ import com.intellij.xdebugger.XDebuggerManager;
 import top.harcochen.dsh.DshActions;
 
 /**
- * Captures the suspended debugger session as a one-shot context chip and prefills the composer,
- * mirroring dsh-ide's {@code dsh.explainDebugState}.
+ * Attaches the suspended session's stack, source and diagnostics as one-shot context and prefills
+ * the composer. Runtime variable values are not collected.
  */
 public final class DshExplainDebugStateAction extends DumbAwareAction {
     @Override

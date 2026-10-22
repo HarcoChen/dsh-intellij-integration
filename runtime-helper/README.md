@@ -18,7 +18,7 @@ only at runtime. The TypeScript entry point can also be checked with TypeScript 
 Node type definitions, `--noEmit --strict --target ES2022 --module commonjs
 --moduleResolution node --esModuleInterop --skipLibCheck`.
 
-The current Remote/default-version pin is `dsh-v0.2.0-rc.2`; local-upgrade prompts
+The current Remote/default-version pin is `dsh-v0.2.1-rc.2`; local-upgrade prompts
 now direct fallback to official Desktop installation. Recovery algorithms retain
 the vendor baseline below. See `../RPC_0.2.0_RC2_ADAPTATION.md` for the Java and
 Webview migration and its integration validation.
@@ -60,3 +60,18 @@ owns public debugger operations; the helper owns HTTP framing and cancellation.
 The old orphan-lock operation is removed: legacy locks are discovery hints only.
 Launcher exit after (or before) readiness retains a proven serving endpoint and
 relinquishes child ownership rather than starting another Runtime.
+
+The v0.11.0 synchronization updates default/wire pins to Harness
+`687f282e8625c6b8d11ff58211a90524be2e4317` and adopts the companion's English
+recovery attribution text. See [the repository TODO](../TODO.md) for scope and validation boundaries.
+
+The browser terminal assets are independently reproducible:
+
+```sh
+npm ci
+node build-terminal.mjs
+```
+
+`terminal-view.ts` uses pinned xterm.js dependencies and imports `terminal-host.css`.
+The build writes `webview/terminal.js`, `terminal.css`, and the two bundled licenses.
+These dependencies run only in JCEF, not inside the lifecycle helper or Host.

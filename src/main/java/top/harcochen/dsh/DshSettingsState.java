@@ -68,12 +68,12 @@ public final class DshSettingsState implements PersistentStateComponent<DshSetti
     public java.util.List<String> agentStatusLabels =
             new java.util.ArrayList<>(
                     java.util.List.of(
-                            "大肥鱼正在深潜…",
-                            "大肥鱼摆摆尾巴，想想办法…",
-                            "大肥鱼翻了个身，继续思考…",
-                            "大肥鱼正在吞吐上下文…",
-                            "大肥鱼在鱼缸里转圈…",
-                            "大肥鱼：这题我会…"));
+                            "The big fish is diving deep…",
+                            "The big fish wags its tail and mulls it over…",
+                            "The big fish rolls over and keeps thinking…",
+                            "The big fish is gulping context…",
+                            "The big fish circles the tank…",
+                            "The big fish: I've got this one…"));
 
     public boolean enableEffortKnob = true;
     public int balanceRefreshIntervalMs = 30_000;

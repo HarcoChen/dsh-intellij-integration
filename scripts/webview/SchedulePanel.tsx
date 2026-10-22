@@ -16,7 +16,7 @@ function timing(item: DshScheduleItem): string {
 export function SchedulePanel({ schedule, catalog }: { schedule?: DshScheduleItem[]; catalog?: ChatViewState['scheduleCatalog'] }): React.JSX.Element {
     return <div className="dsh-schedule" aria-label={t('Active reminders')}>
         <button type="button" className="dsh-button dsh-button-secondary" onClick={() => postAction({ type: 'manageSchedules' })}>{t('Manage schedules')}</button>
-        {catalog?.status === 'unavailable' ? <div className="dsh-card-detail">{t('Enable the Schedule bundle in plugin settings to use reminders.')}</div> : null}
+        {catalog?.status === 'unavailable' ? <div className="dsh-card-detail">{t('Schedule is unavailable in this Runtime version or disabled in plugin settings.')}</div> : null}
         <ul className="dsh-schedule-items">
             {(schedule ?? []).map(item => <li className="dsh-schedule-item" key={item.id}>
                 <div className="dsh-schedule-prompt">{item.prompt}</div>

@@ -81,8 +81,9 @@ IDE settings, including across IDE restarts; idle views do not overwrite edits.
 Enable **Allow Agent to control this IDE debugger** in plugin settings, then restart
 its locally owned Runtime. The Agent can start an existing Run/Debug configuration,
 manage source breakpoints, pause/resume/step, select paused threads and frames, and
-read bounded context through a local authenticated MCP endpoint. Source diagnostics
-reuse existing IDE highlights; sensitive variable values are redacted by name.
+read bounded call stacks, current source and diagnostics through a local authenticated MCP
+endpoint. Source diagnostics reuse existing IDE highlights. Runtime variable values are
+not collected; attach any values needed for analysis manually.
 The endpoint cannot create arbitrary launch configurations or evaluate expressions.
 Externally managed Runtimes retain their own integrations.
 
@@ -95,7 +96,7 @@ The plugin manages local Runtime startup, shutdown, and restart. Automatic start
 
 Runtime 0.1.5 support includes transient assistant streaming across reconnects, V3 history and compaction records, submitted attachments, queued subagent prompts, and explicit Goal resume after reconnect. Mode selection follows Runtime policy, and skill menus show source paths on hover. The context ring still shows statistics on hover; click the model name to switch models.
 
-The default Runtime is now `0.2.0-rc.2`. The chat menu opens native **Manage sessions**, **Manage DeepSeek account**, and **Manage schedules** dialogs. Session management supports pinning and restoring archived sessions. Account management uses the Runtime's browser sign-in flow and shows profile, wallet balances, and bonus notices. Schedule management shows reminders across sessions; reminders owned by the current session can be edited or deleted, and delivery history can be inspected. In projects without a folder, the first explicit session can initialize the Runtime's default Workspace.
+The default Runtime is now `0.2.1-rc.2`. The chat menu opens native **Manage sessions**, **Manage DeepSeek account**, and **Manage schedules** dialogs. Session management supports pinning and restoring archived sessions. Account management uses the Runtime's browser sign-in flow and shows profile, wallet balances, and bonus notices. Schedule management shows reminders across sessions; reminders owned by the current session can be edited or deleted, and delivery history can be inspected. In projects without a folder, the first explicit session can initialize the Runtime's default Workspace.
 
 The IDE also bundles the shared Laya/Jev Runtime integration and mounts it into local Runtimes it starts. It is disabled by default. Enable it and selected decision features under **Settings → Tools → DeepSeek Harness**, configure a System One API key from the chat menu, then restart the Runtime. The key is stored in IntelliJ Password Safe. The endpoint accepts HTTPS or localhost/127.0.0.1 HTTP for local Laya; externally managed Runtimes are not modified.
 
@@ -104,6 +105,14 @@ Owned local Runtimes retry after crashes and can recover through isolated valida
 Only a compatible Runtime advertised by an editor is reused automatically. The plugin reads dsh-ide Runtime advertisements and publishes only its own discovery record; legacy editor locks are read-only hints and never block startup. A short loopback gate reduces simultaneous startup races. A wrapper that exits while its Runtime still serves relinquishes ownership without causing a duplicate launch. Updating a verified local npm installation requires a native confirmation dialog. Manually configured external Runtimes remain externally managed. Upgrade old Runtimes before connecting; 0.1.5 history migrations are not a downgrade path.
 
 Optional Agent Teams show members, tasks, dependencies, and write-scope warnings in the Activity Dock. Team members use the existing subagent history, follow-up, and interrupt controls. Enable the official Team profile bundle in the Runtime to use this feature; the plugin reads its Session projection.
+
+The **Session center** offers live search with requests needing attention first, grouped by Harness Workspace. The chat header shows the current working directory; historical file links and tool diffs resolve against the directory at the time of the operation. Current-file Problems can be selected from the attachment menu or `@diagnostics`, and Jobs include read-only execution history.
+
+Native choice dialogs for models, providers, presets, plugins, schedules, Workspaces and templates support keyword filtering. Use the arrow keys to select a result and Enter to confirm; Escape cancels.
+
+Use **Open Runtime terminal** in the chat menu to create or reattach a Host PTY. It retains its identity across session switching, restores its screen after reconnecting, and closes the Host process when its view is closed. Pending input is discarded on disconnect. This terminal is separate from the IDE terminal context feature.
+
+**Install or remove plugins** uses the Runtime's official package manager, with package inspection, explicit install/removal confirmation, build-script approval, progress and cancellation. Settings now offer guided Web search/fetch configuration, and custom providers expose schema-defined model reasoning levels. Runtime access grants govern available actions; readers cannot submit prompts or answer interactive requests without the corresponding permissions.
 
 Timed questions show the Host countdown and preserve answer drafts through reconnects and view recreation. Questions that continue after timeout can still be answered in the next turn. Jobs expose live output and cancellation, with bounded output tails and reconnect cursors. Plugin settings show Bundle selections and plugin switches, including read-only reasons and whether a change needs a restart. Schedule reminders require the optional Schedule bundle; enable it in plugin settings.
 
@@ -122,7 +131,7 @@ Open **Settings | Tools | DeepSeek Harness**.
 | Server URL / Port | `""` / `0` | Prefer an already running DSH Runtime; port `0` selects an available port for local startup. |
 | Auto start | `true` | Start or connect to the Runtime when the project opens. |
 | Send with Enter | Disabled | Enable Enter to send and Shift+Enter to insert a new line. Ctrl/Cmd+Enter sends in either mode; changes apply immediately. |
-| Runtime version | `0.2.0-rc.2` | Version for explicit package-manager launch commands; the minimum supported local Runtime is `0.1.5-rc.1`. |
+| Runtime version | `0.2.1-rc.2` | Version for explicit package-manager launch commands; the minimum supported local Runtime is `0.1.5-rc.1`. |
 | Autonomous debugger | Disabled | Local MCP access to existing IDE configurations and public debugger controls; restart an owned Runtime after enabling. |
 | Laya/Jev integration | Disabled | Bundled System One integration for locally started Runtimes; the endpoint, model, and optional policies are configurable. |
 | npm registry | `https://registry.npmmirror.com` | Registry mirror used as a download fallback. |

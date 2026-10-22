@@ -30,7 +30,7 @@ export async function adaptComposerPreferences(root) {
             '                        if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return;',
             '                        if (enterToSend && event.key === "Enter" && event.shiftKey && !event.ctrlKey && !event.metaKey) return;',
         ].join('\n')],
-        ['                        if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {\n                            event.preventDefault();\n                            send();\n                        }', [
+        ['                        if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {\n                            event.preventDefault();\n                            send();\n                        }', [
             '                        if (event.key === "Enter" && (',
             '                            event.ctrlKey || event.metaKey ||',
             '                            (enterToSend && !event.shiftKey && !event.altKey)',
@@ -39,6 +39,7 @@ export async function adaptComposerPreferences(root) {
             '                            if (!event.repeat) send();',
             '                        }',
         ].join('\n')],
+        ['{t("Ctrl / ⌘ + Enter to send")}', '{t(enterToSend ? "Enter to send; Shift+Enter for a new line." : "Ctrl/Cmd + Enter to send.")}'],
         ['                    rows={2}', [
             '                    rows={2}',
             '                    title={t(enterToSend',

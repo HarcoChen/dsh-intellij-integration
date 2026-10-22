@@ -38,6 +38,8 @@ public final class DshMessageProjector {
         Map<String, Long> rowKeys = new LinkedHashMap<>();
         Map<String, Partial> partials = new LinkedHashMap<>();
         Map<String, Long> toolRows = new LinkedHashMap<>();
+        Map<String, JsonObject> toolCalls = new LinkedHashMap<>();
+        Map<String, JsonObject> toolResults = new LinkedHashMap<>();
         int activeTurn = 0;
         String turnPhase = "completed";
         String turnDetail = null;
@@ -160,6 +162,7 @@ public final class DshMessageProjector {
                 rows.put(seq, row);
                 rowKeys.put(key, seq);
                 toolRows.put(callId, seq);
+                toolCalls.put(callId, entry);
                 continue;
             }
 
@@ -171,6 +174,7 @@ public final class DshMessageProjector {
                     callId = sourceObject == null ? null : string(sourceObject, "callId");
                 }
                 if (callId == null) callId = "call-" + seq;
+                toolResults.put(callId, entry);
                 Long existing = toolRows.get(callId);
                 JsonObject row =
                         existing == null
@@ -195,7 +199,9 @@ public final class DshMessageProjector {
                                     entry,
                                     "completed",
                                     null);
-                boolean failed = data.has("error") && !data.get("error").isJsonNull();
+                boolean failed =
+                        (data.has("error") && !data.get("error").isJsonNull())
+                                || DshJson.bool(message, "isError", false);
                 row.getAsJsonObject("tool").addProperty("status", failed ? "failed" : "completed");
                 String result = presentationText(data, entry);
                 if (!result.isBlank())
@@ -226,7 +232,20 @@ public final class DshMessageProjector {
         }
 
         JsonArray messages = new JsonArray();
-        for (JsonObject row : rows.values()) messages.add(row);
+        for (JsonObject row : rows.values()) {
+            JsonObject tool = object(row, "tool");
+            if (tool != null) {
+                String call = string(tool, "callId");
+                DshToolDiff.DiffView diff =
+                        DshToolDiff.storedDiffView(toolCalls.get(call), toolResults.get(call));
+                if (diff != null) {
+                    JsonArray paths = new JsonArray();
+                    for (String path : DshToolDiff.diffViewPaths(diff)) paths.add(path);
+                    tool.add("diffPaths", paths);
+                }
+            }
+            messages.add(row);
+        }
         JsonObject stream = object(history, "assistantStream");
         if (stream != null && stream.has("chunks") && stream.get("chunks").isJsonArray()) {
             JsonArray chunks = stream.getAsJsonArray("chunks");

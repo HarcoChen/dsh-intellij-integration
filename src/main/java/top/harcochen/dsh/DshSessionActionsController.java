@@ -10,7 +10,6 @@ import com.intellij.openapi.ui.DialogWrapper;
 import com.intellij.openapi.ui.Messages;
 import java.awt.BorderLayout;
 import java.awt.Dimension;
-import java.awt.FontMetrics;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -18,13 +17,11 @@ import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
-import javax.swing.AbstractAction;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.JList;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
-import javax.swing.KeyStroke;
 import javax.swing.ListSelectionModel;
 import top.harcochen.dsh.remote.DshRemoteException;
 import top.harcochen.dsh.remote.DshRemoteService;
@@ -187,6 +184,178 @@ final class DshSessionActionsController {
         }
     }
 
+    private SessionCenter sessionCenter;
+
+    void close() {
+        ApplicationManager.getApplication()
+                .invokeLater(
+                        () -> {
+                            if (sessionCenter != null)
+                                sessionCenter.close(DialogWrapper.CANCEL_EXIT_CODE);
+                        });
+    }
+
+    void openSessionCenter() {
+        ApplicationManager.getApplication()
+                .invokeLater(
+                        () -> {
+                            if (sessionCenter != null) {
+                                sessionCenter.toFront();
+                                return;
+                            }
+                            sessionCenter = new SessionCenter();
+                            sessionCenter.show();
+                        });
+    }
+
+    private final class SessionCenter extends DialogWrapper {
+        private final javax.swing.JTextField search = new javax.swing.JTextField();
+        private final javax.swing.DefaultListModel<String> model =
+                new javax.swing.DefaultListModel<>();
+        private final JList<String> list = new JList<>(model);
+        private final List<String> ids = new ArrayList<>();
+        private final Consumer<DshRemoteState.Snapshot> listener =
+                ignored -> ApplicationManager.getApplication().invokeLater(this::render);
+        private boolean closed;
+
+        SessionCenter() {
+            super(project, false);
+            setModal(false);
+            setTitle(DshBundle.message("dsh.session.center.title"));
+            list.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+            search.getDocument()
+                    .addDocumentListener(
+                            new javax.swing.event.DocumentListener() {
+                                @Override
+                                public void insertUpdate(javax.swing.event.DocumentEvent event) {
+                                    render();
+                                }
+
+                                @Override
+                                public void removeUpdate(javax.swing.event.DocumentEvent event) {
+                                    render();
+                                }
+
+                                @Override
+                                public void changedUpdate(javax.swing.event.DocumentEvent event) {
+                                    render();
+                                }
+                            });
+            list.addMouseListener(
+                    new java.awt.event.MouseAdapter() {
+                        @Override
+                        public void mouseClicked(java.awt.event.MouseEvent event) {
+                            if (event.getClickCount() == 2) doOKAction();
+                        }
+                    });
+            init();
+            render();
+            remote.addListener(listener);
+        }
+
+        @Override
+        protected JComponent createCenterPanel() {
+            JPanel content = new JPanel(new BorderLayout(0, 8));
+            content.add(
+                    new JLabel(DshBundle.message("dsh.session.center.hint")), BorderLayout.NORTH);
+            JPanel body = new JPanel(new BorderLayout(0, 8));
+            body.add(search, BorderLayout.NORTH);
+            body.add(new JScrollPane(list), BorderLayout.CENTER);
+            content.add(body, BorderLayout.CENTER);
+            content.setPreferredSize(new Dimension(850, 460));
+            return content;
+        }
+
+        @Override
+        public JComponent getPreferredFocusedComponent() {
+            return search;
+        }
+
+        private void render() {
+            if (closed) return;
+            String selected =
+                    list.getSelectedIndex() < 0 || list.getSelectedIndex() >= ids.size()
+                            ? null
+                            : ids.get(list.getSelectedIndex());
+            String query = search.getText().strip().toLowerCase(Locale.ROOT);
+            List<JsonObject> rows = new ArrayList<>();
+            for (JsonElement raw : sessions.get()) {
+                if (!raw.isJsonObject()) continue;
+                JsonObject row = raw.getAsJsonObject();
+                if (DshJson.bool(row, "archived", false)
+                        || "subagent".equals(DshJson.string(row, "origin"))) continue;
+                if (row.toString().toLowerCase(Locale.ROOT).contains(query)) rows.add(row);
+            }
+            rows.sort(
+                    java.util.Comparator.comparingInt(this::priority)
+                            .thenComparing(
+                                    java.util.Comparator.comparingLong(
+                                                    (JsonObject row) ->
+                                                            DshJson.longValue(
+                                                                    row.get("updatedAt"), 0))
+                                            .reversed()));
+            ids.clear();
+            model.clear();
+            for (JsonObject row : rows) {
+                String id = DshJson.string(row, "sessionId");
+                if (id == null) continue;
+                ids.add(id);
+                String status =
+                        DshJson.bool(row, "attention", false)
+                                ? DshBundle.message("dsh.session.center.attention")
+                                : row.has("lastError")
+                                        ? DshBundle.message("dsh.session.center.error")
+                                        : DshJson.bool(row, "running", false)
+                                                ? DshBundle.message("dsh.session.center.running")
+                                                : DshBundle.message("dsh.session.center.idle");
+                model.addElement(
+                        DshJson.stringOr(row, "title", id)
+                                + " · "
+                                + DshJson.stringOr(
+                                        row,
+                                        "workspaceTitle",
+                                        DshBundle.message("dsh.session.center.ungrouped"))
+                                + " · "
+                                + status
+                                + ("migration-required".equals(DshJson.string(row, "formatStatus"))
+                                        ? " · " + DshBundle.message("dsh.session.center.migration")
+                                        : "")
+                                + " · "
+                                + DshJson.stringOr(row, "cwd", id));
+            }
+            int index = selected == null ? -1 : ids.indexOf(selected);
+            if (index >= 0) list.setSelectedIndex(index);
+            else if (!ids.isEmpty()) list.setSelectedIndex(0);
+        }
+
+        private int priority(JsonObject row) {
+            return DshJson.bool(row, "attention", false)
+                    ? 0
+                    : row.has("lastError") ? 1 : DshJson.bool(row, "running", false) ? 2 : 3;
+        }
+
+        @Override
+        protected void doOKAction() {
+            int index = list.getSelectedIndex();
+            if (index < 0 || index >= ids.size()) return;
+            String id = ids.get(index);
+            if (!remote.access().allows("session/follow", "session", id)) {
+                notifyUser(DshBundle.message("dsh.remote.access.denied"));
+                return;
+            }
+            selectSession.accept(id);
+            super.doOKAction();
+        }
+
+        @Override
+        protected void dispose() {
+            closed = true;
+            remote.removeListener(listener);
+            sessionCenter = null;
+            super.dispose();
+        }
+    }
+
     void search() {
         ApplicationManager.getApplication()
                 .invokeLater(
@@ -260,7 +429,7 @@ final class DshSessionActionsController {
             labels.add(title + "  (" + id + ")" + (status.isBlank() ? "" : "  · " + status));
         }
         int picked =
-                Messages.showChooseDialog(
+                DshChoiceDialog.show(
                         project,
                         DshBundle.message("dsh.session.manage.choose"),
                         DshBundle.message("dsh.session.manage.title"),
@@ -280,7 +449,7 @@ final class DshSessionActionsController {
                                     pinned ? "dsh.session.manage.unpin" : "dsh.session.manage.pin")
                         };
         int action =
-                Messages.showChooseDialog(
+                DshChoiceDialog.show(
                         project,
                         labels.get(picked),
                         DshBundle.message("dsh.session.manage.title"),
@@ -329,7 +498,7 @@ final class DshSessionActionsController {
             return;
         }
         int selected =
-                Messages.showChooseDialog(
+                DshChoiceDialog.show(
                         project,
                         DshBundle.message("dsh.session.select.message"),
                         DshBundle.message("dsh.session.select.title"),
@@ -510,13 +679,15 @@ final class DshSessionActionsController {
     }
 
     private void chooseModel(String session, List<String> labels, List<ModelChoice> choices) {
-        ModelChooserDialog dialog =
-                new ModelChooserDialog(
+        String[] values = labels.toArray(new String[0]);
+        int selected =
+                DshChoiceDialog.show(
                         project,
                         DshBundle.message("dsh.model.select.message"),
                         DshBundle.message("dsh.model.select.title"),
-                        labels);
-        int selected = dialog.showAndGet() ? dialog.selectedIndex() : -1;
+                        Messages.getQuestionIcon(),
+                        values,
+                        values[0]);
         if (selected >= 0 && selected < choices.size()) {
             ModelChoice choice = choices.get(selected);
             operations.execute(() -> selectModel(session, choice.provider(), choice.model(), null));
@@ -630,58 +801,4 @@ final class DshSessionActionsController {
     private record ModelChoice(String provider, String model) {}
 
     /** Model picker with enough horizontal space for provider/model identifiers. */
-    private static final class ModelChooserDialog extends DialogWrapper {
-        private final JList<String> list;
-        private final JScrollPane scroll;
-        private final String message;
-
-        ModelChooserDialog(Project project, String message, String title, List<String> labels) {
-            super(project);
-            this.message = message;
-            list = new JList<>(labels.toArray(new String[0]));
-            list.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-            list.setSelectedIndex(0);
-            list.getInputMap().put(KeyStroke.getKeyStroke("ENTER"), "choose-model");
-            list.getActionMap()
-                    .put(
-                            "choose-model",
-                            new AbstractAction() {
-                                @Override
-                                public void actionPerformed(java.awt.event.ActionEvent event) {
-                                    doOKAction();
-                                }
-                            });
-            scroll = new JScrollPane(list);
-            scroll.setPreferredSize(preferredSize(list, labels));
-            setTitle(title);
-            setResizable(true);
-            init();
-        }
-
-        @Override
-        protected JComponent createCenterPanel() {
-            JPanel panel = new JPanel(new BorderLayout(0, 8));
-            panel.add(new JLabel(message), BorderLayout.NORTH);
-            panel.add(scroll, BorderLayout.CENTER);
-            return panel;
-        }
-
-        @Override
-        public JComponent getPreferredFocusedComponent() {
-            return list;
-        }
-
-        int selectedIndex() {
-            return list.getSelectedIndex();
-        }
-
-        private static Dimension preferredSize(JList<String> list, List<String> labels) {
-            FontMetrics metrics = list.getFontMetrics(list.getFont());
-            int longest = labels.stream().mapToInt(metrics::stringWidth).max().orElse(0);
-            int width = Math.max(560, Math.min(1100, longest + 72));
-            int rows = Math.min(Math.max(labels.size(), 1), 12);
-            int height = Math.max(260, Math.min(520, rows * metrics.getHeight() + 64));
-            return new Dimension(width, height);
-        }
-    }
 }
