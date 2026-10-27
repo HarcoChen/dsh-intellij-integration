@@ -943,8 +943,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
                     dynamicPlugins.decline(string(action, "pluginId"), string(action, "requestId"));
             case "answerApproval", "answerQuestion" -> answerInteraction(action);
             case "copyCode", "insertCode", "openCode", "applyCode" -> codeActions.handle(action);
-            case "openToolDiff" ->
-                    diffs.openToolDiff(string(action, "callId"), string(action, "path"));
+            case "openToolDiff" -> openToolDiff(action);
             case "openChangeDiff" ->
                     diffs.openChangeDiff(integer(action, "turn", 0), string(action, "fileId"));
             case "restoreTurnChanges" -> diffs.restoreTurnChanges(integer(action, "turn", 0));
@@ -1672,9 +1671,44 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
                 });
     }
 
-    private void answerInteraction(JsonObject action) {
-        String key = string(action, "key");
+    private void openToolDiff(JsonObject action) {
         String current = sessionId;
+        String callId = string(action, "callId");
+        String path = string(action, "path");
+        DshRemoteState.SessionView view = sessionView(current);
+        String approvalKey = null;
+        if (view != null && callId != null) {
+            for (JsonElement raw : view.interactions) {
+                if (!raw.isJsonObject()) continue;
+                JsonObject item = raw.getAsJsonObject();
+                if (callId.equals(string(item, "callId"))
+                        && "approval".equals(string(item, "kind"))
+                        && "pending".equals(string(item, "status"))) {
+                    approvalKey = string(item, "key");
+                    break;
+                }
+            }
+        }
+        String key = approvalKey;
+        diffs.openToolDiff(
+                callId,
+                path,
+                key == null
+                        ? null
+                        : outcome -> {
+                            JsonObject answer = new JsonObject();
+                            answer.addProperty("key", key);
+                            answer.addProperty("outcome", outcome);
+                            answerInteraction(current, answer);
+                        });
+    }
+
+    private void answerInteraction(JsonObject action) {
+        answerInteraction(sessionId, action);
+    }
+
+    private void answerInteraction(String current, JsonObject action) {
+        String key = string(action, "key");
         if (key == null || key.isBlank() || current == null || current.isBlank()) return;
         // The Runtime expects the raw outcome value: an approval decision string,
         // or the question answer envelope.

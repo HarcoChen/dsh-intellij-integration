@@ -55,7 +55,7 @@ Before an approval can release a structured file edit, DSH checks IntelliJ's uns
 There is no separate switch to enable native diff review. In the **DSH** tool window:
 
 1. Expand a file-edit tool card in the conversation, then click a file path under **Changes** to open its before/after diff in the IDE.
-2. If a structured file edit is waiting for approval, click its file path in the approval card to preview the proposed change before answering the approval. The diff viewer itself does not approve the tool call.
+2. If a structured file edit is waiting for approval, click its file path in the approval card to preview the proposed change before answering the approval. The native review dialog provides **Approve tool call** and **Reject tool call** buttons. These apply to the entire tool call, including any other files it edits. **Close** leaves approval pending. The preview is read-only; editing the proposed result before approval is not supported.
 3. To review a whole turn, keep the session selected before starting the turn. In a Git working directory, DSH captures turn changes automatically. Open **Changes** in the activity dock above the composer after the turn finishes, then click a file to open its diff.
 
 The turn-level **Changes** tab requires Git and only covers turns observed by this open tool window; reopening an old conversation does not recreate earlier turn snapshots. Tool-card diffs do not require Git, but need supported structured edit data: a shell command that rewrites a file may have no tool-card diff. Files must also be accessible to the IDE process for these local diff features. If a diff cannot be reconstructed reliably, DSH displays an error.

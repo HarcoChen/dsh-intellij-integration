@@ -51,7 +51,7 @@ final class DshDiffController {
         this.errorSink = errorSink;
     }
 
-    void openToolDiff(String callId, String path) {
+    void openToolDiff(String callId, String path, Consumer<String> approvalDecision) {
         String current = sessionId.get();
         if (callId == null || path == null || current == null) {
             return;
@@ -94,7 +94,8 @@ final class DshDiffController {
                                 DshBundle.message("dsh.diff.before"),
                                 state.settled
                                         ? DshBundle.message("dsh.diff.after")
-                                        : DshBundle.message("dsh.diff.proposed"));
+                                        : DshBundle.message("dsh.diff.proposed"),
+                                state.settled ? null : approvalDecision);
                     } catch (Exception error) {
                         report(error);
                     }
@@ -253,9 +254,21 @@ final class DshDiffController {
             String path,
             String beforeTitle,
             String afterTitle) {
+        showTextDiff(title, before, after, path, beforeTitle, afterTitle, null);
+    }
+
+    private void showTextDiff(
+            String title,
+            String before,
+            String after,
+            String path,
+            String beforeTitle,
+            String afterTitle,
+            Consumer<String> approvalDecision) {
         ApplicationManager.getApplication()
                 .invokeLater(
                         () -> {
+                            if (project.isDisposed()) return;
                             FileType fileType = fileTypeOf(path);
                             com.intellij.diff.DiffContentFactory factory =
                                     com.intellij.diff.DiffContentFactory.getInstance();
@@ -270,7 +283,15 @@ final class DshDiffController {
                                                     project, after == null ? "" : after, fileType),
                                             beforeTitle,
                                             afterTitle);
-                            com.intellij.diff.DiffManager.getInstance().showDiff(project, request);
+                            request.putUserData(
+                                    com.intellij.diff.util.DiffUserDataKeys.FORCE_READ_ONLY, true);
+                            if (approvalDecision == null) {
+                                com.intellij.diff.DiffManager.getInstance()
+                                        .showDiff(project, request);
+                            } else {
+                                new DshDiffApprovalDialog(project, request, approvalDecision)
+                                        .show();
+                            }
                         });
     }
 
