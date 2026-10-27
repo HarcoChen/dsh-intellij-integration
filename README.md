@@ -50,6 +50,18 @@ Review file edits in the IDE's own diff viewer. For supported tool diff cards, D
 
 Before an approval can release a structured file edit, DSH checks IntelliJ's unsaved editor buffers against the proposed paths. Overlapping edits keep the approval pending until you save or revert the document.
 
+#### How do I review the agent's changes in JetBrains?
+
+There is no separate switch to enable native diff review. In the **DSH** tool window:
+
+1. Expand a file-edit tool card in the conversation, then click a file path under **Changes** to open its before/after diff in the IDE.
+2. If a structured file edit is waiting for approval, click its file path in the approval card to preview the proposed change before answering the approval. The diff viewer itself does not approve the tool call.
+3. To review a whole turn, keep the session selected before starting the turn. In a Git working directory, DSH captures turn changes automatically. Open **Changes** in the activity dock above the composer after the turn finishes, then click a file to open its diff.
+
+The turn-level **Changes** tab requires Git and only covers turns observed by this open tool window; reopening an old conversation does not recreate earlier turn snapshots. Tool-card diffs do not require Git, but need supported structured edit data: a shell command that rewrites a file may have no tool-card diff. Files must also be accessible to the IDE process for these local diff features. If a diff cannot be reconstructed reliably, DSH displays an error.
+
+If these entries are missing, report the plugin version, Harness version, whether the session uses a local or remote Runtime, and the edit tool name (or the displayed error) in [issue #28](https://github.com/HarcoChen/dsh-intellij-integration/issues/28).
+
 ### Put the right context into the conversation
 
 Use **DSH: Ask About Selection** for an open-ended question, or the **DSH** context menu for explain / fix / review / documentation tasks. The context picker also supports attaching the current unstaged Git diff. Editor context is bounded by the configurable byte limit.
