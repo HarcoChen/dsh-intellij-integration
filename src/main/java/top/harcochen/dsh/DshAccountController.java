@@ -25,6 +25,7 @@ final class DshAccountController {
     private final ExecutorService operations;
     private final Consumer<String> notifier;
     private final Consumer<String> errorSink;
+    private final DshAccountNotifications notifications;
 
     DshAccountController(
             Project project,
@@ -39,6 +40,8 @@ final class DshAccountController {
         this.operations = operations;
         this.notifier = notifier;
         this.errorSink = errorSink;
+        this.notifications =
+                new DshAccountNotifications(project, remote, operations, this::manage, errorSink);
     }
 
     void manage() {
@@ -62,7 +65,8 @@ final class DshAccountController {
                     "credential-stored".equals(status)
                             ? signedInSummary(client)
                             : DshBundle.message("dsh.account.signed.out");
-            if ("credential-stored".equals(status)) showBonuses(client);
+            if ("credential-stored".equals(status) && !notifications.show(client))
+                showBonuses(client);
             ApplicationManager.getApplication()
                     .invokeLater(() -> choose(status, summary, links, client));
         } catch (Exception error) {

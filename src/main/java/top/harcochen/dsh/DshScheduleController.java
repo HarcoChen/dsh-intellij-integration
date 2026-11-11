@@ -17,8 +17,8 @@ import top.harcochen.dsh.remote.DshRemoteException;
 import top.harcochen.dsh.remote.DshRemoteService;
 import top.harcochen.dsh.remote.DshRemoteState;
 
-/** RC.2 Schedule catalog and current-session reminder management. */
-final class DshScheduleController {
+/** Host-wide task management with legacy reminder compatibility. */
+final class DshScheduleController implements AutoCloseable {
     private final Project project;
     private final DshRemoteService remote;
     private final DshRuntimeService runtime;
@@ -28,9 +28,13 @@ final class DshScheduleController {
     private final Consumer<String> notifier;
     private final Consumer<String> errorSink;
     private final Runnable stateChanged;
+    private volatile boolean closed;
 
     private record ScheduleSnapshot(
-            String session, JsonArray schedules, DshRemoteState.ProjectionCell cell) {}
+            String session,
+            JsonArray schedules,
+            DshRemoteState.ProjectionCell cell,
+            long generation) {}
 
     private volatile ScheduleSnapshot currentSchedules;
     private volatile String unavailableSession;
@@ -67,8 +71,9 @@ final class DshScheduleController {
     }
 
     void refreshCurrent(String selected) {
-        if (selected == null || selected.isBlank()) return;
+        if (closed || selected == null || selected.isBlank()) return;
         long token = refreshGeneration.incrementAndGet();
+        long connectionGeneration = remote.snapshot().generation;
         unavailableSession = null;
         DshRemoteState.ProjectionCell cell = scheduleCell.apply(selected);
         DshRemoteState.ProjectionCell snapshot =
@@ -81,10 +86,14 @@ final class DshScheduleController {
                         JsonElement value = remote.listSchedules(selected);
                         if (!value.isJsonArray()
                                 || !selected.equals(sessionId.get())
-                                || token != refreshGeneration.get()) return;
+                                || token != refreshGeneration.get()
+                                || remote.snapshot().generation != connectionGeneration) return;
+                        JsonArray normalized = DshSessionStateStore.schedule(value);
+                        if (normalized == null)
+                            throw new IllegalStateException("Invalid Schedule list");
                         currentSchedules =
                                 new ScheduleSnapshot(
-                                        selected, value.getAsJsonArray().deepCopy(), snapshot);
+                                        selected, normalized, snapshot, connectionGeneration);
                         stateChanged.run();
                     } catch (DshRemoteException missing) {
                         if (missing.isCapabilityMissing() && token == refreshGeneration.get()) {
@@ -103,6 +112,7 @@ final class DshScheduleController {
         return selected != null
                         && cached != null
                         && selected.equals(cached.session())
+                        && cached.generation() == remote.snapshot().generation
                         && Objects.equals(cell, cached.cell())
                 ? cached.schedules().deepCopy()
                 : null;
@@ -113,6 +123,7 @@ final class DshScheduleController {
                 () -> {
                     try {
                         runtime.startAsync().join();
+                        long generation = remote.snapshot().generation;
                         JsonElement value;
                         try {
                             value = remote.scheduleCatalog();
@@ -132,27 +143,31 @@ final class DshScheduleController {
                             JsonObject record = candidate.getAsJsonObject();
                             if (DshJson.string(record, "id") == null) continue;
                             JsonObject copy = record.deepCopy();
-                            if (!copy.has("sessionId") && sessionId.get() != null)
+                            if (!copy.has("target")
+                                    && !copy.has("sessionId")
+                                    && sessionId.get() != null)
                                 copy.addProperty("sessionId", sessionId.get());
                             records.add(copy);
                         }
                         ApplicationManager.getApplication()
-                                .invokeLater(() -> chooseRecord(records));
+                                .invokeLater(
+                                        () -> {
+                                            if (!project.isDisposed()
+                                                    && remote.snapshot().generation == generation)
+                                                chooseRecord(records, generation);
+                                        });
                     } catch (Exception error) {
                         report(error);
                     }
                 });
     }
 
-    private void chooseRecord(List<JsonObject> records) {
-        if (records.isEmpty()) {
-            notifier.accept(DshBundle.message("dsh.schedule.empty"));
-            return;
-        }
+    private void chooseRecord(List<JsonObject> records, long generation) {
         List<String> labels = new ArrayList<>();
+        labels.add(DshBundle.message("dsh.schedule.create"));
         for (JsonObject record : records) {
             String title = DshJson.stringOr(record, "title", DshJson.stringOr(record, "id", ""));
-            String owner = DshJson.stringOr(record, "sessionId", "");
+            String owner = targetLabel(record);
             String status = DshJson.stringOr(record, "status", "active");
             labels.add(title + "  ·  " + status + "  ·  " + owner);
         }
@@ -164,7 +179,205 @@ final class DshScheduleController {
                         Messages.getQuestionIcon(),
                         labels.toArray(new String[0]),
                         labels.get(0));
-        if (selected >= 0) chooseAction(records.get(selected));
+        if (selected == 0) create(generation);
+        else if (selected > 0) {
+            JsonObject record = records.get(selected - 1);
+            if (record.has("target")) chooseModernAction(record, generation);
+            else chooseAction(record);
+        }
+    }
+
+    private void chooseModernAction(JsonObject record, long generation) {
+        String[] keys = {
+            "history",
+            "edit.title",
+            "edit.prompt",
+            "edit.rule",
+            "target",
+            "pause.resume",
+            "run",
+            "delete"
+        };
+        String[] labels =
+                java.util.Arrays.stream(keys)
+                        .map(key -> DshBundle.message("dsh.schedule." + key))
+                        .toArray(String[]::new);
+        int choice =
+                DshChoiceDialog.show(
+                        project,
+                        DshJson.stringOr(record, "title", "")
+                                + "\n"
+                                + DshJson.stringOr(record, "prompt", "")
+                                + "\n"
+                                + DshJson.stringOr(record, "status", "")
+                                + " · "
+                                + targetLabel(record),
+                        DshBundle.message("dsh.schedule.title"),
+                        Messages.getQuestionIcon(),
+                        labels,
+                        labels[0]);
+        String id = DshJson.string(record, "id");
+        if (choice < 0) return;
+        if (choice == 0) {
+            operations.execute(() -> showHistory(null, id));
+            return;
+        }
+        JsonObject patch = new JsonObject();
+        if (choice == 1 || choice == 2) {
+            String field = choice == 1 ? "title" : "prompt";
+            String text =
+                    multiline("dsh.schedule.edit." + field, DshJson.stringOr(record, field, ""));
+            if (text == null || text.isBlank()) return;
+            patch.addProperty(field, text.strip());
+        } else if (choice == 3) {
+            JsonObject timing = chooseRule();
+            if (timing == null) return;
+            patch.add("timing", timing);
+        } else if (choice == 4) {
+            JsonObject target = chooseTarget();
+            if (target == null) return;
+            patch.add("target", target);
+        } else if (choice == 5) {
+            patch.addProperty("active", !"active".equals(DshJson.string(record, "status")));
+        }
+        JsonObject request = new JsonObject();
+        request.addProperty("id", id);
+        String action = choice == 6 ? "run" : "edit";
+        if (choice == 6 || choice == 7) {
+            if (Messages.showYesNoDialog(
+                            project,
+                            DshBundle.message(
+                                    choice == 6
+                                            ? "dsh.schedule.run.confirm"
+                                            : "dsh.schedule.delete.confirm"),
+                            DshBundle.message("dsh.schedule.title"),
+                            Messages.getWarningIcon())
+                    != Messages.YES) return;
+        }
+        if (choice != 6) {
+            request.addProperty("action", choice == 7 ? "delete" : "update");
+            request.add(
+                    "expectedUpdatedAt",
+                    record.has("updatedAt")
+                            ? record.get("updatedAt")
+                            : com.google.gson.JsonNull.INSTANCE);
+            if (choice != 7) request.add("patch", patch);
+        }
+        modernMutation(action, request, generation);
+    }
+
+    private void create(long generation) {
+        String title = input("dsh.schedule.edit.title", "");
+        if (title == null) return;
+        String prompt = multiline("dsh.schedule.edit.prompt", "");
+        if (prompt == null || prompt.isBlank()) return;
+        JsonObject timing = chooseRule();
+        if (timing == null) return;
+        JsonObject target = chooseTarget();
+        if (target == null) return;
+        JsonObject request = new JsonObject();
+        request.addProperty("title", title);
+        request.addProperty("prompt", prompt.strip());
+        request.add("timing", timing);
+        request.add("target", target);
+        if (Messages.showYesNoDialog(
+                        project,
+                        title + "\n" + prompt + "\n" + timing + "\n" + targetLabel(request),
+                        DshBundle.message("dsh.schedule.create"),
+                        Messages.getQuestionIcon())
+                == Messages.YES) modernMutation("create", request, generation);
+    }
+
+    private JsonObject chooseTarget() {
+        String[] kinds = {"session", "new_once", "new"};
+        String[] labels =
+                java.util.Arrays.stream(kinds)
+                        .map(kind -> DshBundle.message("dsh.schedule.target." + kind))
+                        .toArray(String[]::new);
+        int selected =
+                DshChoiceDialog.show(
+                        project,
+                        DshBundle.message("dsh.schedule.target"),
+                        DshBundle.message("dsh.schedule.title"),
+                        Messages.getQuestionIcon(),
+                        labels,
+                        labels[0]);
+        if (selected < 0) return null;
+        JsonObject target = new JsonObject();
+        target.addProperty("kind", kinds[selected]);
+        if (selected == 0) {
+            String session = sessionId.get();
+            if (session == null) {
+                notifier.accept(DshBundle.message("dsh.review.no.session"));
+                return null;
+            }
+            target.addProperty("sessionId", session);
+        }
+        return target;
+    }
+
+    private static String targetLabel(JsonObject record) {
+        JsonElement raw = record.get("target");
+        if (raw == null || !raw.isJsonObject()) return DshJson.stringOr(record, "sessionId", "");
+        JsonObject target = raw.getAsJsonObject();
+        String kind = DshJson.stringOr(target, "kind", "");
+        String label =
+                switch (kind) {
+                    case "session", "new_once", "new" ->
+                            DshBundle.message("dsh.schedule.target." + kind);
+                    default -> kind;
+                };
+        return label + " " + DshJson.stringOr(target, "sessionId", "");
+    }
+
+    private void modernMutation(String action, JsonObject request, long generation) {
+        operations.execute(
+                () -> {
+                    try {
+                        if (remote.snapshot().generation != generation)
+                            throw new IllegalStateException(
+                                    DshBundle.message("dsh.runtime.changed"));
+                        JsonElement raw = remote.scheduleRequest(action, request);
+                        if (!raw.isJsonObject())
+                            throw new IllegalStateException("Invalid Schedule result");
+                        JsonObject result = raw.getAsJsonObject();
+                        if (result.has("code"))
+                            throw new IllegalStateException(
+                                    DshBundle.message(
+                                            "dsh.schedule.refused",
+                                            DshJson.string(result, "code")));
+                        if (remote.snapshot().generation != generation) return;
+                        stateChanged.run();
+                        refreshCurrent(sessionId.get());
+                        manage();
+                    } catch (Exception error) {
+                        report(error);
+                    }
+                });
+    }
+
+    private String multiline(String key, String initial) {
+        javax.swing.JTextArea text = new javax.swing.JTextArea(initial, 10, 65);
+        text.setLineWrap(true);
+        text.setWrapStyleWord(true);
+        com.intellij.openapi.ui.DialogWrapper dialog =
+                new com.intellij.openapi.ui.DialogWrapper(project) {
+                    {
+                        setTitle(DshBundle.message(key));
+                        init();
+                    }
+
+                    @Override
+                    protected javax.swing.JComponent createCenterPanel() {
+                        return new javax.swing.JScrollPane(text);
+                    }
+
+                    @Override
+                    public javax.swing.JComponent getPreferredFocusedComponent() {
+                        return text;
+                    }
+                };
+        return dialog.showAndGet() ? text.getText() : null;
     }
 
     private void chooseAction(JsonObject record) {
@@ -253,7 +466,7 @@ final class DshScheduleController {
     }
 
     private JsonObject chooseRule() {
-        String[] kinds = {"at", "every", "daily", "weekly", "cron"};
+        String[] kinds = {"at", "after", "every", "daily", "weekly", "cron", "rrule"};
         int selected =
                 DshChoiceDialog.show(
                         project,
@@ -266,7 +479,33 @@ final class DshScheduleController {
         String kind = kinds[selected];
         JsonObject change = new JsonObject();
         change.addProperty("kind", kind);
-        if ("at".equals(kind)) {
+        if ("rrule".equals(kind)) {
+            String rule =
+                    multiline(
+                            "dsh.schedule.rule.rrule",
+                            "DTSTART;TZID="
+                                    + java.time.ZoneId.systemDefault().getId()
+                                    + ":"
+                                    + java.time.LocalDate.now()
+                                            .plusDays(1)
+                                            .format(
+                                                    java.time.format.DateTimeFormatter
+                                                            .BASIC_ISO_DATE)
+                                    + "T090000\nRRULE:FREQ=DAILY");
+            if (rule == null || rule.isBlank()) return null;
+            change.addProperty("rrule", rule.strip());
+        } else if ("after".equals(kind)) {
+            String seconds = input("dsh.schedule.rule.after", "3600");
+            if (seconds == null) return null;
+            try {
+                long value = Long.parseLong(seconds);
+                if (value <= 0) throw new NumberFormatException();
+                change.addProperty("after_seconds", value);
+            } catch (NumberFormatException invalid) {
+                notifier.accept(DshBundle.message("dsh.schedule.rule.invalid"));
+                return null;
+            }
+        } else if ("at".equals(kind)) {
             String value = input("dsh.schedule.rule.at", "");
             if (value == null) return null;
             change.addProperty("at", value);
@@ -274,7 +513,9 @@ final class DshScheduleController {
             String value = input("dsh.schedule.rule.every", "60");
             if (value == null) return null;
             try {
-                change.addProperty("every_seconds", Long.parseLong(value));
+                long seconds = Long.parseLong(value);
+                if (seconds < 60) throw new NumberFormatException();
+                change.addProperty("every_seconds", seconds);
             } catch (NumberFormatException invalid) {
                 notifier.accept(DshBundle.message("dsh.schedule.rule.invalid"));
                 return null;
@@ -361,6 +602,7 @@ final class DshScheduleController {
     }
 
     private void showHistory(String owner, String id) {
+        long generation = remote.snapshot().generation;
         try {
             JsonElement value = remote.scheduleHistory(owner, id, 50, null);
             String detail =
@@ -369,11 +611,14 @@ final class DshScheduleController {
                             : DshBundle.message("dsh.schedule.history.empty");
             ApplicationManager.getApplication()
                     .invokeLater(
-                            () ->
+                            () -> {
+                                if (!project.isDisposed()
+                                        && remote.snapshot().generation == generation)
                                     DshTextDialog.show(
                                             project,
                                             DshBundle.message("dsh.schedule.history"),
-                                            detail));
+                                            detail);
+                            });
         } catch (Exception error) {
             report(error);
         }
@@ -382,5 +627,12 @@ final class DshScheduleController {
     private void report(Exception error) {
         errorSink.accept(DshJson.message(error));
         notifier.accept(DshBundle.message("dsh.schedule.failed", DshJson.message(error)));
+    }
+
+    @Override
+    public void close() {
+        closed = true;
+        refreshGeneration.incrementAndGet();
+        currentSchedules = null;
     }
 }

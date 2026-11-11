@@ -78,6 +78,7 @@ final class DshActionAccess {
                     case "archiveSession" -> "workspace/archiveSession";
                     case "killJob" -> "job/kill";
                     case "openRuntimeTerminal" -> "terminal/attach";
+                    case "openForge" -> "forgePanel/follow";
                     case "goalCreate" -> "goal/create";
                     case "goalEdit" -> "goal/edit";
                     case "goalPause" -> "goal/pause";
@@ -100,6 +101,7 @@ final class DshActionAccess {
                             "openChangeDiff",
                             "openToolDiff",
                             "reviewChanges",
+                            "exportConversation",
                             "browseRuntimeFiles",
                             "refreshRuntimeFile",
                             "openTeamMember" ->

@@ -7,7 +7,7 @@ import java.util.regex.Pattern;
 
 /** Exact SemVer compatibility; package selectors must be resolved by the launcher first. */
 public final class DshRuntimeVersion {
-    static final String DEFAULT = "0.2.1-rc.2";
+    static final String DEFAULT = "0.2.2-rc.1";
     static final String MINIMUM = "0.1.5-rc.1";
     private static final Pattern VERSION =
             Pattern.compile(

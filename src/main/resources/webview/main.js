@@ -23601,6 +23601,9 @@
     "What\u2019s new": "\u66F4\u65B0\u8BF4\u660E",
     "Schedule is unavailable in this Runtime version or disabled in plugin settings.": "\u5F53\u524D Runtime \u7248\u672C\u4E0D\u652F\u6301\u65E5\u7A0B\uFF0C\u6216\u5DF2\u5728\u63D2\u4EF6\u8BBE\u7F6E\u4E2D\u7981\u7528\u3002",
     "Review changes": "\u5BA1\u9605\u6539\u52A8",
+    "Export conversation": "\u5BFC\u51FA\u5BF9\u8BDD",
+    "Changes and worktrees": "\u6539\u52A8\u4E0E Worktree",
+    "Recurrence": "\u91CD\u590D\u89C4\u5219",
     "Open chat in editor tab": "\u5728\u7F16\u8F91\u5668\u6807\u7B7E\u9875\u6253\u5F00\u804A\u5929",
     "Enter to send; Shift+Enter for a new line.": "Enter \u53D1\u9001\uFF0CShift+Enter \u6362\u884C\u3002",
     "DSH Session center": "DSH \u4F1A\u8BDD\u4E2D\u5FC3",
@@ -24587,6 +24590,8 @@
       { key: "sessions", label: t("Manage sessions"), action: { type: "manageSessions" }, separatorBefore: true },
       { key: "center", label: t("DSH Session center"), action: { type: "openSessionCenter" } },
       { key: "review", label: t("Review changes"), action: { type: "reviewChanges" }, disabled: !hasSession },
+      { key: "exportConversation", label: t("Export conversation"), action: { type: "exportConversation" }, disabled: !hasSession },
+      { key: "forge", label: t("Changes and worktrees"), action: { type: "openForge" }, disabled: !hasSession },
       { key: "editorTab", label: t("Open chat in editor tab"), action: { type: "openInEditor" } },
       { key: "account", label: t("Manage DeepSeek account"), action: { type: "manageAccount" } },
       { key: "schedules", label: t("Manage schedules"), action: { type: "manageSchedules" } },
@@ -26213,6 +26218,8 @@ ${t("Click to retry")}` : t("Click to start DSH Runtime"),
   // webview/src/components/dock/SchedulePanel.tsx
   var import_react17 = __toESM(require_react());
   function timing(item) {
+    const recurrence = item;
+    if (recurrence.kind === "rrule") return recurrence.rrule ?? t("Recurrence");
     if (item.kind === "after") return t("After {duration}", { duration: `${item.afterSeconds}s` });
     if (item.kind === "every") return t("Every {duration}", { duration: `${item.everySeconds}s` });
     if (item.kind === "daily") return t("Daily at {time} ({timeZone})", { time: item.time, timeZone: item.timeZone });

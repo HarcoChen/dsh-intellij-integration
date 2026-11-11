@@ -494,6 +494,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
                     top.harcochen.dsh.remote.DshTeamProjection.normalize(
                             cellValue(selected, "agentTeam"));
             if (team != null) subagents.observeTeam(selected, team);
+            subagents.observeCatalog(selected, cellValue(selected, "subagentCatalog"));
             long scheduleEpoch = remote.settingsEpoch();
             if (!selected.equals(lastScheduleSession) || scheduleEpoch != lastScheduleEpoch) {
                 lastScheduleSession = selected;
@@ -780,6 +781,10 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
             case "openSessionCenter" -> sessionActions.openSessionCenter();
             case "reviewChanges" -> openToolDiff(new JsonObject());
             case "manageSessions" -> sessionActions.manageSessions();
+            case "exportConversation" -> sessionActions.exportConversation();
+            case "openForge" ->
+                    new DshForgeController(project, remote, operations, this::notify)
+                            .open(sessionId);
             case "renameSession" -> sessionActions.rename();
             case "forkSession" -> sessionActions.fork();
             case "forkFromMessage" -> checkpointFork(integer(action, "seq", -1));
@@ -1572,7 +1577,25 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
         JsonObject team =
                 top.harcochen.dsh.remote.DshTeamProjection.normalize(
                         cellValue(sessionId, "agentTeam"));
-        if (team != null) state.add("team", team);
+        if (team != null) {
+            if (!team.has("members")) {
+                JsonArray members = new JsonArray();
+                for (JsonElement raw : subagents.treeView(sessionId).getAsJsonArray("nodes")) {
+                    JsonObject node = raw.getAsJsonObject();
+                    if (!"child".equals(string(node, "kind"))
+                            || DshJson.integer(node, "depth", 0) != 1
+                            || !"continuable".equals(string(node, "mode"))) continue;
+                    JsonObject member = new JsonObject();
+                    member.addProperty("id", string(node, "id"));
+                    member.addProperty("name", string(node, "label"));
+                    member.addProperty("role", "teammate");
+                    member.addProperty("phase", "active");
+                    members.add(member);
+                }
+                team.add("members", members);
+            }
+            state.add("team", team);
+        }
         state.add("changeReviews", changeReviews.view(sessionId));
         state.add("skills", sessionState.skillCatalog(sessionId));
         state.add("commands", sessionState.commandCatalog(sessionId));
@@ -2132,6 +2155,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
         for (ChatMirror mirror : List.copyOf(mirrors)) mirror.dispose();
         runtimeTerminals.close();
         sessionActions.close();
+        schedules.close();
         jobs.close();
         runtimeFiles.close();
         runtime.removeStatusListener(runtimeStatusListener);

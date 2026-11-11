@@ -76,6 +76,11 @@ final class DshSessionActionsController {
         this.errorSink = errorSink;
     }
 
+    void exportConversation() {
+        new DshConversationExporter(project, remote, operations, this::notifyUser, this::report)
+                .export(sessionId.get());
+    }
+
     void refreshModelCatalog(String session) {
         if (session == null || session.equals(modelCatalogSession)) {
             return;

@@ -14,14 +14,20 @@ public final class DshTeamProjection {
     public static JsonObject normalize(JsonElement value) {
         if (value == null || !value.isJsonObject()) return null;
         JsonObject team = value.getAsJsonObject();
-        if (!team.has("members")
-                || !team.get("members").isJsonArray()
+        boolean legacyRoster = team.has("members");
+        if ((legacyRoster
+                        && (!team.get("members").isJsonArray()
+                                || team.getAsJsonArray("members").size() > 500))
+                || (!legacyRoster
+                        && (!team.has("enabled")
+                                || !team.get("enabled").isJsonPrimitive()
+                                || !team.getAsJsonPrimitive("enabled").isBoolean()))
                 || !team.has("tasks")
                 || !team.get("tasks").isJsonArray()
-                || team.getAsJsonArray("members").size() > 500
                 || team.getAsJsonArray("tasks").size() > 2000) return null;
         Set<String> members = new HashSet<>();
-        for (JsonElement valueMember : team.getAsJsonArray("members")) {
+        for (JsonElement valueMember :
+                legacyRoster ? team.getAsJsonArray("members") : new JsonArray()) {
             if (!valueMember.isJsonObject()) return null;
             JsonObject member = valueMember.getAsJsonObject();
             if (DshJson.strictString(member, "id") == null
@@ -61,11 +67,28 @@ public final class DshTeamProjection {
                         return null;
             }
         }
-        return team.deepCopy();
+        JsonObject result = team.deepCopy();
+        for (JsonElement raw : result.getAsJsonArray("tasks")) {
+            JsonObject task = raw.getAsJsonObject();
+            for (String key : new String[] {"ownerId", "ownerName"})
+                if (task.has(key) && DshJson.strictString(task, key) == null) return null;
+            if (!task.has("ownerName") && task.has("ownerId")) {
+                String owner = DshJson.string(task, "ownerId");
+                if (legacyRoster)
+                    for (JsonElement rawMember : team.getAsJsonArray("members")) {
+                        JsonObject member = rawMember.getAsJsonObject();
+                        if (owner.equals(DshJson.string(member, "id")))
+                            task.addProperty("ownerName", DshJson.string(member, "name"));
+                    }
+                if (!task.has("ownerName")) task.addProperty("ownerName", owner);
+            }
+        }
+        return result;
     }
 
     public static JsonArray members(JsonObject team, String parent) {
         JsonArray nodes = new JsonArray();
+        if (!team.has("members")) return nodes;
         for (JsonElement candidate : team.getAsJsonArray("members")) {
             JsonObject member = candidate.getAsJsonObject();
             if (parent.equals(DshJson.strictString(member, "id"))

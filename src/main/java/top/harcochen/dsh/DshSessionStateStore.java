@@ -304,6 +304,11 @@ final class DshSessionStateStore {
                 row.addProperty("everySeconds", seconds);
             } else if ("at".equals(kind)) {
                 row.addProperty("kind", kind);
+            } else if ("rrule".equals(kind)) {
+                String rule = DshJson.strictString(source, "rrule");
+                if (rule == null || rule.isBlank() || rule.length() > 16384) return null;
+                row.addProperty("kind", kind);
+                row.addProperty("rrule", rule);
             } else if (Set.of("daily", "weekly", "cron").contains(kind == null ? "" : kind)) {
                 String zone = DshJson.strictString(source, "timeZone");
                 if (zone == null || zone.length() > 128) return null;

@@ -522,17 +522,51 @@ public final class DshRemoteService implements Disposable {
     }
 
     public JsonElement listSchedules(String sessionId) throws DshRemoteException {
-        return unary.call(
-                DshRemoteContracts.SCHEDULE_LIST,
-                DshRemoteContracts.argsScheduleSession(sessionId));
+        try {
+            JsonElement catalog = scheduleCatalog();
+            if (!catalog.isJsonArray())
+                throw DshRemoteException.protocol(
+                        "schedule/catalog", "Invalid Schedule catalog", null);
+            JsonArray selected = new JsonArray();
+            for (JsonElement raw : catalog.getAsJsonArray()) {
+                if (!raw.isJsonObject()) continue;
+                JsonObject row = raw.getAsJsonObject();
+                if (!"active".equals(DshJson.stringOr(row, "status", "active"))) continue;
+                boolean relevant = sessionId.equals(DshJson.string(row, "sessionId"));
+                JsonElement target = row.get("target");
+                if (target != null && target.isJsonObject())
+                    relevant |=
+                            sessionId.equals(DshJson.string(target.getAsJsonObject(), "sessionId"));
+                if (row.has("involvedSessionIds") && row.get("involvedSessionIds").isJsonArray())
+                    for (JsonElement id : row.getAsJsonArray("involvedSessionIds"))
+                        relevant |= id.isJsonPrimitive() && sessionId.equals(id.getAsString());
+                if (relevant) selected.add(row.deepCopy());
+            }
+            return selected;
+        } catch (DshRemoteException missing) {
+            if (!missing.isCapabilityMissing()) throw missing;
+            return unary.call(
+                    DshRemoteContracts.SCHEDULE_LIST,
+                    DshRemoteContracts.argsScheduleSession(sessionId));
+        }
     }
 
     public JsonElement scheduleHistory(
             String sessionId, String scheduleId, int limit, String before)
             throws DshRemoteException {
+        JsonObject request = new JsonObject();
+        request.addProperty("id", scheduleId);
+        if (sessionId != null) request.addProperty("sessionId", sessionId);
+        request.addProperty("limit", limit);
+        if (before != null) request.addProperty("before", before);
         return unary.call(
-                DshRemoteContracts.SCHEDULE_HISTORY,
-                DshRemoteContracts.argsScheduleHistory(sessionId, scheduleId, limit, before));
+                DshRemoteContracts.SCHEDULE_HISTORY, DshRemoteContracts.withRequest(request));
+    }
+
+    public JsonElement scheduleRequest(String action, JsonObject request) {
+        if (!java.util.Set.of("create", "edit", "view", "run").contains(action))
+            throw new IllegalArgumentException("Invalid Schedule action");
+        return unary.call("schedule/" + action, DshRemoteContracts.withRequest(request));
     }
 
     public JsonElement updateSchedule(JsonObject request) throws DshRemoteException {
@@ -566,6 +600,23 @@ public final class DshRemoteService implements Disposable {
         return unary.call(
                 DshRemoteContracts.ACCOUNT_GET_BALANCE,
                 DshRemoteContracts.argsAccountClient(client));
+    }
+
+    public JsonElement accountNotifications(JsonObject client) {
+        return unary.call("account/getNotifications", DshRemoteContracts.argsAccountClient(client));
+    }
+
+    public boolean reportAccountNotification(String id, String event, JsonObject client) {
+        if (!java.util.Set.of("displayed", "cta_clicked", "dismissed").contains(event))
+            throw new IllegalArgumentException("Invalid notification event");
+        JsonObject args = DshRemoteContracts.argsAccountClient(client);
+        args.addProperty("id", id);
+        args.addProperty("event", event);
+        JsonElement value = unary.call("account/reportNotificationEvent", args);
+        if (!value.isJsonPrimitive() || !value.getAsJsonPrimitive().isBoolean())
+            throw DshRemoteException.protocol(
+                    "account/reportNotificationEvent", "Invalid notification receipt", null);
+        return value.getAsBoolean();
     }
 
     public JsonElement accountBonuses(JsonObject client) throws DshRemoteException {
@@ -1058,6 +1109,24 @@ public final class DshRemoteService implements Disposable {
         return normalizePluginChange(unary.call(endpoint, args));
     }
 
+    public JsonObject updatePluginBundle(JsonObject args) {
+        JsonElement raw = unary.call("pluginManager/updateBundle", args);
+        if (!raw.isJsonObject())
+            throw DshRemoteException.protocol(
+                    "pluginManager/updateBundle", "Invalid update result", null);
+        JsonObject update = raw.getAsJsonObject();
+        if (DshJson.strictString(update, "from") == null
+                || DshJson.strictString(update, "to") == null
+                || !java.util.Set.of("check", "remove", "install")
+                        .contains(DshJson.stringOr(update, "step", "")))
+            throw DshRemoteException.protocol(
+                    "pluginManager/updateBundle", "Invalid update result", null);
+        JsonObject result = normalizePluginChange(update.get("result"));
+        if (update.has("restore"))
+            result.add("restore", normalizePluginChange(update.get("restore")));
+        return result;
+    }
+
     public JsonObject inspectPlugin(JsonObject args) {
         JsonElement raw = unary.call("pluginManager/inspect", args);
         if (!raw.isJsonObject())
@@ -1253,7 +1322,7 @@ public final class DshRemoteService implements Disposable {
         JsonArray events = new JsonArray();
         for (JsonElement record : merged.values()) events.add(record);
         result.add("events", events);
-        result.addProperty("hasMore", false);
+        result.addProperty("hasMore", hasMore);
         JsonObject projections =
                 tail.has("projections") && tail.get("projections").isJsonObject()
                         ? tail.getAsJsonObject("projections")

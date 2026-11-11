@@ -27,6 +27,16 @@ final class DshSubagentController {
 
     private volatile SubagentTree tree;
     private volatile SubagentPreview preview;
+    private String catalogRoot;
+    private JsonElement observedCatalog;
+
+    synchronized void observeCatalog(String root, JsonElement catalog) {
+        if (catalog == null) return;
+        if (java.util.Objects.equals(root, catalogRoot) && catalog.equals(observedCatalog)) return;
+        catalogRoot = root;
+        observedCatalog = catalog.deepCopy();
+        refresh(root);
+    }
 
     DshSubagentController(
             DshRemoteService remote,
@@ -49,9 +59,12 @@ final class DshSubagentController {
         generation.incrementAndGet();
         tree = null;
         preview = null;
+        catalogRoot = null;
+        observedCatalog = null;
     }
 
     void observeTeam(String root, JsonObject team) {
+        if (!team.has("members")) return;
         JsonArray nodes = top.harcochen.dsh.remote.DshTeamProjection.members(team, root);
         for (JsonElement value : nodes) {
             JsonObject node = value.getAsJsonObject();
@@ -80,6 +93,7 @@ final class DshSubagentController {
             return;
         }
         long requestedGeneration = generation.incrementAndGet();
+        long connectionGeneration = remote.snapshot().generation;
         SubagentTree requestedTree = new SubagentTree(rootSessionId, requestedGeneration);
         tree = requestedTree;
         stateChanged.run();
@@ -87,13 +101,15 @@ final class DshSubagentController {
                 () -> {
                     try {
                         JsonArray nodes = loadTree(rootSessionId);
-                        if (generation.get() != requestedGeneration) {
+                        if (generation.get() != requestedGeneration
+                                || remote.snapshot().generation != connectionGeneration) {
                             return;
                         }
                         requestedTree.nodes = nodes;
                         requestedTree.state = "ready";
                     } catch (Exception error) {
-                        if (generation.get() != requestedGeneration) {
+                        if (generation.get() != requestedGeneration
+                                || remote.snapshot().generation != connectionGeneration) {
                             return;
                         }
                         requestedTree.state = "error";
@@ -107,7 +123,7 @@ final class DshSubagentController {
     /** Walks durable direct-child catalogs breadth-first with depth and cycle guards. */
     private JsonArray loadTree(String rootSessionId) throws Exception {
         JsonObject team = remote.agentTeam(rootSessionId);
-        if (team != null)
+        if (team != null && team.has("members"))
             return top.harcochen.dsh.remote.DshTeamProjection.members(team, rootSessionId);
         JsonArray nodes = new JsonArray();
         Set<String> visited = new HashSet<>();
@@ -150,6 +166,9 @@ final class DshSubagentController {
                     continue;
                 }
                 String label = DshJson.string(entry, "label");
+                String name = DshJson.strictString(entry, "name");
+                if (name != null && !name.isBlank())
+                    label = label == null || label.equals(name) ? name : name + " · " + label;
                 if ("continuable".equals(mode) && label == null) {
                     continue;
                 }

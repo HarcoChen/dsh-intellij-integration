@@ -25,6 +25,8 @@ public final class DshCommandAction extends DumbAwareAction {
                     case "Dsh.ManagePlugins" -> "managePlugins";
                     case "Dsh.OpenSessionCenter" -> "openSessionCenter";
                     case "Dsh.ReviewChanges" -> "reviewChanges";
+                    case "Dsh.ExportConversation" -> "exportConversation";
+                    case "Dsh.OpenForge" -> "openForge";
                     case "Dsh.OpenBrowser" -> "openBrowser";
                     case "Dsh.OpenLogs" -> "openLogs";
                     case "Dsh.ConfigureApiKey" -> "configureApiKey";

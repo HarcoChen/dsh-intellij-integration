@@ -8,8 +8,8 @@ Status: `[x]` implemented, `[-]` usable but not yet at VS Code parity, `[ ]` not
 ## Maintenance — 2026-11-11
 
 Audited current Harness master `e8f7b93a344964de3dca1ace9e72b6e4d6de87cb`
-(`0.2.2-rc.2`). The default Runtime and companion Webview pins below remain unchanged;
-this batch adds selected wire compatibility, not a full 0.2.2 feature-parity claim.
+(`0.2.2-rc.2`). The default Runtime is the published and exercised `0.2.2-rc.1`.
+The companion Webview uses the audited `96d3aaf` source plus the IntelliJ adapters.
 
 - [x] Accept atomic per-event `changes: [{key, val}]` projection frames and legacy key/value frames.
 - [x] Prefer durable Inbox projections for queued/steering messages; retain the legacy queue fallback.
@@ -23,11 +23,40 @@ this batch adds selected wire compatibility, not a full 0.2.2 feature-parity cla
 - [x] Isolated installed Runtime `0.2.2-rc.1` with a temporary DSH_HOME: Java authentication,
   Mux, both follow activation modes, real batched projection reduction matching a fresh Host
   read, and multipart UTF-8 file preview pass. No model requests or unit tests were added.
-- [ ] Full 0.2.2 migration: generic account notification API, latest Team/subagent presentation,
-  and new Forge/plugin-update surfaces require a separate complete contract/UI audit before
-  advancing the default Runtime or companion bundle.
+- [x] Host-wide Schedule create/edit/delete, pause/resume, explicit run, revision conflicts,
+  delivery history, seven timing kinds including RRULE, destination selection and change-event refresh.
+- [x] Registry/Git bundle updates, compatible version choices, confirmation, progress,
+  cancellation and presentation of the Host's previous-version restoration result.
+- [x] Latest Team tasks and owner names, legacy roster support and live subagent-catalog refresh.
+- [x] Generic account notices with legacy fallback, credential/connection fencing,
+  expiry, ordered display and action receipts. Live signed-in notification delivery still needs acceptance.
+- [x] Native Forge panel with checkout and change request overview, scoped Host Git patches,
+  change request patches, checks, review-thread reads, tracking and worktree request/cancel/retry.
+- [x] Conversation export to Markdown or JSON through native save, with bounded-history reporting.
+- [x] Isolated real published `0.2.2-rc.1` integration covers task creation, pause, stale-revision
+  conflict, delivery history and deletion, RRULE normalization into the Activity Dock,
+  Team normalization, Forge stream and Git diff,
+  worktree request/cancel, and package install/version-list/update through a loopback registry.
+  The published Runtime exposes the legacy account API, whose fallback was verified.
+- [ ] Source `0.2.2-rc.2` generic notification delivery, real signed-in Forge checks/reviews,
+  and Git-host package updates require their corresponding account or remote-host acceptance.
+- [ ] Remaining extended features include granular file/hunk rollback, Forge review publication
+  and merge controls, and debugger stop/restart. Existing whole-turn restore remains available.
 - [ ] Installed IntelliJ/PyCharm interaction: multi-file review, correction submission, settings
-  toggling, restart history, terminal capture, and Session center actions remain manual acceptance.
+  toggling, restart history, terminal capture, Session center, the save dialog and the native
+  Schedule/Forge panels remain manual acceptance.
+
+### Same-category plugin comparison
+
+Reviewed project READMEs on 2026-11-11. The comparison covers DSH IntelliJ/JetBrains plugins.
+These are the projects' published feature claims.
+
+| Plugin | Relevant features | This plugin's coverage |
+| --- | --- | --- |
+| [DSH Studio](https://github.com/skansgai/dsh-studio) | Embedded Host WebUI, Runtime lifecycle, selection context, recent sessions, headless tasks | Native chat, lifecycle, editor context and Session center are implemented. Headless task UI is a remaining extension. |
+| [DSH Lite](https://github.com/EPCN-fla/dsh-lite-idea) | ACP chat, model/preset/permission controls, skills, Session export | Chat controls, skills and Markdown/JSON export are implemented. |
+| [DSH ⇄ JetBrains](https://github.com/abadiegie/dsh-jetbrains) | Shared IDE context, turn diffs, persisted reviews and per-file/hunk revert | Context, native turn/tool diffs, saved reviews and whole-turn restore are implemented. Granular rollback is a remaining extension. |
+| [DeepSeek Harness WebUI](https://github.com/Chocomintopia/dsh-jetbrains-plugin) | Embedded official WebUI, fixed DeepSeek Chat tab and reload action | Native integrated chat, Runtime reconnect and browser entry are implemented. |
 
 ## Current parity — dsh-ide v0.11.0（2026-10-19）
 

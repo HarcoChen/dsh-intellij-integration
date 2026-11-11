@@ -18,8 +18,10 @@ import java.util.UUID;
  * audit before changing anything in this file.
  *
  * <p>Selected forward compatibility was checked against master {@code e8f7b93a344} (0.2.2-rc.2):
- * batched control projections, durable Inbox queues, and explicit follow activation. The default
- * Runtime and the complete contract baseline remain pinned above.
+ * batched control projections, durable Inbox queues, explicit follow activation, Host schedules,
+ * plugin updates, Team tasks and Forge reads. Generic account notices retain the legacy fallback.
+ * The published default Runtime is 0.2.2-rc.1. The carrier baseline above also supports older
+ * Hosts.
  */
 public final class DshRemoteContracts {
     /** Harness tag this contract was audited against. */

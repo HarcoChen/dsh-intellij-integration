@@ -107,7 +107,7 @@ Agent 可启动已有 Run/Debug 配置、管理源码断点、暂停/继续/单�
 
 Runtime 0.1.5 适配包括断线后恢复临时流式回答、V3 历史与压缩记录、附件提交、子代理排队提示，以及重连后显式恢复 Goal。模式选择遵循 Runtime 策略，技能菜单悬停显示来源路径。上下文环形条悬停查看统计，点击模型名称切换模型。
 
-默认 Runtime 已更新到 `0.2.1-rc.2`。聊天菜单增加原生“管理会话”“管理 DeepSeek 账户”“管理日程”对话框。会话可固定、恢复归档；账户管理使用 Runtime 的浏览器登录流程，并显示资料、余额和赠金提醒；日程可跨会话查看，当前会话的提醒可编辑、删除或查看投递历史。没有项目目录时，首次显式创建会话可初始化 Runtime 默认 Workspace。
+默认 Runtime 已更新到 `0.2.2-rc.1`。聊天菜单增加原生“管理会话”“管理 DeepSeek 账户”“管理日程”对话框。会话可固定、恢复归档；账户管理使用 Runtime 的浏览器登录流程，并显示资料、余额和账户通知，新接口不可用时兼容旧版赠金提醒。日程管理支持创建和编辑 Host 任务、暂停/恢复、确认后立即执行，以及查看投递历史。可配置单次、间隔、每天、每周、Cron 和 RRULE 规则，并选择当前会话、首次创建后复用的会话或每次新建会话作为投递目标。没有项目目录时，首次显式创建会话可初始化 Runtime 默认 Workspace。
 
 插件还内置共享的 Laya/Jev Runtime 集成，并装载到本插件启动的本地 Runtime 中；默认关闭。可在 **Settings → Tools → DeepSeek Harness** 中开启集成及所需功能，从聊天菜单配置 System One API Key，再重启 Runtime。密钥保存在 IntelliJ Password Safe；服务地址支持 HTTPS，也支持本机 Laya 的 localhost/127.0.0.1 HTTP。插件不会修改外部管理的 Runtime。
 
@@ -119,7 +119,7 @@ Runtime 0.1.5 适配包括断线后恢复临时流式回答、V3 历史与压缩
 
 API Key 保存在 IntelliJ **Password Safe** 中，传递给新启动的本地 Runtime。界面提供英文和简体中文资源。
 
-限时问题会显示 Host 倒计时，并在重连和视图重建后保留回答草稿；超时后仍可提交延迟回答。Jobs 提供实时输出、取消和按游标重连续读。插件设置提供 Bundle 选择、插件启停、只读原因，以及保存、生效或需重启等结果。Schedule 提醒需要启用可选的 Schedule bundle。
+限时问题会显示 Host 倒计时，并在重连和视图重建后保留回答草稿；超时后仍可提交延迟回答。Jobs 提供实时输出、取消和按游标重连续读。插件设置提供 Bundle 选择、插件启停、只读原因，以及保存、生效或需重启等结果。新版 Runtime 包含 Host Schedule 服务，旧版部署可能需要启用可选的 Schedule bundle。
 
 通过 Find Action 的 **DSH：浏览 Runtime 工作区文件**，或 `/ide` 入口，浏览当前会话在 Host 上的文件。原生预览只读，支持最大 1 MiB 的 UTF-8 文本、文件变更刷新和手动刷新，并绑定打开时的 Runtime。
 
@@ -129,7 +129,13 @@ API Key 保存在 IntelliJ **Password Safe** 中，传递给新启动的本地 R
 
 通过聊天菜单中的**打开 Runtime 终端**创建或重新连接 Host PTY。切换会话时保留终端身份，重连时恢复屏幕，关闭视图时请求清理 Host 进程；断线时丢弃未结算输入。可使用 **附加选区到聊天** 或 **附加屏幕到聊天**，显式附加最多 64 KiB 的一次性上下文。它与 IDE 终端上下文功能各自独立。
 
-**安装或卸载插件**使用 Runtime 官方软件包管理器，支持检查软件包、确认安装或卸载、批准构建脚本、查看进度和取消安装。设置提供网页搜索与抓取配置，自定义提供方可编辑 Runtime schema 定义的模型推理等级。Remote 访问授权会限制聊天操作，读取权限不会自动授予发送消息或回答交互请求的权限。
+**安装、更新或卸载插件**使用 Runtime 官方软件包管理器，支持检查软件包、确认安装或卸载、批准构建脚本、查看进度和取消安装。设置提供网页搜索与抓取配置，自定义提供方可编辑 Runtime schema 定义的模型推理等级。Remote 访问授权会限制聊天操作，读取权限不会自动授予发送消息或回答交互请求的权限。
+
+从聊天菜单选择 **导出对话**，或在 Find Action 中使用 **DSH: Export Conversation**，可通过 IDE 保存对话为 Markdown 或 JSON。Markdown 包含对话文本和附件标记，JSON 保留有上限的事件历史和投影。会话超过历史读取上限时会提示记录不完整。
+
+启用 Runtime 的 **变更请求与 Worktree** bundle 后，可从聊天菜单或 Find Action 打开 **DSH: Changes and Worktrees**。原生面板显示 Host 检出目录、关联的变更请求、检查结果和审阅讨论，支持按范围查看 Host Git 改动、查看变更请求补丁以及按 URL 关联变更请求。首轮开始前可请求从 HEAD 或指定基准分支创建 Worktree，也可取消待处理请求或重试创建。操作由 Host 执行并校验 sandbox 权限。
+
+Runtime 插件管理增加版本更新。Registry 插件会列出兼容的新版本，Git 插件可填写固定到完整 commit 的 spec 和目标版本。更新过程显示进度、支持取消，并报告失败后的旧版本恢复结果。
 
 ## 配置
 
@@ -143,7 +149,7 @@ API Key 保存在 IntelliJ **Password Safe** 中，传递给新启动的本地 R
 | 自动启动 | `true` | 项目打开时自动启动或连接 Runtime。 |
 | 按 Enter 发送消息 | 关闭 | 开启后 Enter 发送、Shift+Enter 换行；两种模式都支持 Ctrl/Cmd+Enter 发送，修改后立即生效。 |
 | 原生改动审阅 | 启用 | 集中审阅待审批编辑、编辑修改建议并捕获本地 Git 回合。关闭无需重启 Runtime。 |
-| Runtime 版本 | `0.2.1-rc.2` | 明确配置 pnpm/npx 启动时使用的版本；本机 Runtime 最低支持 `0.1.5-rc.1`。 |
+| Runtime 版本 | `0.2.2-rc.1` | 明确配置 pnpm/npx 启动时使用的版本；本机 Runtime 最低支持 `0.1.5-rc.1`。 |
 | 自主调试 | 关闭 | 通过本机 MCP 操作已有 IDE 配置及公共调试能力；开启后需重启插件拥有的 Runtime。 |
 | Laya/Jev 集成 | 关闭 | 本地启动 Runtime 随附 System One 集成，可配置地址、模型和可选能力。 |
 | npm 镜像 | `https://registry.npmmirror.com` | 下载后备重试的 Registry 镜像。 |

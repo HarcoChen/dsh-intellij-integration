@@ -29,6 +29,7 @@ final class DshPluginManagementController {
     private final Runnable changed;
     private final Consumer<String> notify;
     private final AtomicBoolean pending = new AtomicBoolean();
+    private volatile long managementGeneration;
 
     DshPluginManagementController(
             Project project,
@@ -50,24 +51,32 @@ final class DshPluginManagementController {
         operations.execute(
                 () -> {
                     String endpoint = runtime.getUrl();
+                    managementGeneration = remote.snapshot().generation;
                     try {
                         JsonArray bundles = remote.pluginBundles();
                         assertEndpoint(endpoint);
                         List<String> labels = new ArrayList<>();
                         labels.add(DshBundle.message("dsh.plugins.install"));
-                        List<String> names = new ArrayList<>();
+                        List<JsonObject> targets = new ArrayList<>();
+                        List<Boolean> updating = new ArrayList<>();
                         for (JsonElement raw : bundles) {
                             JsonObject bundle = raw.getAsJsonObject();
                             if (!DshJson.bool(bundle, "installed", false)
-                                    || !DshJson.bool(bundle, "removable", false)
                                     || bundle.has("readOnlyReason")) continue;
-                            names.add(DshJson.string(bundle, "name"));
-                            labels.add(
-                                    DshBundle.message("dsh.plugins.remove")
-                                            + " · "
-                                            + DshJson.string(bundle, "name")
+                            String label =
+                                    DshJson.string(bundle, "name")
                                             + " "
-                                            + DshJson.stringOr(bundle, "version", ""));
+                                            + DshJson.stringOr(bundle, "version", "");
+                            if (DshJson.bool(bundle, "removable", false)) {
+                                targets.add(bundle);
+                                updating.add(false);
+                                labels.add(DshBundle.message("dsh.plugins.remove") + " · " + label);
+                            }
+                            if (bundle.has("update") || DshJson.bool(bundle, "updatable", false)) {
+                                targets.add(bundle);
+                                updating.add(true);
+                                labels.add(DshBundle.message("dsh.plugins.update") + " · " + label);
+                            }
                         }
                         int selected =
                                 ui(
@@ -83,7 +92,12 @@ final class DshPluginManagementController {
                         assertEndpoint(endpoint);
                         if (selected == 0) install(endpoint);
                         else {
-                            String name = names.get(selected - 1);
+                            JsonObject target = targets.get(selected - 1);
+                            if (updating.get(selected - 1)) {
+                                update(endpoint, target);
+                                return;
+                            }
+                            String name = DshJson.string(target, "name");
                             if (!confirm(DshBundle.message("dsh.plugins.remove.confirm", name)))
                                 return;
                             assertEndpoint(endpoint);
@@ -103,6 +117,94 @@ final class DshPluginManagementController {
                         pending.set(false);
                     }
                 });
+    }
+
+    private void update(String endpoint, JsonObject bundle) {
+        String name = DshJson.string(bundle, "name");
+        String installed = DshJson.stringOr(bundle, "version", "");
+        String method = DshJson.stringOr(bundle, "update", "registry");
+        JsonObject options = new JsonObject();
+        String version;
+        if ("git".equals(method)) {
+            String spec =
+                    ui(
+                            () ->
+                                    Messages.showInputDialog(
+                                            project,
+                                            DshBundle.message("dsh.plugins.git.spec"),
+                                            title(),
+                                            Messages.getQuestionIcon()));
+            if (spec == null || spec.isBlank()) return;
+            version =
+                    ui(
+                            () ->
+                                    Messages.showInputDialog(
+                                            project,
+                                            DshBundle.message("dsh.plugins.git.version"),
+                                            title(),
+                                            Messages.getQuestionIcon()));
+            if (version == null) return;
+            version = version.strip();
+            options.addProperty("spec", spec.strip());
+        } else {
+            JsonObject query = new JsonObject();
+            query.addProperty("name", name);
+            assertEndpoint(endpoint);
+            JsonElement raw = remote.callFeature("pluginManager/listVersions", query);
+            if (!raw.isJsonObject()) throw new IllegalStateException("Invalid plugin version list");
+            JsonObject listing = raw.getAsJsonObject();
+            if ("refused".equals(DshJson.string(listing, "status")))
+                throw new IllegalStateException(
+                        DshJson.stringOr(listing, "reason", "Version lookup refused"));
+            if (!"listed".equals(DshJson.string(listing, "status"))
+                    || !listing.has("versions")
+                    || !listing.get("versions").isJsonArray()
+                    || listing.getAsJsonArray("versions").size() > 1000)
+                throw new IllegalStateException("Invalid plugin version list");
+            List<String> versions = new ArrayList<>();
+            for (JsonElement value : listing.getAsJsonArray("versions")) {
+                if (!value.isJsonObject()) continue;
+                JsonObject row = value.getAsJsonObject();
+                String candidate = DshJson.strictString(row, "version");
+                if (DshRuntimeVersion.exact(candidate) != null
+                        && DshJson.bool(row, "bundle", false)
+                        && !row.has("incompatible")
+                        && !row.has("deprecated")) versions.add(candidate);
+            }
+            if (versions.isEmpty()) {
+                notify.accept(DshBundle.message("dsh.plugins.no.versions"));
+                return;
+            }
+            int selected =
+                    ui(
+                            () ->
+                                    DshChoiceDialog.show(
+                                            project,
+                                            DshBundle.message("dsh.plugins.versions"),
+                                            title(),
+                                            Messages.getQuestionIcon(),
+                                            versions.toArray(String[]::new),
+                                            versions.get(0)));
+            if (selected < 0) return;
+            version = versions.get(selected);
+            if (listing.has("registry"))
+                options.add("registry", listing.get("registry").deepCopy());
+        }
+        if (DshRuntimeVersion.exact(version) == null
+                || DshRuntimeVersion.exact(installed) == null
+                || DshRuntimeVersion.compare(version, installed) <= 0)
+            throw new IllegalArgumentException(DshBundle.message("dsh.plugins.spec.invalid"));
+        if (!confirm(DshBundle.message("dsh.plugins.update.confirm", name, installed, version)))
+            return;
+        assertEndpoint(endpoint);
+        JsonObject args = new JsonObject();
+        args.addProperty("name", name);
+        args.addProperty("version", version);
+        String requestId = java.util.UUID.randomUUID().toString();
+        options.addProperty("requestId", requestId);
+        args.add("options", options);
+        JsonObject result = runPackage(endpoint, args, requestId, true);
+        finish(result, endpoint);
     }
 
     private void install(String endpoint) {
@@ -178,6 +280,11 @@ final class DshPluginManagementController {
         JsonObject args = new JsonObject();
         args.addProperty("spec", spec);
         args.add("options", options);
+        return runPackage(endpoint, args, requestId, false);
+    }
+
+    private JsonObject runPackage(
+            String endpoint, JsonObject args, String requestId, boolean update) {
         CompletableFuture<JsonObject> result = new CompletableFuture<>();
         ui(
                 () -> {
@@ -196,9 +303,13 @@ final class DshPluginManagementController {
                                                             () -> {
                                                                 try {
                                                                     assertEndpoint(endpoint);
-                                                                    return remote.pluginChange(
-                                                                            "pluginManager/installBundle",
-                                                                            args);
+                                                                    return update
+                                                                            ? remote
+                                                                                    .updatePluginBundle(
+                                                                                            args)
+                                                                            : remote.pluginChange(
+                                                                                    "pluginManager/installBundle",
+                                                                                    args);
                                                                 } catch (RuntimeException error) {
                                                                     if (error
                                                                                     instanceof
@@ -207,6 +318,11 @@ final class DshPluginManagementController {
                                                                             && remoteError
                                                                                     .isCapabilityMissing())
                                                                         throw error;
+                                                                    if (update)
+                                                                        throw new IllegalStateException(
+                                                                                DshBundle.message(
+                                                                                        "dsh.plugins.update.unknown"),
+                                                                                error);
                                                                     assertEndpoint(endpoint);
                                                                     JsonObject wait =
                                                                             new JsonObject();
@@ -244,11 +360,18 @@ final class DshPluginManagementController {
                                                                                 "requestId")))
                                                                     return;
                                                                 if (event.equals(
-                                                                        "plugin-manager/install-state"))
+                                                                                "plugin-manager/install-state")
+                                                                        || event.equals(
+                                                                                "plugin-manager/update-state"))
                                                                     indicator.setText2(
                                                                             DshJson.stringOr(
-                                                                                    frame, "phase",
-                                                                                    ""));
+                                                                                    frame,
+                                                                                    "phase",
+                                                                                    DshJson
+                                                                                            .stringOr(
+                                                                                                    frame,
+                                                                                                    "step",
+                                                                                                    "")));
                                                                 if (event.equals(
                                                                                 "plugin-manager/install-log")
                                                                         && DshJson.strictString(
@@ -345,6 +468,15 @@ final class DshPluginManagementController {
             details.add(DshJson.stringOr(error, "diagnostic", DshJson.stringOr(error, "code", "")));
             if (error.has("incompatible")) details.add(error.get("incompatible").toString());
         }
+        if (result.has("restore"))
+            details.add(
+                    DshBundle.message(
+                            "dsh.plugins.update.restore",
+                            DshJson.stringOr(
+                                    result.getAsJsonObject("restore"), "application", "unknown")));
+        if (result.has("pendingBuilds"))
+            details.add(
+                    DshBundle.message("dsh.plugins.builds.confirm", result.get("pendingBuilds")));
         if (result.has("warnings"))
             for (JsonElement warning : result.getAsJsonArray("warnings"))
                 details.add(warning.getAsString());
@@ -361,7 +493,9 @@ final class DshPluginManagementController {
     }
 
     private void assertEndpoint(String endpoint) {
-        if (endpoint == null || !endpoint.equals(runtime.getUrl()))
+        if (endpoint == null
+                || !endpoint.equals(runtime.getUrl())
+                || remote.snapshot().generation != managementGeneration)
             throw new IllegalStateException(DshBundle.message("dsh.runtime.changed"));
     }
 
