@@ -59,6 +59,8 @@ Native change review is enabled by default. In the **DSH** tool window:
 3. Edit the right side of a pending preview to draft a correction. **Request revision** rejects the original call and attaches your edited contents to chat. Send a message to ask the Agent for a revised edit and a new approval. The draft does not write files or change the original tool arguments; ordinary approval is disabled while that call has edited drafts.
 4. Turn snapshots require Git and a local Runtime managed by this IDE. Keep the session selected before starting the turn. Captured text comparisons are saved in the IDE system directory, scoped to this project and Runtime endpoint, for up to 30 days within bounded storage. Reopened snapshots are read-only and cannot restore files. Older turns that were never captured cannot be reconstructed as turn snapshots.
 
+For a captured local Git turn, **Revert file** restores one file, including captured creation, deletion or rename. **Revert block…** selects one remaining line block in a modified UTF-8 file of up to 1 MiB. Rollback preserves line endings and POSIX read/write permissions and rechecks disk contents, unsaved editor documents, Runtime identity and active-turn state. Partially reverted turns still support whole-turn restore. Saved history from a previous window stays read-only.
+
 Uncheck **Enable native change review** in **Settings → Tools → DeepSeek Harness** to disable the review center, revision drafts and snapshot capture. Changes take effect immediately; tool-card links still open ordinary read-only diffs. The Runtime's own approval policy remains separately configurable.
 
 Tool-card diffs use the connected Host's file preview API and can work without Git or a matching local file. They require supported structured edit data; shell edits may have no tool-card diff. A missing capability, binary or oversized file, or content that cannot be reconstructed reliably produces an error instead of a guessed comparison.
@@ -102,6 +104,8 @@ not collected; attach any values needed for analysis manually.
 The endpoint cannot create arbitrary launch configurations or evaluate expressions.
 Externally managed Runtimes retain their own integrations.
 
+`debug_control` can list bridge-owned `executions` and stop or restart one by its `executionId`, or by the debug `sessionId` returned from `debug_start`. These actions cover configurations launched through this bridge, including `noDebug` runs. Restart waits for the exact prior process to exit and reuses the existing configuration. A timeout reports failure before a replacement is started.
+
 Product-specific debugger options and terminal context on the 2024.3 baseline are
 listed with API evidence in [TODO](TODO.md#platform-exceptions--deliberately-not-implemented).
 
@@ -136,6 +140,8 @@ Choose **Export conversation** from the chat menu or **DSH: Export Conversation*
 Enable the Runtime's **Change requests & worktrees** bundle, then use **Changes and worktrees** in the chat menu or **DSH: Changes and Worktrees** in Find Action. The native panel shows the Host checkout, bound change requests, checks and review threads. It reads local Git changes by scope and change request patches, and can track a change request URL. Before the first turn, request a worktree from HEAD or a chosen base branch. Pending requests can be cancelled and failed creation can be retried. The Host applies its sandbox and validates each operation.
 
 Use **DSH: Browse Runtime Workspace Files** from Find Action or `/ide` to browse the selected Session’s Host files. Native previews are read-only UTF-8 text up to 1 MiB, refresh on Host file changes, and remain bound to their Runtime. **DSH: Refresh Runtime File Previews** provides manual refresh.
+
+In the Forge panel, **Review and merge actions** publishes reviews and line comments, replies to or resolves discussions, submits or discards pending reviews, marks drafts ready, and merges with a repository-supported method. Available Host capabilities also offer failed-check reruns, reviewer selection and branch updates. Each write shows the URL, reviewed head and action for confirmation. Head changes reject stale actions. An unconfirmed outcome asks you to check the code host before another attempt.
 
 API keys are stored in IntelliJ **Password Safe** and passed to a newly started local Runtime. The UI includes English and Simplified Chinese resources.
 

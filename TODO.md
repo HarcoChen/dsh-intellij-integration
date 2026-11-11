@@ -40,8 +40,20 @@ The companion Webview uses the audited `96d3aaf` source plus the IntelliJ adapte
   The published Runtime exposes the legacy account API, whose fallback was verified.
 - [ ] Source `0.2.2-rc.2` generic notification delivery, real signed-in Forge checks/reviews,
   and Git-host package updates require their corresponding account or remote-host acceptance.
-- [ ] Remaining extended features include granular file/hunk rollback, Forge review publication
-  and merge controls, and debugger stop/restart. Existing whole-turn restore remains available.
+- [x] Per-file and line-block rollback of captured local turns, partial-turn tracking, disk drift
+  and unsaved-document guards, exact Runtime ownership checks, and CRLF/EOF handling.
+- [x] Forge review and inline comment publication, thread reply/resolve, pending-review submit/discard,
+  ready/merge controls and optional check/reviewer/branch operations, with head and outcome checks.
+- [x] Debugger execution inventory and bridge-owned stop/restart, including noDebug runs,
+  exact launch attribution, process-exit waiting and listener cleanup.
+- [x] Isolated IntelliJ 2024.3.6 acceptance exercises real Git captures, partial and whole-turn
+  rollback, stale previews, disk conflicts, add/delete/rename restoration, actual unsaved IDE
+  documents, missing final newlines, empty files, POSIX read/write permissions, and real IDE
+  execution listing/launch/restart/stop. Git index and HEAD remain intact.
+- [x] A local provider inside the real Runtime exercises review/inline-comment publication,
+  stale and unknown outcomes, marking ready and head-bound merge. No external review was published.
+- [ ] Source-only Forge discussion writes and check/reviewer/branch controls still need acceptance
+  against a Host that exposes those newer optional methods, followed by signed-in UI acceptance.
 - [ ] Installed IntelliJ/PyCharm interaction: multi-file review, correction submission, settings
   toggling, restart history, terminal capture, Session center, the save dialog and the native
   Schedule/Forge panels remain manual acceptance.
@@ -55,7 +67,7 @@ These are the projects' published feature claims.
 | --- | --- | --- |
 | [DSH Studio](https://github.com/skansgai/dsh-studio) | Embedded Host WebUI, Runtime lifecycle, selection context, recent sessions, headless tasks | Native chat, lifecycle, editor context and Session center are implemented. Headless task UI is a remaining extension. |
 | [DSH Lite](https://github.com/EPCN-fla/dsh-lite-idea) | ACP chat, model/preset/permission controls, skills, Session export | Chat controls, skills and Markdown/JSON export are implemented. |
-| [DSH ⇄ JetBrains](https://github.com/abadiegie/dsh-jetbrains) | Shared IDE context, turn diffs, persisted reviews and per-file/hunk revert | Context, native turn/tool diffs, saved reviews and whole-turn restore are implemented. Granular rollback is a remaining extension. |
+| [DSH ⇄ JetBrains](https://github.com/abadiegie/dsh-jetbrains) | Shared IDE context, turn diffs, persisted reviews and per-file/hunk revert | Context, native turn/tool diffs, saved reviews, whole-turn restore and per-file/line-block rollback are implemented. |
 | [DeepSeek Harness WebUI](https://github.com/Chocomintopia/dsh-jetbrains-plugin) | Embedded official WebUI, fixed DeepSeek Chat tab and reload action | Native integrated chat, Runtime reconnect and browser entry are implemented. |
 
 ## Current parity — dsh-ide v0.11.0（2026-10-19）
@@ -96,7 +108,7 @@ These are feasible extensions, not implemented feature paths or current parity c
 
 - [x] Attach selected text or the current screen from the Runtime-owned terminal as bounded,
   explicit one-shot context. This does not require the newer IDE terminal API.
-- [ ] Add stop/restart controls to the optional debugger tools for existing IDE-launched
+- [x] Add stop/restart controls to the optional debugger tools for bridge-launched
   sessions, with process ownership and session identity checks.
 - [x] Add preview and management actions directly to Session center, reusing the existing
   rename/archive/pin/move flows rather than opening a separate session manager.

@@ -8,6 +8,9 @@ import com.intellij.execution.RunManager;
 import com.intellij.execution.RunnerAndConfigurationSettings;
 import com.intellij.execution.executors.DefaultDebugExecutor;
 import com.intellij.execution.executors.DefaultRunExecutor;
+import com.intellij.execution.process.ProcessAdapter;
+import com.intellij.execution.process.ProcessEvent;
+import com.intellij.execution.process.ProcessHandler;
 import com.intellij.execution.runners.ExecutionEnvironmentBuilder;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ReadAction;
@@ -46,6 +49,18 @@ final class DshDebugTools implements AutoCloseable {
     private final Map<XDebugSession, String> ids = new IdentityHashMap<>();
     private final Map<XExecutionStack, Integer> threads = new IdentityHashMap<>();
     private int nextThreadId = 1;
+
+    private record Launch(
+            String executionId,
+            RunnerAndConfigurationSettings settings,
+            boolean noDebug,
+            ProcessHandler handler) {}
+
+    private final Map<ProcessHandler, Launch> launches =
+            java.util.Collections.synchronizedMap(new IdentityHashMap<>());
+    private final Map<ProcessHandler, ProcessAdapter> launchListeners =
+            java.util.Collections.synchronizedMap(new IdentityHashMap<>());
+    private final Set<ProcessHandler> stopping = java.util.concurrent.ConcurrentHashMap.newKeySet();
     private final ScheduledExecutorService timer =
             Executors.newSingleThreadScheduledExecutor(
                     task -> {
@@ -116,7 +131,8 @@ final class DshDebugTools implements AutoCloseable {
         tools.add(
                 tool(
                         "debug_control",
-                        "Continue, pause, step, list paused threads or wait. Line-level stepping only.",
+                        "Continue, pause, step, list paused threads or wait. "
+                                + "Stop/restart uses a debug_start executionId or sessionId and waits for exit.",
                         """
                         {
                           "action": {
@@ -128,10 +144,16 @@ final class DshDebugTools implements AutoCloseable {
                               "stepIn",
                               "stepOut",
                               "threads",
-                              "wait"
+                              "wait",
+                              "stop",
+                              "restart",
+                              "executions"
                             ]
                           },
                           "sessionId": {
+                            "type": "string"
+                          },
+                          "executionId": {
                             "type": "string"
                           },
                           "threadId": {
@@ -285,6 +307,11 @@ final class DshDebugTools implements AutoCloseable {
                                     .toList());
         RunnerAndConfigurationSettings settings = matches.get(0);
         boolean noDebug = DshJson.bool(args, "noDebug", false);
+        return start(settings, noDebug);
+    }
+
+    private CompletableFuture<String> start(
+            RunnerAndConfigurationSettings settings, boolean noDebug) {
         try {
             var executor =
                     noDebug
@@ -292,6 +319,7 @@ final class DshDebugTools implements AutoCloseable {
                             : DefaultDebugExecutor.getDebugExecutorInstance();
             var builder = ExecutionEnvironmentBuilder.create(executor, settings);
             CompletableFuture<String> result = new CompletableFuture<>();
+            String executionId = UUID.randomUUID().toString();
             var environment =
                     builder.build(
                             descriptor -> {
@@ -300,6 +328,11 @@ final class DshDebugTools implements AutoCloseable {
                                             new IllegalStateException("Debugger bridge closed"));
                                     return;
                                 }
+                                recordLaunch(
+                                        executionId,
+                                        settings,
+                                        noDebug,
+                                        descriptor.getProcessHandler());
                                 XDebugSession started =
                                         noDebug
                                                 ? null
@@ -312,7 +345,10 @@ final class DshDebugTools implements AutoCloseable {
                                                     + settings.getName()
                                                     + (noDebug
                                                             ? " without debugging."
-                                                            : "; debugger session is still initializing."));
+                                                            : "; debugger session is still initializing.")
+                                                    + " (executionId "
+                                                    + executionId
+                                                    + ").");
                                 else
                                     result.complete(
                                             "Started debug session "
@@ -327,8 +363,10 @@ final class DshDebugTools implements AutoCloseable {
                     new com.intellij.execution.ExecutionListener() {
                         private boolean matches(
                                 com.intellij.execution.runners.ExecutionEnvironment started) {
-                            return started.getRunProfile() == settings.getConfiguration()
-                                    && started.getExecutor().getId().equals(executor.getId());
+                            return started == environment
+                                    || (environment.getExecutionId() != 0
+                                            && started.getExecutionId()
+                                                    == environment.getExecutionId());
                         }
 
                         @Override
@@ -360,14 +398,16 @@ final class DshDebugTools implements AutoCloseable {
                                 com.intellij.execution.runners.ExecutionEnvironment started,
                                 com.intellij.execution.process.ProcessHandler handler) {
                             if (!matches(started)) return;
+                            recordLaunch(executionId, settings, noDebug, handler);
                             onEdt(
                                             () -> {
                                                 XDebugSession[] live =
                                                         XDebuggerManager.getInstance(project)
                                                                 .getDebugSessions();
                                                 for (XDebugSession session : live)
-                                                    if (session.getRunProfile()
-                                                            == settings.getConfiguration())
+                                                    if (session.getRunContentDescriptor()
+                                                                    .getProcessHandler()
+                                                            == handler)
                                                         return "Started debug session "
                                                                 + settings.getName()
                                                                 + " (sessionId "
@@ -375,7 +415,9 @@ final class DshDebugTools implements AutoCloseable {
                                                                 + ").";
                                                 return "Started existing configuration "
                                                         + settings.getName()
-                                                        + "; query the debugger for its pause.";
+                                                        + " (executionId "
+                                                        + executionId
+                                                        + ").";
                                             })
                                     .whenComplete(
                                             (value, error) -> {
@@ -395,6 +437,124 @@ final class DshDebugTools implements AutoCloseable {
         } catch (com.intellij.execution.ExecutionException error) {
             return CompletableFuture.failedFuture(error);
         }
+    }
+
+    private synchronized void recordLaunch(
+            String executionId,
+            RunnerAndConfigurationSettings settings,
+            boolean noDebug,
+            ProcessHandler handler) {
+        if (handler == null || closed || handler.isProcessTerminated()) return;
+        Launch previous =
+                launches.putIfAbsent(handler, new Launch(executionId, settings, noDebug, handler));
+        if (previous != null) return;
+        ProcessAdapter listener =
+                new ProcessAdapter() {
+                    @Override
+                    public void processTerminated(ProcessEvent event) {
+                        launches.remove(handler);
+                        launchListeners.remove(handler);
+                        handler.removeProcessListener(this);
+                    }
+                };
+        launchListeners.put(handler, listener);
+        handler.addProcessListener(listener);
+        if (handler.isProcessTerminated()) {
+            launches.remove(handler);
+            launchListeners.remove(handler);
+            handler.removeProcessListener(listener);
+        }
+    }
+
+    private CompletableFuture<String> lifecycle(JsonObject args, boolean restart) {
+        String requested = DshJson.strictString(args, "executionId");
+        if (requested != null && args.has("sessionId"))
+            throw new IllegalArgumentException("Choose one executionId or sessionId.");
+        if (requested == null) requested = DshJson.strictString(args, "sessionId");
+        Launch launch = null;
+        synchronized (launches) {
+            for (Launch candidate : launches.values()) {
+                boolean matches = candidate.executionId().equals(requested);
+                for (var entry : ids.entrySet())
+                    matches |=
+                            entry.getValue().equals(requested)
+                                    && entry.getKey().getRunContentDescriptor().getProcessHandler()
+                                            == candidate.handler();
+                if (matches) {
+                    launch = candidate;
+                    break;
+                }
+            }
+        }
+        if (launch == null)
+            throw new IllegalArgumentException(
+                    "Use an executionId or sessionId returned by this debugger bridge's debug_start.");
+        if (!stopping.add(launch.handler()))
+            throw new IllegalStateException("This execution is already stopping or restarting.");
+        Launch target = launch;
+        CompletableFuture<String> result =
+                stopProcess(target)
+                        .thenCompose(
+                                ignored ->
+                                        restart
+                                                ? restartLaunch(target)
+                                                : CompletableFuture.completedFuture(
+                                                        "Stopped execution "
+                                                                + target.executionId()
+                                                                + "."));
+        result.whenComplete((value, error) -> stopping.remove(target.handler()));
+        return result;
+    }
+
+    private CompletableFuture<String> restartLaunch(Launch target) {
+        return onEdt(
+                        () -> {
+                            if (!RunManager.getInstance(project)
+                                    .getAllSettings()
+                                    .contains(target.settings()))
+                                throw new IllegalStateException(
+                                        "Run configuration removed. Choose another with debug_start.");
+                            return start(target.settings(), target.noDebug());
+                        })
+                .thenCompose(value -> value);
+    }
+
+    private CompletableFuture<Void> stopProcess(Launch launch) {
+        ProcessHandler handler = launch.handler();
+        CompletableFuture<Void> result = new CompletableFuture<>();
+        ProcessAdapter listener =
+                new ProcessAdapter() {
+                    @Override
+                    public void processTerminated(ProcessEvent event) {
+                        result.complete(null);
+                    }
+                };
+        handler.addProcessListener(listener);
+        var timeout =
+                timer.schedule(
+                        () ->
+                                result.completeExceptionally(
+                                        new IllegalStateException(
+                                                "Process did not exit within 20 seconds. "
+                                                        + "A replacement was not started.")),
+                        20,
+                        TimeUnit.SECONDS);
+        result.whenComplete(
+                (value, error) -> {
+                    timeout.cancel(false);
+                    handler.removeProcessListener(listener);
+                });
+        if (handler.isProcessTerminated()) result.complete(null);
+        else if (!handler.isProcessTerminating()) {
+            try {
+                handler.destroyProcess();
+            } catch (RuntimeException error) {
+                result.completeExceptionally(error);
+            }
+        }
+        pending.add(result);
+        result.whenComplete((value, error) -> pending.remove(result));
+        return result;
     }
 
     private String id(XDebugSession session) {
@@ -520,8 +680,31 @@ final class DshDebugTools implements AutoCloseable {
     }
 
     private CompletableFuture<String> control(JsonObject args) {
-        XDebugSession session = session(args);
         String action = DshJson.strictString(args, "action");
+        if ("executions".equals(action)) {
+            JsonArray executions = new JsonArray();
+            synchronized (launches) {
+                for (Launch launch : launches.values()) {
+                    JsonObject row = new JsonObject();
+                    row.addProperty("executionId", launch.executionId());
+                    row.addProperty("configurationName", launch.settings().getName());
+                    row.addProperty("debug", !launch.noDebug());
+                    row.addProperty("terminating", launch.handler().isProcessTerminating());
+                    executions.add(row);
+                }
+            }
+            return CompletableFuture.completedFuture(executions.toString());
+        }
+        if ("stop".equals(action) || "restart".equals(action)) {
+            if (args.has("threadId") || args.has("timeoutMs"))
+                throw new IllegalArgumentException(
+                        "Stop/restart acts on the complete launched execution.");
+            return lifecycle(args, "restart".equals(action));
+        }
+        if (args.has("executionId"))
+            throw new IllegalArgumentException(
+                    "Use sessionId for debugger thread and stepping controls.");
+        XDebugSession session = session(args);
         if ("wait".equals(action))
             return waitForPause(session, DshJson.integer(args, "timeoutMs", 10000));
         if ("threads".equals(action))
@@ -729,11 +912,19 @@ final class DshDebugTools implements AutoCloseable {
     }
 
     @Override
-    public void close() {
+    public synchronized void close() {
         closed = true;
         timer.shutdownNow();
         for (var future : pending)
             future.completeExceptionally(new IllegalStateException("Debugger bridge closed"));
         pending.clear();
+        Map<ProcessHandler, ProcessAdapter> listeners;
+        synchronized (launchListeners) {
+            listeners = new IdentityHashMap<>(launchListeners);
+            launchListeners.clear();
+        }
+        listeners.forEach(ProcessHandler::removeProcessListener);
+        launches.clear();
+        stopping.clear();
     }
 }

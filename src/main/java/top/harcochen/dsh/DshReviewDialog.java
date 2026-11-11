@@ -45,7 +45,19 @@ final class DshReviewDialog extends DialogWrapper {
             String path,
             String approvalKey,
             Callable<Content> load,
-            Function<String, CompletionStage<String>> decide) {}
+            Function<String, CompletionStage<String>> decide,
+            Function<Boolean, CompletionStage<RollbackResult>> rollback) {
+        File(
+                String label,
+                String path,
+                String approvalKey,
+                Callable<Content> load,
+                Function<String, CompletionStage<String>> decide) {
+            this(label, path, approvalKey, load, decide, null);
+        }
+    }
+
+    record RollbackResult(boolean complete, String message) {}
 
     private final Project project;
     private final List<File> files;
@@ -60,6 +72,9 @@ final class DshReviewDialog extends DialogWrapper {
     private Action approve;
     private Action reject;
     private Action revise;
+    private Action revertFile;
+    private Action revertHunk;
+    private final Set<File> reverted = new HashSet<>();
     private boolean busy;
     private boolean closed;
     private int loadEpoch;
@@ -188,6 +203,12 @@ final class DshReviewDialog extends DialogWrapper {
                         JSplitPane.HORIZONTAL_SPLIT, new JScrollPane(list), diff.getComponent());
         split.setResizeWeight(0.25);
         split.setDividerLocation(280);
+        JPanel navigation = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.LEADING));
+        navigation.add(new javax.swing.JButton(action("dsh.review.previous", () -> navigate(-1))));
+        navigation.add(new javax.swing.JButton(action("dsh.review.next", () -> navigate(1))));
+        navigation.add(
+                new javax.swing.JButton(action("dsh.review.refresh", this::refreshSelected)));
+        panel.add(navigation, BorderLayout.NORTH);
         panel.add(split, BorderLayout.CENTER);
         panel.add(status, BorderLayout.SOUTH);
         panel.setPreferredSize(new Dimension(1100, 700));
@@ -199,15 +220,9 @@ final class DshReviewDialog extends DialogWrapper {
         approve = action("dsh.diff.approval.approve", () -> decide("allowed-once", false));
         reject = action("dsh.diff.approval.reject", () -> decide("rejected", false));
         revise = action("dsh.review.revise", () -> decide("rejected", true));
-        return new Action[] {
-            action("dsh.review.previous", () -> navigate(-1)),
-            action("dsh.review.next", () -> navigate(1)),
-            action("dsh.review.refresh", this::refreshSelected),
-            approve,
-            reject,
-            revise,
-            getCancelAction()
-        };
+        revertFile = action("dsh.review.revert.file", () -> rollback(false));
+        revertHunk = action("dsh.review.revert.hunk", () -> rollback(true));
+        return new Action[] {approve, reject, revise, revertFile, revertHunk, getCancelAction()};
     }
 
     private Action action(String key, Runnable run) {
@@ -236,6 +251,7 @@ final class DshReviewDialog extends DialogWrapper {
     }
 
     private void navigate(int delta) {
+        if (busy) return;
         int index = list.getSelectedIndex() + delta;
         if (index >= 0 && index < files.size()) list.setSelectedIndex(index);
     }
@@ -356,8 +372,38 @@ final class DshReviewDialog extends DialogWrapper {
         approve.setEnabled(pending && !groupChanged(file));
         reject.setEnabled(pending);
         revise.setEnabled(pending && groupChanged(file));
+        boolean canRevert =
+                !busy && file != null && file.rollback() != null && !reverted.contains(file);
+        revertFile.setEnabled(canRevert);
+        revertHunk.setEnabled(canRevert && contents.containsKey(file));
         list.setEnabled(!busy);
         getCancelAction().setEnabled(!busy);
+    }
+
+    private void rollback(boolean hunk) {
+        File file = selected();
+        if (busy || file == null || file.rollback() == null || reverted.contains(file)) return;
+        busy = true;
+        status.setText(DshBundle.message("dsh.review.submitting"));
+        updateActions();
+        file.rollback()
+                .apply(hunk)
+                .whenComplete(
+                        (result, error) ->
+                                ApplicationManager.getApplication()
+                                        .invokeLater(
+                                                () -> {
+                                                    if (closed || project.isDisposed()) return;
+                                                    busy = false;
+                                                    if (error != null)
+                                                        status.setText(errorMessage(error));
+                                                    else if (result != null) {
+                                                        if (result.complete()) reverted.add(file);
+                                                        if (result.message() != null)
+                                                            status.setText(result.message());
+                                                    }
+                                                    updateActions();
+                                                }));
     }
 
     private void decide(String outcome, boolean revision) {

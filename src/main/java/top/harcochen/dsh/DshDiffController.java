@@ -206,6 +206,7 @@ final class DshDiffController {
 
     private void appendTurnFiles(String current, List<DshReviewDialog.File> files) {
         if (!remote.access().owner()) return;
+        long generation = remote.snapshot().generation;
         for (JsonElement value : changeReviews.view(current)) {
             JsonObject review = value.getAsJsonObject();
             int turn = DshJson.integer(review, "turn", 0);
@@ -233,9 +234,139 @@ final class DshDiffController {
                                     return new DshReviewDialog.Content(
                                             sides.beforeText(), sides.afterText());
                                 },
-                                null));
+                                null,
+                                DshJson.bool(file, "restorable", false)
+                                        ? hunk ->
+                                                rollback(current, turn, id, path, generation, hunk)
+                                        : null));
             }
         }
+    }
+
+    private record RollbackSelection(Integer block, String revision) {}
+
+    private java.util.concurrent.CompletionStage<DshReviewDialog.RollbackResult> rollback(
+            String current, int turn, String id, String path, long generation, boolean hunk) {
+        return java.util.concurrent.CompletableFuture.supplyAsync(
+                () -> {
+                    try {
+                        List<Path> paths = changeReviews.revertPaths(current, turn, id);
+                        assertWritable(current, generation, paths);
+                        DshChangeReviewStore.HunkPreview preview =
+                                hunk ? changeReviews.revertHunks(current, turn, id) : null;
+                        if (preview != null && preview.blocks().isEmpty())
+                            return new DshReviewDialog.RollbackResult(
+                                    false, DshBundle.message("dsh.review.hunks.empty"));
+                        RollbackSelection selection =
+                                DshPluginManagementController.ui(
+                                        () -> confirmRollback(path, preview));
+                        if (selection == null)
+                            return new DshReviewDialog.RollbackResult(
+                                    false, DshBundle.message("dsh.review.revert.cancelled"));
+                        boolean complete =
+                                changeReviews.revert(
+                                        current,
+                                        turn,
+                                        id,
+                                        selection.block(),
+                                        selection.revision(),
+                                        () -> assertWritable(current, generation, paths));
+                        com.intellij.openapi.vfs.VirtualFileManager.getInstance()
+                                .asyncRefresh(null);
+                        return new DshReviewDialog.RollbackResult(
+                                complete, DshBundle.message("dsh.review.reverted", path));
+                    } catch (Exception error) {
+                        throw new java.util.concurrent.CompletionException(error);
+                    }
+                },
+                operations);
+    }
+
+    private RollbackSelection confirmRollback(
+            String path, DshChangeReviewStore.HunkPreview preview) {
+        if (project.isDisposed()) return null;
+        if (preview == null) {
+            int answer =
+                    Messages.showYesNoDialog(
+                            project,
+                            DshBundle.message("dsh.review.revert.file.confirm", path),
+                            DshBundle.message("dsh.review.revert.file"),
+                            Messages.getWarningIcon());
+            return answer == Messages.YES ? new RollbackSelection(null, null) : null;
+        }
+        String[] labels =
+                preview.blocks().stream()
+                        .map(
+                                value ->
+                                        DshBundle.message(
+                                                "dsh.review.hunk.lines",
+                                                value.beforeLine(),
+                                                value.beforeLines(),
+                                                value.afterLine(),
+                                                value.afterLines()))
+                        .toArray(String[]::new);
+        int chosen =
+                DshChoiceDialog.show(
+                        project,
+                        path,
+                        DshBundle.message("dsh.review.revert.hunk"),
+                        Messages.getQuestionIcon(),
+                        labels,
+                        labels[0]);
+        if (chosen < 0) return null;
+        DshReviewHunks.Block selected = preview.blocks().get(chosen);
+        String snippet = "− " + selected.after() + "\n+ " + selected.before();
+        int answer =
+                Messages.showYesNoDialog(
+                        project,
+                        DshBundle.message("dsh.review.revert.hunk.confirm", path)
+                                + "\n\n"
+                                + snippet.substring(0, Math.min(snippet.length(), 6000)),
+                        DshBundle.message("dsh.review.revert.hunk"),
+                        Messages.getWarningIcon());
+        return answer == Messages.YES
+                ? new RollbackSelection(selected.index(), preview.revision())
+                : null;
+    }
+
+    private void assertWritable(String current, long generation, List<Path> paths) {
+        assertGeneration(generation);
+        if (!DshSettingsState.getInstance(project).enableChangeReview
+                || !remote.access().owner()
+                || !DshRuntimeService.getInstance(project).hasLocalProcess())
+            throw new IllegalStateException(DshBundle.message("dsh.change.review.cannot.restore"));
+        if (isSessionRunning(current))
+            throw new IllegalStateException(DshBundle.message("dsh.restore.wait.for.turn"));
+        assertSavedDocuments(paths);
+    }
+
+    static void assertSavedDocuments(List<Path> paths) {
+        boolean dirty =
+                com.intellij.openapi.application.ReadAction.compute(
+                        () -> {
+                            var manager =
+                                    com.intellij.openapi.fileEditor.FileDocumentManager
+                                            .getInstance();
+                            for (var document : manager.getUnsavedDocuments()) {
+                                var file = manager.getFile(document);
+                                if (file == null) continue;
+                                String canonical = file.getCanonicalPath();
+                                Path edited =
+                                        Path.of(canonical == null ? file.getPath() : canonical)
+                                                .toAbsolutePath()
+                                                .normalize();
+                                if (paths.stream()
+                                        .anyMatch(
+                                                path ->
+                                                        path.toAbsolutePath()
+                                                                .normalize()
+                                                                .equals(edited))) return true;
+                            }
+                            return false;
+                        });
+        if (dirty)
+            throw new IllegalStateException(
+                    DshBundle.message("dsh.review.unsaved", paths.toString()));
     }
 
     private void assertGeneration(long generation) {
@@ -370,15 +501,17 @@ final class DshDiffController {
         if (answer != Messages.YES) {
             return;
         }
-        operations.execute(() -> restore(current, turn, onSuccess));
+        long generation = remote.snapshot().generation;
+        operations.execute(() -> restore(current, turn, generation, onSuccess));
     }
 
-    private void restore(String current, int turn, Runnable onSuccess) {
+    private void restore(String current, int turn, long generation, Runnable onSuccess) {
         try {
             if (isSessionRunning(current)) {
                 throw new IllegalStateException(DshBundle.message("dsh.restore.wait.for.turn"));
             }
-            changeReviews.restore(current, turn);
+            List<Path> paths = changeReviews.restorePaths(current, turn);
+            changeReviews.restore(current, turn, () -> assertWritable(current, generation, paths));
             com.intellij.openapi.vfs.VirtualFileManager.getInstance().asyncRefresh(null);
             notifyUser(DshBundle.message("dsh.restore.success", turn));
             if (onSuccess != null) {

@@ -65,6 +65,8 @@ final class DshChangeReviewStore {
         private String oldMode;
         private String newMode;
         private boolean restorable;
+        private boolean restored;
+        private final Set<Integer> revertedHunks = new LinkedHashSet<>();
 
         /** Content hash sampled at capture; a later mismatch means the user edited the file. */
         private String newWorkingHash;
@@ -264,7 +266,9 @@ final class DshChangeReviewStore {
                 entry.addProperty("status", file.status);
                 entry.addProperty("path", file.path);
                 if (file.oldPath != null) entry.addProperty("oldPath", file.oldPath);
-                entry.addProperty("restorable", file.restorable);
+                entry.addProperty(
+                        "restorable", file.restorable && !file.restored && !review.restored);
+                entry.addProperty("restored", file.restored);
                 files.add(entry);
             }
             row.add("files", files);
@@ -341,6 +345,7 @@ final class DshChangeReviewStore {
                 item.addProperty("status", file.status);
                 item.addProperty("oldPath", file.oldPath);
                 item.addProperty("binary", sides.binary());
+                item.addProperty("restored", file.restored);
                 item.addProperty("beforeText", sides.beforeText());
                 item.addProperty("afterText", sides.afterText());
                 files.add(item);
@@ -447,7 +452,7 @@ final class DshChangeReviewStore {
                 || review.restored
                 || review.files.isEmpty()) return false;
         for (ChangeFile file : review.files) {
-            if (!file.restorable) return false;
+            if (!file.restored && !file.restorable) return false;
         }
         return true;
     }
@@ -456,7 +461,9 @@ final class DshChangeReviewStore {
     synchronized int restorableFileCount(String sessionId, int turn) {
         SessionReviews session = sessionId == null ? null : sessions.get(sessionId);
         ChangeReview review = session == null ? null : session.reviews.get(turn);
-        return review == null ? 0 : review.files.size();
+        return review == null
+                ? 0
+                : (int) review.files.stream().filter(file -> !file.restored).count();
     }
 
     /**
@@ -467,24 +474,197 @@ final class DshChangeReviewStore {
      * open is never silently overwritten.
      */
     void restore(String sessionId, int turn) throws Exception {
+        restore(sessionId, turn, () -> {});
+    }
+
+    void restore(String sessionId, int turn, Runnable assertWritable) throws Exception {
         ChangeReview review;
         synchronized (this) {
             review = review(sessionId, turn);
+        }
+        synchronized (review) {
             if (!isRestorable(sessionId, turn))
                 throw new IllegalStateException(
                         DshBundle.message("dsh.change.review.cannot.restore"));
+            ChangeReview subset =
+                    subset(review, review.files.stream().filter(file -> !file.restored).toList());
+            restoreFiles(subset, assertWritable);
+            synchronized (this) {
+                for (ChangeFile file : subset.files) file.restored = true;
+                review.restored = true;
+            }
+            operations.execute(() -> persist(sessionId, review));
         }
+        onUpdate.run();
+    }
+
+    synchronized List<Path> restorePaths(String sessionId, int turn) {
+        ChangeReview review = review(sessionId, turn);
+        List<Path> paths = new ArrayList<>();
+        for (ChangeFile file : review.files) {
+            if (file.restored) continue;
+            paths.add(resolvePath(review, file.path));
+            if (file.oldPath != null) paths.add(resolvePath(review, file.oldPath));
+        }
+        return List.copyOf(paths);
+    }
+
+    record HunkPreview(String revision, List<DshReviewHunks.Block> blocks) {}
+
+    HunkPreview revertHunks(String sessionId, int turn, String fileId) throws Exception {
+        ChangeReview review;
+        synchronized (this) {
+            review = review(sessionId, turn);
+        }
+        synchronized (review) {
+            ChangeFile file = revertFile(review, fileId);
+            DshReviewHunks.Plan plan = hunkPlan(review, file);
+            return new HunkPreview(file.newWorkingHash, plan.remaining(file.revertedHunks));
+        }
+    }
+
+    List<Path> revertPaths(String sessionId, int turn, String fileId) {
+        synchronized (this) {
+            ChangeReview review = review(sessionId, turn);
+            ChangeFile file = revertFile(review, fileId);
+            List<Path> paths = new ArrayList<>();
+            paths.add(resolvePath(review, file.path));
+            if (file.oldPath != null) paths.add(resolvePath(review, file.oldPath));
+            return List.copyOf(paths);
+        }
+    }
+
+    boolean revert(
+            String sessionId,
+            int turn,
+            String fileId,
+            Integer block,
+            String revision,
+            Runnable assertWritable)
+            throws Exception {
+        ChangeReview review;
+        synchronized (this) {
+            review = review(sessionId, turn);
+        }
+        synchronized (review) {
+            ChangeFile file = revertFile(review, fileId);
+            assertWritable.run();
+            if (block == null) {
+                restoreFiles(subset(review, List.of(file)), assertWritable);
+                synchronized (this) {
+                    file.restored = true;
+                }
+            } else {
+                if (!java.util.Objects.equals(revision, file.newWorkingHash))
+                    throw new IllegalStateException(DshBundle.message("dsh.files.changed"));
+                DshReviewHunks.Plan plan = hunkPlan(review, file);
+                if (block < 0
+                        || block >= plan.fragments().size()
+                        || file.revertedHunks.contains(block))
+                    throw new IllegalStateException(DshBundle.message("dsh.files.changed"));
+                Set<Integer> reverted = new LinkedHashSet<>(file.revertedHunks);
+                reverted.add(block);
+                byte[] next = plan.content(reverted);
+                assertWritable.run();
+                List<String> conflicts = conflicts(subset(review, List.of(file)));
+                if (!conflicts.isEmpty())
+                    throw new IllegalStateException(conflictMessage(conflicts));
+                Path target = resolvePath(review, file.path);
+                Path temporary = Files.createTempFile(target.getParent(), ".dsh-revert-", ".tmp");
+                try {
+                    Files.write(temporary, next);
+                    if (target.getFileSystem().supportedFileAttributeViews().contains("posix"))
+                        Files.setPosixFilePermissions(
+                                temporary,
+                                Files.getPosixFilePermissions(target, LinkOption.NOFOLLOW_LINKS));
+                    try {
+                        Files.move(
+                                temporary,
+                                target,
+                                java.nio.file.StandardCopyOption.ATOMIC_MOVE,
+                                java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                    } catch (java.nio.file.AtomicMoveNotSupportedException unsupported) {
+                        Files.move(
+                                temporary,
+                                target,
+                                java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                    }
+                } finally {
+                    Files.deleteIfExists(temporary);
+                }
+                synchronized (this) {
+                    file.revertedHunks.add(block);
+                    file.newWorkingHash = workingHash(next);
+                    file.restored = reverted.size() == plan.fragments().size();
+                }
+            }
+            synchronized (this) {
+                review.restored = review.files.stream().allMatch(fileEntry -> fileEntry.restored);
+            }
+            operations.execute(() -> persist(sessionId, review));
+        }
+        onUpdate.run();
+        synchronized (this) {
+            return review.files.stream()
+                    .filter(file -> file.id.equals(fileId))
+                    .findFirst()
+                    .orElseThrow()
+                    .restored;
+        }
+    }
+
+    private ChangeFile revertFile(ChangeReview review, String fileId) {
+        if (!captureLocal.getAsBoolean()
+                || !archiveAccess.getAsBoolean()
+                || review.restored
+                || !"ready".equals(review.state))
+            throw new IllegalStateException(DshBundle.message("dsh.change.review.cannot.restore"));
+        return review.files.stream()
+                .filter(file -> file.id.equals(fileId) && file.restorable && !file.restored)
+                .findFirst()
+                .orElseThrow(
+                        () ->
+                                new IllegalStateException(
+                                        DshBundle.message("dsh.change.review.cannot.restore")));
+    }
+
+    private DshReviewHunks.Plan hunkPlan(ChangeReview review, ChangeFile file) throws Exception {
+        if (!"modified".equals(file.status)
+                || !REGULAR_MODES.contains(file.oldMode)
+                || !java.util.Objects.equals(file.oldMode, file.newMode))
+            throw new IllegalStateException(DshBundle.message("dsh.review.hunks.unsupported"));
+        List<String> conflicts = conflicts(subset(review, List.of(file)));
+        if (!conflicts.isEmpty()) throw new IllegalStateException(conflictMessage(conflicts));
+        byte[] before = prepareRestore(subset(review, List.of(file))).get(file.id);
+        byte[] after =
+                runGit(
+                        review.git,
+                        List.of(
+                                "cat-file",
+                                "--filters",
+                                "--path=" + review.git.pathPrefix + file.path,
+                                file.newBlob));
+        DshReviewHunks.Plan plan = DshReviewHunks.compare(before, after);
+        if (!file.newWorkingHash.equals(workingHash(plan.content(file.revertedHunks))))
+            throw new IllegalStateException(DshBundle.message("dsh.files.changed"));
+        return plan;
+    }
+
+    private void restoreFiles(ChangeReview review, Runnable assertWritable) throws Exception {
         List<String> conflicts = conflicts(review);
         if (!conflicts.isEmpty()) throw new IllegalStateException(conflictMessage(conflicts));
         Map<String, byte[]> contents = prepareRestore(review);
+        assertWritable.run();
         List<String> latest = conflicts(review);
         if (!latest.isEmpty()) throw new IllegalStateException(conflictMessage(latest));
         applyRestore(review, contents);
-        synchronized (this) {
-            review.restored = true;
-        }
-        operations.execute(() -> persist(sessionId, review));
-        onUpdate.run();
+    }
+
+    private static ChangeReview subset(ChangeReview source, List<ChangeFile> files) {
+        ChangeReview result = new ChangeReview(source.turn);
+        result.git = source.git;
+        result.files = files;
+        return result;
     }
 
     void dispose() {
@@ -925,16 +1105,14 @@ final class DshChangeReviewStore {
     private static void applyMode(Path target, String mode) {
         try {
             Set<PosixFilePermission> permissions =
-                    new LinkedHashSet<>(
-                            Set.of(
-                                    PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE,
-                                    PosixFilePermission.GROUP_READ,
-                                            PosixFilePermission.OTHERS_READ));
-            if (isExecutableMode(mode)) {
-                permissions.add(PosixFilePermission.OWNER_EXECUTE);
-                permissions.add(PosixFilePermission.GROUP_EXECUTE);
-                permissions.add(PosixFilePermission.OTHERS_EXECUTE);
-            }
+                    new LinkedHashSet<>(Files.getPosixFilePermissions(target));
+            Set<PosixFilePermission> executable =
+                    Set.of(
+                            PosixFilePermission.OWNER_EXECUTE,
+                            PosixFilePermission.GROUP_EXECUTE,
+                            PosixFilePermission.OTHERS_EXECUTE);
+            if (isExecutableMode(mode)) permissions.addAll(executable);
+            else permissions.removeAll(executable);
             Files.setPosixFilePermissions(target, permissions);
         } catch (UnsupportedOperationException | IOException ignored) {
             // A non-POSIX filesystem carries no executable bit to restore.
