@@ -5,6 +5,30 @@ An item is complete only after the host action, runtime protocol, projected stat
 
 Status: `[x]` implemented, `[-]` usable but not yet at VS Code parity, `[ ]` not implemented.
 
+## Maintenance — 2026-11-11
+
+Audited current Harness master `e8f7b93a344964de3dca1ace9e72b6e4d6de87cb`
+(`0.2.2-rc.2`). The default Runtime and companion Webview pins below remain unchanged;
+this batch adds selected wire compatibility, not a full 0.2.2 feature-parity claim.
+
+- [x] Accept atomic per-event `changes: [{key, val}]` projection frames and legacy key/value frames.
+- [x] Prefer durable Inbox projections for queued/steering messages; retain the legacy queue fallback.
+- [x] Explicitly activate persistent chat follows; keep one-shot history/preview follows passive.
+- [x] Issue #28: centralized native review, editable correction drafts via reject-and-resubmit,
+  whole-call approval, drift/dirty-document guards, and an immediately effective settings switch.
+- [x] Bounded project/endpoint-scoped persisted text snapshots; reopened history is read-only.
+- [x] Runtime terminal selection/screen context and Session center preview/management.
+- [x] Java compilation, formatting, Checkstyle, plugin ZIP build and IC/PC 2024.3.6
+  Plugin Verifier. Terminal TypeScript strict checking and both browser bundle rebuilds pass.
+- [x] Isolated installed Runtime `0.2.2-rc.1` with a temporary DSH_HOME: Java authentication,
+  Mux, both follow activation modes, real batched projection reduction matching a fresh Host
+  read, and multipart UTF-8 file preview pass. No model requests or unit tests were added.
+- [ ] Full 0.2.2 migration: generic account notification API, latest Team/subagent presentation,
+  and new Forge/plugin-update surfaces require a separate complete contract/UI audit before
+  advancing the default Runtime or companion bundle.
+- [ ] Installed IntelliJ/PyCharm interaction: multi-file review, correction submission, settings
+  toggling, restart history, terminal capture, and Session center actions remain manual acceptance.
+
 ## Current parity — dsh-ide v0.11.0（2026-10-19）
 
 Target: companion `96d3aaff973879617b82f9187d4b2d344a12f5ed` and Harness
@@ -41,11 +65,11 @@ The bundled Jev gitlink remains `e5d74c5`. Scope and validation boundaries are t
 
 These are feasible extensions, not implemented feature paths or current parity claims:
 
-- [ ] Attach selected text or the current screen from the Runtime-owned terminal as bounded,
+- [x] Attach selected text or the current screen from the Runtime-owned terminal as bounded,
   explicit one-shot context. This does not require the newer IDE terminal API.
 - [ ] Add stop/restart controls to the optional debugger tools for existing IDE-launched
   sessions, with process ownership and session identity checks.
-- [ ] Add preview and management actions directly to Session center, reusing the existing
+- [x] Add preview and management actions directly to Session center, reusing the existing
   rename/archive/pin/move flows rather than opening a separate session manager.
 
 ### Completed differences

@@ -95,6 +95,13 @@ public final class DshRuntimeService implements Disposable {
         return status;
     }
 
+    /** Local working-tree capture is only valid for a Runtime launched by this IDE. */
+    boolean hasLocalProcess() {
+        return DshRuntimeEndpoint.parse(baseUrl, true) != null
+                && ((process != null && process.isAlive())
+                        || (managedHelper != null && managedHelper.isAlive()));
+    }
+
     public String runtimeVersion() {
         return launchedVersion;
     }

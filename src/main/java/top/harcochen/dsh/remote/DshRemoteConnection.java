@@ -517,7 +517,7 @@ public final class DshRemoteConnection implements AutoCloseable {
                         openManaged(
                                 DshRemoteContracts.STREAM_SESSION_FOLLOW,
                                 DshRemoteContracts.argsSessionFollow(
-                                        lease.address, FOLLOW_MAX_MESSAGES),
+                                        lease.address, FOLLOW_MAX_MESSAGES, true),
                                 new FollowStreamHandler(key)));
         lease.stream = stream;
         coreStreams.put(key, stream);

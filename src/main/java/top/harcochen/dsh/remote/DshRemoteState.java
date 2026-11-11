@@ -18,6 +18,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import top.harcochen.dsh.DshJson;
 
 /**
  * Domain state for one Remote connection, confined to the connection executor.
@@ -348,6 +349,23 @@ public final class DshRemoteState {
             case "queue" -> control.replaceQueue(asArray(frame.get("items")));
             case "jobs" -> control.replaceJobs(asArray(frame.get("jobs")));
             case "projection" -> {
+                long seq = DshAssistantStream.integer(frame.get("seq"), -1);
+                if (frame.has("changes")) {
+                    if (!frame.get("changes").isJsonArray()) return;
+                    Map<String, JsonElement> changes = new LinkedHashMap<>();
+                    for (JsonElement raw : frame.getAsJsonArray("changes")) {
+                        if (!raw.isJsonObject()) return;
+                        JsonObject change = raw.getAsJsonObject();
+                        String key = DshJson.strictString(change, "key");
+                        if (key == null
+                                || key.isBlank()
+                                || !change.has("val")
+                                || changes.containsKey(key)) return;
+                        changes.put(key, change.get("val"));
+                    }
+                    control.applyProjections(changes, seq);
+                    return;
+                }
                 String key = string(frame, "key");
                 if (key == null || key.isBlank() || !frame.has("seq")) return;
                 control.applyProjection(
@@ -587,7 +605,10 @@ public final class DshRemoteState {
     JsonObject claimInteraction(String sessionId, String key) {
         SessionControl control = controlBySession.get(sessionId);
         JsonObject item = control == null ? null : control.interactions.get(key);
-        if (item == null || !"pending".equals(string(item, "status"))) return null;
+        if (item == null
+                || !("pending".equals(string(item, "status"))
+                        || ("approval".equals(string(item, "kind"))
+                                && "failed".equals(string(item, "status"))))) return null;
         control.setInteractionStatus(key, "submitting", null);
         return item.deepCopy();
     }
@@ -923,13 +944,24 @@ public final class DshRemoteState {
         }
 
         void applyProjection(String key, JsonElement value, long seq) {
+            Map<String, JsonElement> changes = new LinkedHashMap<>();
+            changes.put(key, value);
+            applyProjections(changes, seq);
+        }
+
+        void applyProjections(Map<String, JsonElement> changes, long seq) {
             if (seq == Long.MIN_VALUE) return;
-            ProjectionCell known = projections.get(key);
-            if (known != null && known.seq() > seq) return;
             Map<String, ProjectionCell> updated = new LinkedHashMap<>(projections);
-            updated.put(
-                    key,
-                    new ProjectionCell(value == null ? JsonNull.INSTANCE : value.deepCopy(), seq));
+            changes.forEach(
+                    (key, value) -> {
+                        ProjectionCell known = projections.get(key);
+                        if (known == null || known.seq() <= seq)
+                            updated.put(
+                                    key,
+                                    new ProjectionCell(
+                                            value == null ? JsonNull.INSTANCE : value.deepCopy(),
+                                            seq));
+                    });
             projections.clear();
             projections.putAll(updated);
             reconcileQuestions();
@@ -1106,7 +1138,33 @@ public final class DshRemoteState {
         }
 
         JsonArray queueDock() {
-            return queue;
+            ProjectionCell inbox = projections.get("inbox");
+            if (inbox == null) return queue;
+            JsonArray items = new JsonArray();
+            if (inbox.value() == null || !inbox.value().isJsonObject()) return items;
+            JsonObject value = inbox.value().getAsJsonObject();
+            for (String target : List.of("next-turn", "next-step")) {
+                JsonElement pending = value.get(target);
+                if (pending == null || !pending.isJsonArray()) continue;
+                for (JsonElement raw : pending.getAsJsonArray()) {
+                    if (!raw.isJsonObject()) continue;
+                    JsonObject message = raw.getAsJsonObject();
+                    String id = DshJson.strictString(message, "id");
+                    if (id == null || id.isBlank()) continue;
+                    JsonObject item = new JsonObject();
+                    item.addProperty("id", id);
+                    item.addProperty(
+                            "placement", "next-turn".equals(target) ? "queued" : "steering");
+                    item.add("message", message);
+                    JsonElement source = message.get("source");
+                    if (source != null && source.isJsonObject()) {
+                        String rpcId = DshJson.strictString(source.getAsJsonObject(), "rpcId");
+                        if (rpcId != null) item.addProperty("rpcId", rpcId);
+                    }
+                    items.add(item);
+                }
+            }
+            return queueDockItems(items);
         }
 
         JsonArray jobRows(String ownerSessionId) {

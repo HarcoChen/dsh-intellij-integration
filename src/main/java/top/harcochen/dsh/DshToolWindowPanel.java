@@ -198,11 +198,22 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
                         DshRemoteService.getInstance(project),
                         runtime,
                         operations,
-                        this::notify);
+                        this::notify,
+                        this::attachSessionContext);
         this.jobs = new DshJobsController(remote, this::postStateLater);
         this.runtimeFiles =
                 new DshRuntimeWorkspaceBrowser(project, runtime, remote, operations, this::notify);
-        this.changeReviews = new DshChangeReviewStore(this::postStateLater);
+        this.changeReviews =
+                new DshChangeReviewStore(
+                        project.getBasePath(),
+                        runtime::getUrl,
+                        () ->
+                                runtime.hasLocalProcess()
+                                        && DshSettingsState.getInstance(project).enableChangeReview,
+                        () ->
+                                remote.access().owner()
+                                        && DshSettingsState.getInstance(project).enableChangeReview,
+                        this::postStateLater);
         this.ideContext =
                 new DshIdeContextController(
                         project,
@@ -395,6 +406,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
     }
 
     private void onRuntimeStatus(DshRuntimeService.RuntimeStatus status) {
+        if (!DshSettingsState.getInstance(project).enableChangeReview) changeReviews.pauseCapture();
         dynamicPlugins.refreshOnRuntimeStart(status);
         postStateLater();
     }
@@ -766,6 +778,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
             }
             case "searchSession" -> sessionActions.search();
             case "openSessionCenter" -> sessionActions.openSessionCenter();
+            case "reviewChanges" -> openToolDiff(new JsonObject());
             case "manageSessions" -> sessionActions.manageSessions();
             case "renameSession" -> sessionActions.rename();
             case "forkSession" -> sessionActions.fork();
@@ -1671,45 +1684,65 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
                 });
     }
 
+    private void attachSessionContext(String session, JsonObject item) {
+        if (!java.util.Objects.equals(session, sessionId)) {
+            notify(DshBundle.message("dsh.context.session.changed"));
+            return;
+        }
+        ideContext.attachCustomItem(item);
+        notify(DshBundle.message("dsh.context.attached"));
+    }
+
     private void openToolDiff(JsonObject action) {
         String current = sessionId;
-        String callId = string(action, "callId");
-        String path = string(action, "path");
         DshRemoteState.SessionView view = sessionView(current);
-        String approvalKey = null;
-        if (view != null && callId != null) {
+        java.util.Map<String, String> approvals = new LinkedHashMap<>();
+        if (view != null)
             for (JsonElement raw : view.interactions) {
                 if (!raw.isJsonObject()) continue;
                 JsonObject item = raw.getAsJsonObject();
-                if (callId.equals(string(item, "callId"))
+                String callId = string(item, "callId");
+                if (callId != null
                         && "approval".equals(string(item, "kind"))
-                        && "pending".equals(string(item, "status"))) {
-                    approvalKey = string(item, "key");
-                    break;
-                }
+                        && ("pending".equals(string(item, "status"))
+                                || "failed".equals(string(item, "status"))))
+                    approvals.put(callId, string(item, "key"));
             }
-        }
-        String key = approvalKey;
-        diffs.openToolDiff(
-                callId,
-                path,
-                key == null
-                        ? null
-                        : outcome -> {
-                            JsonObject answer = new JsonObject();
-                            answer.addProperty("key", key);
-                            answer.addProperty("outcome", outcome);
-                            answerInteraction(current, answer);
-                        });
+        diffs.openReview(
+                string(action, "callId"),
+                string(action, "path"),
+                approvals,
+                (key, outcome) -> {
+                    JsonObject answer = new JsonObject();
+                    answer.addProperty("key", key);
+                    answer.addProperty("outcome", outcome);
+                    return answerInteraction(current, answer);
+                },
+                item -> {
+                    if (!java.util.Objects.equals(current, sessionId))
+                        return DshBundle.message("dsh.context.session.changed");
+                    attachSessionContext(current, item);
+                    return null;
+                });
     }
 
     private void answerInteraction(JsonObject action) {
-        answerInteraction(sessionId, action);
+        answerInteraction(sessionId, action)
+                .exceptionally(
+                        error -> {
+                            lastError = DshJson.message(error);
+                            notify(lastError);
+                            postStateLater();
+                            return lastError;
+                        });
     }
 
-    private void answerInteraction(String current, JsonObject action) {
+    private CompletableFuture<String> answerInteraction(String current, JsonObject action) {
         String key = string(action, "key");
-        if (key == null || key.isBlank() || current == null || current.isBlank()) return;
+        if (key == null || key.isBlank() || current == null || current.isBlank())
+            return CompletableFuture.completedFuture(
+                    DshBundle.message("dsh.interaction.unavailable"));
+        long generation = remote.snapshot().generation;
         // The Runtime expects the raw outcome value: an approval decision string,
         // or the question answer envelope.
         JsonElement outcomeValue;
@@ -1722,8 +1755,10 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
                     action.has("answers") ? action.get("answers").deepCopy() : new JsonArray());
             outcomeValue = answers;
         }
-        operations.execute(
+        return CompletableFuture.supplyAsync(
                 () -> {
+                    if (remote.snapshot().generation != generation)
+                        return DshBundle.message("dsh.runtime.changed");
                     DshRemoteState.SessionView view = sessionView(current);
                     boolean pending = false;
                     JsonObject pendingItem = null;
@@ -1734,7 +1769,9 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
                             String expectedKind = action.has("outcome") ? "approval" : "question";
                             if (key.equals(string(item, "key"))
                                     && expectedKind.equals(string(item, "kind"))
-                                    && "pending".equals(string(item, "status"))) {
+                                    && ("pending".equals(string(item, "status"))
+                                            || ("approval".equals(expectedKind)
+                                                    && "failed".equals(string(item, "status"))))) {
                                 pending = true;
                                 pendingItem = item;
                                 break;
@@ -1744,14 +1781,14 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
                     if (!pending) {
                         lastError = DshBundle.message("dsh.interaction.unavailable");
                         postStateLater();
-                        return;
+                        return lastError;
                     }
                     if (!action.has("outcome")
                             && !DshInteractionProjector.answersMatch(
                                     pendingItem.getAsJsonArray("questions"),
                                     action.getAsJsonArray("answers"))) {
                         notify(DshBundle.message("dsh.question.answers.invalid"));
-                        return;
+                        return DshBundle.message("dsh.question.answers.invalid");
                     }
                     if ("allowed-once".equals(string(action, "outcome"))) {
                         List<String> dirty =
@@ -1764,15 +1801,19 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
                             lastError = message;
                             notify(message);
                             postStateLater();
-                            return;
+                            return message;
                         }
                     }
+                    if (remote.snapshot().generation != generation)
+                        return DshBundle.message("dsh.runtime.changed");
                     String failure = remote.answerInteraction(current, key, outcomeValue);
                     if (failure != null) {
                         lastError = failure;
                         postStateLater();
                     }
-                });
+                    return failure;
+                },
+                operations);
     }
 
     /**

@@ -99,6 +99,7 @@ final class DshActionAccess {
                             "openFileLocation",
                             "openChangeDiff",
                             "openToolDiff",
+                            "reviewChanges",
                             "browseRuntimeFiles",
                             "refreshRuntimeFile",
                             "openTeamMember" ->

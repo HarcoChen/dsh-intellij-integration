@@ -16,6 +16,10 @@ import java.util.UUID;
  * args} object that is strictly empty, because the Gateway rejects any other shape with {@code
  * gateway/arguments-invalid}. Upgrading the managed Runtime requires an endpoint and descriptor
  * audit before changing anything in this file.
+ *
+ * <p>Selected forward compatibility was checked against master {@code e8f7b93a344} (0.2.2-rc.2):
+ * batched control projections, durable Inbox queues, and explicit follow activation. The default
+ * Runtime and the complete contract baseline remain pinned above.
  */
 public final class DshRemoteContracts {
     /** Harness tag this contract was audited against. */
@@ -420,8 +424,15 @@ public final class DshRemoteContracts {
 
     /** `session/follow(request)` for one live history stream. */
     public static JsonObject argsSessionFollow(JsonObject address, int maxMessages) {
+        return argsSessionFollow(address, maxMessages, false);
+    }
+
+    /** Activate only the persistent chat subscription; history previews stay passive. */
+    public static JsonObject argsSessionFollow(
+            JsonObject address, int maxMessages, boolean activate) {
         JsonObject request = new JsonObject();
         request.add("address", address.deepCopy());
+        request.addProperty("activate", activate);
         if (maxMessages > 0) request.addProperty("maxMessages", maxMessages);
         request.addProperty("assistantStream", true);
         return withRequest(request);

@@ -28,6 +28,9 @@ public final class DshSettingsState implements PersistentStateComponent<DshSetti
     /** Use Enter to send a prompt and Shift+Enter to insert a new line. */
     public boolean enterToSend = false;
 
+    /** Optional native review, editable revision drafts and local turn snapshots. */
+    public boolean enableChangeReview = true;
+
     /** Last selected session for this project; empty when nothing is pinned. */
     public String lastSessionId = "";
 
@@ -97,6 +100,7 @@ public final class DshSettingsState implements PersistentStateComponent<DshSetti
         autoStart = state.autoStart;
         persistSession = state.persistSession;
         enterToSend = state.enterToSend;
+        enableChangeReview = state.enableChangeReview;
         lastSessionId = state.lastSessionId;
         installWhenMissing = state.installWhenMissing;
         useManagedRuntime = state.useManagedRuntime;

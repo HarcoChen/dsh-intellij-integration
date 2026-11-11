@@ -36,6 +36,7 @@ public final class DshSettingsConfigurable implements Configurable {
     private JBCheckBox autoStart;
     private JBCheckBox persistSession;
     private JBCheckBox enterToSend;
+    private JBCheckBox enableChangeReview;
     private JBCheckBox installWhenMissing;
     private JBCheckBox useManagedRuntime;
     private JBCheckBox autonomousDebugging;
@@ -88,6 +89,8 @@ public final class DshSettingsConfigurable implements Configurable {
         persistSession = new JBCheckBox(DshBundle.message("dsh.settings.persist.session.label"));
         enterToSend = new JBCheckBox(DshBundle.message("dsh.settings.enter.to.send.label"));
         enterToSend.setToolTipText(DshBundle.message("dsh.settings.enter.to.send.tooltip"));
+        enableChangeReview = new JBCheckBox(DshBundle.message("dsh.settings.change.review.label"));
+        enableChangeReview.setToolTipText(DshBundle.message("dsh.settings.change.review.tooltip"));
         installWhenMissing =
                 new JBCheckBox(DshBundle.message("dsh.settings.install.when.missing.label"));
         useManagedRuntime = new JBCheckBox(DshBundle.message("dsh.settings.managed.runtime.label"));
@@ -164,6 +167,7 @@ public final class DshSettingsConfigurable implements Configurable {
         addCheckbox(autoStart);
         addCheckbox(persistSession);
         addCheckbox(enterToSend);
+        addCheckbox(enableChangeReview);
         addCheckbox(autonomousDebugging);
         addCheckbox(enableCompaction);
         addCheckbox(jevEnabled);
@@ -234,7 +238,9 @@ public final class DshSettingsConfigurable implements Configurable {
     public boolean isModified() {
         if (panel == null) return false;
         DshSettingsState state = DshSettingsState.getInstance(project);
-        return enterToSend.isSelected() != state.enterToSend || otherSettingsModified(state);
+        return enterToSend.isSelected() != state.enterToSend
+                || enableChangeReview.isSelected() != state.enableChangeReview
+                || otherSettingsModified(state);
     }
 
     private boolean otherSettingsModified(DshSettingsState state) {
@@ -355,6 +361,7 @@ public final class DshSettingsConfigurable implements Configurable {
         state.autoStart = autoStart.isSelected();
         state.persistSession = persistSession.isSelected();
         state.enterToSend = enterToSend.isSelected();
+        state.enableChangeReview = enableChangeReview.isSelected();
         state.installWhenMissing = installWhenMissing.isSelected();
         state.useManagedRuntime = useManagedRuntime.isSelected();
         state.autonomousDebugging = autonomousDebugging.isSelected();
@@ -382,6 +389,7 @@ public final class DshSettingsConfigurable implements Configurable {
         autoStart.setSelected(state.autoStart);
         persistSession.setSelected(state.persistSession);
         enterToSend.setSelected(state.enterToSend);
+        enableChangeReview.setSelected(state.enableChangeReview);
         installWhenMissing.setSelected(state.installWhenMissing);
         useManagedRuntime.setSelected(state.useManagedRuntime);
         autonomousDebugging.setSelected(state.autonomousDebugging);

@@ -6128,7 +6128,24 @@ WARNING: This link could potentially be dangerous`)) {
   terminal.loadAddon(fit);
   terminal.open(document.getElementById("terminal"));
   var writable = false;
+  var epoch = -1;
   window.dshTerminalReceive = (frame) => {
+    if (frame.type === "capture") {
+      let text = terminal.getSelection();
+      if (frame.mode === "screen") {
+        const buffer = terminal.buffer.active;
+        text = Array.from({ length: terminal.rows }, (_, i) => buffer.getLine(buffer.viewportY + i)?.translateToString(true) ?? "").join("\n");
+      }
+      const encoder = new TextEncoder();
+      let truncated = false;
+      while (encoder.encode(text).byteLength > 65536) {
+        text = text.slice(0, Math.floor(text.length * 0.9));
+        truncated = true;
+      }
+      window.dshTerminalPost({ type: "context", text, mode: frame.mode, epoch, truncated });
+      return;
+    }
+    if (frame.viewEpoch !== void 0) epoch = frame.viewEpoch;
     if (frame.type === "snapshot") {
       terminal.options.scrollback = Math.min(1e5, Math.max(0, frame.scrollback ?? 5e3));
     }

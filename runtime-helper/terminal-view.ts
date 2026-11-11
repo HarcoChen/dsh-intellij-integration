@@ -6,7 +6,7 @@ import './terminal-host.css';
 declare global {
     interface Window {
         dshTerminalPost: (value: unknown) => void;
-        dshTerminalReceive: (value: { type: string; data?: string; writable?: boolean; message?: string; scrollback?: number; viewEpoch?: number }) => void;
+        dshTerminalReceive: (value: { type: string; data?: string; writable?: boolean; message?: string; scrollback?: number; viewEpoch?: number; mode?: string }) => void;
     }
 }
 const terminal = new Terminal({ cursorBlink: true, scrollback: 5000, fontSize: 13, allowProposedApi: false });
@@ -14,7 +14,25 @@ const fit = new FitAddon();
 terminal.loadAddon(fit);
 terminal.open(document.getElementById('terminal')!);
 let writable = false;
+let epoch = -1;
 window.dshTerminalReceive = frame => {
+    if (frame.type === 'capture') {
+        let text = terminal.getSelection();
+        if (frame.mode === 'screen') {
+            const buffer = terminal.buffer.active;
+            text = Array.from({ length: terminal.rows }, (_, i) =>
+                buffer.getLine(buffer.viewportY + i)?.translateToString(true) ?? '').join('\n');
+        }
+        const encoder = new TextEncoder();
+        let truncated = false;
+        while (encoder.encode(text).byteLength > 65536) {
+            text = text.slice(0, Math.floor(text.length * 0.9));
+            truncated = true;
+        }
+        window.dshTerminalPost({ type: 'context', text, mode: frame.mode, epoch, truncated });
+        return;
+    }
+    if (frame.viewEpoch !== undefined) epoch = frame.viewEpoch;
     if (frame.type === 'snapshot') {
         terminal.options.scrollback = Math.min(100000, Math.max(0, frame.scrollback ?? 5000));
     }

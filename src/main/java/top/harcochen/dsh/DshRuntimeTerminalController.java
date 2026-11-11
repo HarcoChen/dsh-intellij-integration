@@ -34,6 +34,7 @@ final class DshRuntimeTerminalController implements AutoCloseable {
     private final DshRuntimeService runtime;
     private final ExecutorService operations;
     private final Consumer<String> notify;
+    private final java.util.function.BiConsumer<String, JsonObject> attachContext;
     private final Map<String, TerminalDialog> dialogs = new LinkedHashMap<>();
     private final Map<String, JsonObject> pendingCloses = new LinkedHashMap<>();
     private final Consumer<DshRemoteState.Snapshot> listener = this::changed;
@@ -45,12 +46,14 @@ final class DshRuntimeTerminalController implements AutoCloseable {
             DshRemoteService remote,
             DshRuntimeService runtime,
             ExecutorService operations,
-            Consumer<String> notify) {
+            Consumer<String> notify,
+            java.util.function.BiConsumer<String, JsonObject> attachContext) {
         this.project = project;
         this.remote = remote;
         this.runtime = runtime;
         this.operations = operations;
         this.notify = notify;
+        this.attachContext = attachContext;
         remote.addListener(listener);
     }
 
@@ -293,13 +296,52 @@ final class DshRuntimeTerminalController implements AutoCloseable {
 
         @Override
         protected javax.swing.Action[] createActions() {
-            return new javax.swing.Action[] {getCancelAction()};
+            return new javax.swing.Action[] {
+                captureAction("selection"), captureAction("screen"), getCancelAction()
+            };
+        }
+
+        private javax.swing.Action captureAction(String mode) {
+            return new DialogWrapperAction(DshBundle.message("dsh.terminal.attach." + mode)) {
+                @Override
+                protected void doAction(java.awt.event.ActionEvent event) {
+                    if (!ready || attachment == null || !current(endpoint)) return;
+                    JsonObject frame = new JsonObject();
+                    frame.addProperty("type", "capture");
+                    frame.addProperty("mode", mode);
+                    post(frame);
+                }
+            };
         }
 
         private void receive(JsonObject action) {
             if (closed || !current(endpoint)) return;
             String type = DshJson.string(action, "type");
-            if ("ready".equals(type)) {
+            if ("context".equals(type)) {
+                String text = DshJson.strictString(action, "text");
+                String mode = DshJson.strictString(action, "mode");
+                if (attachment == null
+                        || generation != remote.snapshot().generation
+                        || DshJson.longValue(action.get("epoch"), -1) != displayEpoch
+                        || !remote.access().allows("terminal/attach", "session", session)) return;
+                if (text == null || text.isBlank()) {
+                    notify.accept(DshBundle.message("dsh.terminal.attach.empty"));
+                    return;
+                }
+                if (text.getBytes(StandardCharsets.UTF_8).length > 65536
+                        || !("screen".equals(mode) || "selection".equals(mode))) return;
+                JsonObject item = new JsonObject();
+                item.addProperty("id", "terminal:" + id + ":" + mode);
+                item.addProperty("kind", "terminal");
+                item.addProperty("path", "terminal:" + id);
+                item.addProperty(
+                        "label",
+                        DshBundle.message("dsh.terminal.attach." + mode)
+                                + (DshJson.bool(action, "truncated", false) ? " (truncated)" : ""));
+                item.addProperty("content", text);
+                item.addProperty("byteLength", text.getBytes(StandardCharsets.UTF_8).length);
+                attachContext.accept(session, item);
+            } else if ("ready".equals(type)) {
                 ready = true;
                 connect();
             } else if ("rendered".equals(type)) {

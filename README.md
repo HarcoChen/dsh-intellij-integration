@@ -52,13 +52,16 @@ Before an approval can release a structured file edit, DSH checks IntelliJ's uns
 
 #### How do I review the agent's changes in JetBrains?
 
-There is no separate switch to enable native diff review. In the **DSH** tool window:
+Native change review is enabled by default. In the **DSH** tool window:
 
-1. Expand a file-edit tool card in the conversation, then click a file path under **Changes** to open its before/after diff in the IDE.
-2. If a structured file edit is waiting for approval, click its file path in the approval card to preview the proposed change before answering the approval. The native review dialog provides **Approve tool call** and **Reject tool call** buttons. These apply to the entire tool call, including any other files it edits. **Close** leaves approval pending. The preview is read-only; editing the proposed result before approval is not supported.
-3. To review a whole turn, keep the session selected before starting the turn. In a Git working directory, DSH captures turn changes automatically. Open **Changes** in the activity dock above the composer after the turn finishes, then click a file to open its diff.
+1. Choose **Review changes** from the chat menu, or **DSH: Review Changes** from Find Action, to browse supported pending tool edits, completed tool edits, and captured turns in one native dialog. Tool-card and **Changes** file links open the same review surface.
+2. For an edit awaiting approval, use **Approve tool call** or **Reject tool call**. Each decision applies to the entire tool call, including its other files. **Close** leaves approval pending. Loaded previews are checked again before approval; save or revert overlapping unsaved editor documents first.
+3. Edit the right side of a pending preview to draft a correction. **Request revision** rejects the original call and attaches your edited contents to chat. Send a message to ask the Agent for a revised edit and a new approval. The draft does not write files or change the original tool arguments; ordinary approval is disabled while that call has edited drafts.
+4. Turn snapshots require Git and a local Runtime managed by this IDE. Keep the session selected before starting the turn. Captured text comparisons are saved in the IDE system directory, scoped to this project and Runtime endpoint, for up to 30 days within bounded storage. Reopened snapshots are read-only and cannot restore files. Older turns that were never captured cannot be reconstructed as turn snapshots.
 
-The turn-level **Changes** tab requires Git and only covers turns observed by this open tool window; reopening an old conversation does not recreate earlier turn snapshots. Tool-card diffs do not require Git, but need supported structured edit data: a shell command that rewrites a file may have no tool-card diff. Files must also be accessible to the IDE process for these local diff features. If a diff cannot be reconstructed reliably, DSH displays an error.
+Uncheck **Enable native change review** in **Settings → Tools → DeepSeek Harness** to disable the review center, revision drafts and snapshot capture. Changes take effect immediately; tool-card links still open ordinary read-only diffs. The Runtime's own approval policy remains separately configurable.
+
+Tool-card diffs use the connected Host's file preview API and can work without Git or a matching local file. They require supported structured edit data; shell edits may have no tool-card diff. A missing capability, binary or oversized file, or content that cannot be reconstructed reliably produces an error instead of a guessed comparison.
 
 If these entries are missing, report the plugin version, Harness version, whether the session uses a local or remote Runtime, and the edit tool name (or the displayed error) in [issue #28](https://github.com/HarcoChen/dsh-intellij-integration/issues/28).
 
@@ -118,11 +121,11 @@ Only a compatible Runtime advertised by an editor is reused automatically. The p
 
 Optional Agent Teams show members, tasks, dependencies, and write-scope warnings in the Activity Dock. Team members use the existing subagent history, follow-up, and interrupt controls. Enable the official Team profile bundle in the Runtime to use this feature; the plugin reads its Session projection.
 
-The **Session center** offers live search with requests needing attention first, grouped by Harness Workspace. The chat header shows the current working directory; historical file links and tool diffs resolve against the directory at the time of the operation. Current-file Problems can be selected from the attachment menu or `@diagnostics`, and Jobs include read-only execution history.
+The **Session center** offers live search with requests needing attention first, grouped by Harness Workspace. It also previews conversation text and supports rename, pin/unpin, archive/restore, and ordering within a Harness Workspace. The chat header shows the current working directory; historical file links and tool diffs resolve against the directory at the time of the operation. Current-file Problems can be selected from the attachment menu or `@diagnostics`, and Jobs include read-only execution history.
 
 Native choice dialogs for models, providers, presets, plugins, schedules, Workspaces and templates support keyword filtering. Use the arrow keys to select a result and Enter to confirm; Escape cancels.
 
-Use **Open Runtime terminal** in the chat menu to create or reattach a Host PTY. It retains its identity across session switching, restores its screen after reconnecting, and closes the Host process when its view is closed. Pending input is discarded on disconnect. This terminal is separate from the IDE terminal context feature.
+Use **Open Runtime terminal** in the chat menu to create or reattach a Host PTY. It retains its identity across session switching, restores its screen after reconnecting, and closes the Host process when its view is closed. Pending input is discarded on disconnect. Use **Attach selection to chat** or **Attach screen to chat** for an explicit one-shot context attachment of up to 64 KiB. This terminal is separate from the IDE terminal context feature.
 
 **Install or remove plugins** uses the Runtime's official package manager, with package inspection, explicit install/removal confirmation, build-script approval, progress and cancellation. Settings now offer guided Web search/fetch configuration, and custom providers expose schema-defined model reasoning levels. Runtime access grants govern available actions; readers cannot submit prompts or answer interactive requests without the corresponding permissions.
 
@@ -143,6 +146,7 @@ Open **Settings | Tools | DeepSeek Harness**.
 | Server URL / Port | `""` / `0` | Prefer an already running DSH Runtime; port `0` selects an available port for local startup. |
 | Auto start | `true` | Start or connect to the Runtime when the project opens. |
 | Send with Enter | Disabled | Enable Enter to send and Shift+Enter to insert a new line. Ctrl/Cmd+Enter sends in either mode; changes apply immediately. |
+| Native change review | Enabled | Review pending edits, draft corrections and capture local Git turns. Disable without restarting the Runtime. |
 | Runtime version | `0.2.1-rc.2` | Version for explicit package-manager launch commands; the minimum supported local Runtime is `0.1.5-rc.1`. |
 | Autonomous debugger | Disabled | Local MCP access to existing IDE configurations and public debugger controls; restart an owned Runtime after enabling. |
 | Laya/Jev integration | Disabled | Bundled System One integration for locally started Runtimes; the endpoint, model, and optional policies are configurable. |

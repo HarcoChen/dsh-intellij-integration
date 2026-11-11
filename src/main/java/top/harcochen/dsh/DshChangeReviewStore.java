@@ -81,6 +81,7 @@ final class DshChangeReviewStore {
         private String beforeTree;
         private String afterTree;
         private GitContext git;
+        private String archiveScope;
 
         private ChangeReview(int turn) {
             this.turn = turn;
@@ -109,9 +110,23 @@ final class DshChangeReviewStore {
     private final Set<Path> tempRoots = new LinkedHashSet<>();
     private final ExecutorService operations;
     private final Runnable onUpdate;
+    private final DshReviewArchive archive;
+    private final java.util.function.BooleanSupplier captureLocal;
+    private final java.util.function.BooleanSupplier archiveAccess;
+    private final Map<String, JsonArray> history = new LinkedHashMap<>();
+    private String archiveScope;
+    private final Set<String> historyLoading = new LinkedHashSet<>();
     private volatile boolean disposed;
 
-    DshChangeReviewStore(Runnable onUpdate) {
+    DshChangeReviewStore(
+            String projectPath,
+            java.util.function.Supplier<String> endpoint,
+            java.util.function.BooleanSupplier captureLocal,
+            java.util.function.BooleanSupplier archiveAccess,
+            Runnable onUpdate) {
+        this.archive = new DshReviewArchive(projectPath, endpoint);
+        this.captureLocal = captureLocal;
+        this.archiveAccess = archiveAccess;
         this.operations =
                 java.util.concurrent.Executors.newSingleThreadExecutor(
                         runnable -> {
@@ -129,6 +144,11 @@ final class DshChangeReviewStore {
      */
     void observe(String sessionId, String cwd, JsonObject history) {
         if (disposed || sessionId == null || cwd == null || cwd.isBlank()) return;
+        loadHistory(sessionId);
+        if (!captureLocal.getAsBoolean() || !archiveAccess.getAsBoolean()) {
+            pauseCapture();
+            return;
+        }
         SessionReviews session;
         synchronized (this) {
             session = sessions.computeIfAbsent(sessionId, ignored -> new SessionReviews(cwd));
@@ -188,6 +208,7 @@ final class DshChangeReviewStore {
                 start = "turn/start".equals(type);
                 if (start) {
                     ChangeReview review = new ChangeReview(turn);
+                    review.archiveScope = archiveScope;
                     review.operationDirectory = DshWorkingDirectory.at(history, seq, cwd);
                     session.reviews.put(turn, review);
                 } else if (session.reviews.containsKey(turn))
@@ -211,12 +232,26 @@ final class DshChangeReviewStore {
         }
     }
 
+    /** Resume from a fresh observation baseline after any gap in local capture. */
+    synchronized void pauseCapture() {
+        for (SessionReviews session : sessions.values()) {
+            session.baselined = false;
+            session.seen.clear();
+            for (ChangeReview review : session.reviews.values())
+                if ("capturing".equals(review.state)) {
+                    review.state = "error";
+                    review.error = DshBundle.message("dsh.review.capture.interrupted");
+                }
+        }
+    }
+
     /** The client-visible rows, newest turn first. */
     synchronized JsonArray view(String sessionId) {
         JsonArray result = new JsonArray();
+        if (!archiveAccess.getAsBoolean()) return result;
         SessionReviews session = sessionId == null ? null : sessions.get(sessionId);
-        if (session == null) return result;
-        List<ChangeReview> reviews = new ArrayList<>(session.reviews.values());
+        List<ChangeReview> reviews =
+                session == null ? new ArrayList<>() : new ArrayList<>(session.reviews.values());
         reviews.sort((left, right) -> Integer.compare(right.turn, left.turn));
         for (ChangeReview review : reviews) {
             JsonObject row = new JsonObject();
@@ -237,7 +272,93 @@ final class DshChangeReviewStore {
             if (review.error != null) row.addProperty("error", review.error);
             result.add(row);
         }
+        JsonArray saved = history.get(sessionId);
+        if (saved != null)
+            for (JsonElement value : saved) {
+                JsonObject row = value.getAsJsonObject();
+                int turn = DshJson.integer(row, "turn", -1);
+                if (session != null && session.reviews.containsKey(turn)) continue;
+                JsonObject copy = row.deepCopy();
+                copy.addProperty("archived", true);
+                for (JsonElement file : copy.getAsJsonArray("files")) {
+                    JsonObject item = file.getAsJsonObject();
+                    item.remove("beforeText");
+                    item.remove("afterText");
+                    item.addProperty("restorable", false);
+                }
+                result.add(copy);
+            }
         return result;
+    }
+
+    synchronized void loadHistory(String sessionId) {
+        if (sessionId == null || disposed || !archiveAccess.getAsBoolean()) return;
+        String scope = archive.scope();
+        if (!scope.equals(archiveScope)) {
+            if (archiveScope != null) retain(Set.of());
+            archiveScope = scope;
+            history.clear();
+            historyLoading.clear();
+        }
+        if (history.containsKey(sessionId) || !historyLoading.add(sessionId)) return;
+        operations.execute(
+                () -> {
+                    JsonArray saved = archive.load(scope, sessionId);
+                    synchronized (this) {
+                        if (!disposed && scope.equals(archiveScope)) {
+                            history.put(sessionId, saved);
+                            historyLoading.remove(sessionId);
+                        }
+                    }
+                    onUpdate.run();
+                });
+    }
+
+    void readSavedHistory(String sessionId) {
+        if (sessionId == null || disposed || !archiveAccess.getAsBoolean()) return;
+        String scope = archive.scope();
+        JsonArray saved = archive.load(scope, sessionId);
+        synchronized (this) {
+            if (scope.equals(archiveScope)) history.put(sessionId, saved);
+        }
+    }
+
+    private void persist(String sessionId, ChangeReview review) {
+        if (disposed || !archiveAccess.getAsBoolean()) return;
+        try {
+            JsonObject row = new JsonObject();
+            row.addProperty("turn", review.turn);
+            row.addProperty("state", "ready");
+            row.addProperty("restored", review.restored);
+            row.addProperty("capturedAt", System.currentTimeMillis());
+            row.addProperty("cwd", review.operationDirectory);
+            JsonArray files = new JsonArray();
+            for (ChangeFile file : review.files) {
+                FileSides sides = sides(sessionId, review.turn, file.id);
+                JsonObject item = new JsonObject();
+                item.addProperty("id", file.id);
+                item.addProperty("path", file.path);
+                item.addProperty("status", file.status);
+                item.addProperty("oldPath", file.oldPath);
+                item.addProperty("binary", sides.binary());
+                item.addProperty("beforeText", sides.beforeText());
+                item.addProperty("afterText", sides.afterText());
+                files.add(item);
+            }
+            row.add("files", files);
+            String scope = review.archiveScope;
+            if (scope == null) return;
+            archive.save(scope, sessionId, row);
+            synchronized (this) {
+                if (scope.equals(archiveScope))
+                    history.put(sessionId, archive.load(scope, sessionId));
+            }
+        } catch (Exception error) {
+            LOG.warn("Unable to persist DSH review", error);
+            synchronized (this) {
+                review.error = DshBundle.message("dsh.review.archive.failed", message(error));
+            }
+        }
     }
 
     /**
@@ -254,9 +375,33 @@ final class DshChangeReviewStore {
      * which no text diff can honestly display.
      */
     FileSides sides(String sessionId, int turn, String fileId) throws Exception {
+        if (!archiveAccess.getAsBoolean())
+            throw new IllegalStateException(DshBundle.message("dsh.remote.access.denied"));
         ChangeReview review;
         ChangeFile file = null;
         synchronized (this) {
+            SessionReviews current = sessions.get(sessionId);
+            if (current == null || !current.reviews.containsKey(turn)) {
+                JsonArray saved = history.get(sessionId);
+                if (saved != null)
+                    for (JsonElement value : saved) {
+                        JsonObject row = value.getAsJsonObject();
+                        if (DshJson.integer(row, "turn", -1) != turn) continue;
+                        for (JsonElement entry : row.getAsJsonArray("files")) {
+                            JsonObject item = entry.getAsJsonObject();
+                            if (!fileId.equals(DshJson.string(item, "id"))) continue;
+                            String path = DshJson.string(item, "path");
+                            return new FileSides(
+                                    DshJson.string(item, "beforeText"),
+                                    DshJson.string(item, "afterText"),
+                                    DshBundle.message("dsh.change.review.turn.prefix", turn)
+                                            + " "
+                                            + path,
+                                    path,
+                                    DshJson.bool(item, "binary", false));
+                        }
+                    }
+            }
             review = review(sessionId, turn);
             for (ChangeFile candidate : review.files) {
                 if (candidate.id.equals(fileId)) {
@@ -294,6 +439,7 @@ final class DshChangeReviewStore {
 
     /** Whether a turn is in a state where restore is even offered. */
     synchronized boolean isRestorable(String sessionId, int turn) {
+        if (!captureLocal.getAsBoolean() || !archiveAccess.getAsBoolean()) return false;
         SessionReviews session = sessionId == null ? null : sessions.get(sessionId);
         ChangeReview review = session == null ? null : session.reviews.get(turn);
         if (review == null
@@ -337,6 +483,7 @@ final class DshChangeReviewStore {
         synchronized (this) {
             review.restored = true;
         }
+        operations.execute(() -> persist(sessionId, review));
         onUpdate.run();
     }
 
@@ -371,6 +518,7 @@ final class DshChangeReviewStore {
     }
 
     private void captureBefore(String sessionId, int turn) throws Exception {
+        if (disposed || !captureLocal.getAsBoolean() || !archiveAccess.getAsBoolean()) return;
         SessionReviews session;
         ChangeReview review;
         synchronized (this) {
@@ -401,6 +549,7 @@ final class DshChangeReviewStore {
     }
 
     private void captureAfter(String sessionId, int turn) throws Exception {
+        if (disposed || !captureLocal.getAsBoolean() || !archiveAccess.getAsBoolean()) return;
         ChangeReview review;
         synchronized (this) {
             SessionReviews session = sessions.get(sessionId);
@@ -427,13 +576,20 @@ final class DshChangeReviewStore {
                                 "."));
         List<ChangeFile> files = parseRawDiff(raw);
         synchronized (this) {
+            if (!"capturing".equals(review.state)
+                    || !captureLocal.getAsBoolean()
+                    || !archiveAccess.getAsBoolean()) return;
             review.afterTree = afterTree;
             review.files = files;
         }
         captureWorkingHashes(review);
         synchronized (this) {
+            if (!"capturing".equals(review.state)
+                    || !captureLocal.getAsBoolean()
+                    || !archiveAccess.getAsBoolean()) return;
             review.state = "ready";
         }
+        persist(sessionId, review);
         onUpdate.run();
     }
 

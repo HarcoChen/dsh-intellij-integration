@@ -357,7 +357,7 @@ final class DshToolDiff {
                 : new JsonObject();
     }
 
-    private static String callIdOf(JsonObject entry) {
+    static String callIdOf(JsonObject entry) {
         JsonObject data = eventData(entry);
         JsonElement callId = data.get("callId");
         if (callId != null && callId.isJsonPrimitive()) return callId.getAsString();
@@ -380,7 +380,7 @@ final class DshToolDiff {
         return nested != null && nested.isJsonPrimitive() ? nested.getAsString() : null;
     }
 
-    private static List<JsonObject> entries(JsonObject history) {
+    static List<JsonObject> entries(JsonObject history) {
         List<JsonObject> result = new ArrayList<>();
         JsonArray source =
                 history != null && history.has("events") && history.get("events").isJsonArray()
