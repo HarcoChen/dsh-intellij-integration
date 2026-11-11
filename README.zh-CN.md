@@ -135,6 +135,10 @@ API Key 保存在 IntelliJ **Password Safe** 中，传递给新启动的本地 R
 
 **安装、更新或卸载插件**使用 Runtime 官方软件包管理器，支持检查软件包、确认安装或卸载、批准构建脚本、查看进度和取消安装。设置提供网页搜索与抓取配置，自定义提供方可编辑 Runtime schema 定义的模型推理等级。Remote 访问授权会限制聊天操作，读取权限不会自动授予发送消息或回答交互请求的权限。
 
+从 Find Action 或工具菜单打开 **DSH: Headless Tasks**，也可使用聊天菜单中的 **Headless 任务**，运行本地一次性任务。可选择本地目录、可选权限预设和超时。任务使用已配置的 CLI 与 `headless` profile，正文通过 stdin 传递。窗口显示回答、运行事件、诊断及截断提示，支持取消、在新会话中重跑、继续已结束的会话、复制回答，以及导出当前保留的 JSON 任务快照。
+
+关闭任务窗口后任务继续运行，关闭项目会取消活动任务。当前 IDE 项目会话最多保留四个活动任务和二十条近期记录，Harness 会话本身保存在其配置的 home 中。之后可填写已有会话 ID 继续任务，CLI 会校验执行目录和 profile。权限与交互结果遵循 headless profile 的非交互策略。API Key 来自插件 Password Safe、启动环境或 `.env` 配置，具体凭据规则见上游说明。[Headless profile 凭据说明](https://github.com/deepseek-ai/deepseek-harness/tree/master/packages/bundle/headless#credentials)
+
 从聊天菜单选择 **导出对话**，或在 Find Action 中使用 **DSH: Export Conversation**，可通过 IDE 保存对话为 Markdown 或 JSON。Markdown 包含对话文本和附件标记，JSON 保留有上限的事件历史和投影。会话超过历史读取上限时会提示记录不完整。
 
 启用 Runtime 的 **变更请求与 Worktree** bundle 后，可从聊天菜单或 Find Action 打开 **DSH: Changes and Worktrees**。原生面板显示 Host 检出目录、关联的变更请求、检查结果和审阅讨论，支持按范围查看 Host Git 改动、查看变更请求补丁以及按 URL 关联变更请求。首轮开始前可请求从 HEAD 或指定基准分支创建 Worktree，也可取消待处理请求或重试创建。操作由 Host 执行并校验 sandbox 权限。

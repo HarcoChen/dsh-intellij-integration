@@ -104,7 +104,7 @@ final class DshConversationExporter {
                 });
     }
 
-    private static void write(Path target, String content) throws Exception {
+    static void write(Path target, String content) throws Exception {
         Path temporary = Files.createTempFile(target.getParent(), ".dsh-export-", ".tmp");
         try {
             Files.writeString(temporary, content, StandardCharsets.UTF_8);

@@ -5,6 +5,29 @@ An item is complete only after the host action, runtime protocol, projected stat
 
 Status: `[x]` implemented, `[-]` usable but not yet at VS Code parity, `[ ]` not implemented.
 
+## Headless tasks — 2026-11-12
+
+- [x] Native Headless tasks window from Find Action, Tools and the chat menu.
+- [x] Reuse local CLI discovery, configured launcher prefixes and API-key environment injection.
+  Web-app flags are removed when selecting the headless profile.
+- [x] Send task bodies through stdin, decode bounded JSONL events, retain final answers,
+  event tails and diagnostics, and report truncation and CLI failures.
+- [x] Run again in a fresh Session, continue a completed task's Session, or supply an existing
+  Session id with the matching local working directory. Concurrent adoption of a tracked
+  active Session is rejected and mismatched CLI identities stop the affected task.
+- [x] Per-task cancellation, forced cleanup, deadlines and project disposal use the IDE's
+  owned process handlers. Closing the task window leaves its runs available in the project service.
+- [x] Export a retained task snapshot as JSON or copy its answer. The service keeps up to
+  twenty recent runs and four active runs for this project session.
+- [x] Real IntelliJ 2024.3.6 acceptance covers stdin isolation, UTF-8 event framing, directories
+  containing spaces, resume, active-session rejection, mismatched receipts, CLI failure,
+  oversized output, forced cancellation, a one-minute deadline, disposal and atomic JSON export.
+  An unrelated sentinel process survives task cancellation.
+- [x] The official installed `0.2.2-rc.1` CLI completes a task and adopts its persisted Session
+  against a loopback model provider. The Web Runtime remains unstarted during these runs.
+- [ ] Native window interaction and Windows/Linux process execution need platform acceptance.
+  Headless permissions and interaction outcomes follow that profile's noninteractive policy.
+
 ## Maintenance — 2026-11-11
 
 Audited current Harness master `e8f7b93a344964de3dca1ace9e72b6e4d6de87cb`
@@ -65,7 +88,7 @@ These are the projects' published feature claims.
 
 | Plugin | Relevant features | This plugin's coverage |
 | --- | --- | --- |
-| [DSH Studio](https://github.com/skansgai/dsh-studio) | Embedded Host WebUI, Runtime lifecycle, selection context, recent sessions, headless tasks | Native chat, lifecycle, editor context and Session center are implemented. Headless task UI is a remaining extension. |
+| [DSH Studio](https://github.com/skansgai/dsh-studio) | Embedded Host WebUI, Runtime lifecycle, selection context, recent sessions, headless tasks | Native chat, lifecycle, editor context, Session center and headless task UI are implemented. |
 | [DSH Lite](https://github.com/EPCN-fla/dsh-lite-idea) | ACP chat, model/preset/permission controls, skills, Session export | Chat controls, skills and Markdown/JSON export are implemented. |
 | [DSH ⇄ JetBrains](https://github.com/abadiegie/dsh-jetbrains) | Shared IDE context, turn diffs, persisted reviews and per-file/hunk revert | Context, native turn/tool diffs, saved reviews, whole-turn restore and per-file/line-block rollback are implemented. |
 | [DeepSeek Harness WebUI](https://github.com/Chocomintopia/dsh-jetbrains-plugin) | Embedded official WebUI, fixed DeepSeek Chat tab and reload action | Native integrated chat, Runtime reconnect and browser entry are implemented. |

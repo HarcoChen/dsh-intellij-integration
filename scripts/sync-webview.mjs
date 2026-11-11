@@ -27,6 +27,7 @@ try {
     header = header.replace(anchor, [
         '        { key: "review", label: t("Review changes"), action: { type: "reviewChanges" }, disabled: !hasSession },',
         '        { key: "exportConversation", label: t("Export conversation"), action: { type: "exportConversation" }, disabled: !hasSession },',
+        '        { key: "headless", label: t("Headless tasks"), action: { type: "openHeadlessTasks" } },',
         '        { key: "forge", label: t("Changes and worktrees"), action: { type: "openForge" }, disabled: !hasSession },',
         '        { key: "editorTab", label: t("Open chat in editor tab"), action: { type: "openInEditor" } },',
         '        { key: "account", label: t("Manage DeepSeek account"), action: { type: "manageAccount" } },',
@@ -45,6 +46,7 @@ try {
         'Browse Runtime workspace files': '浏览 Runtime 工作区文件', 'Configure Jev API key': '配置 Jev API Key',
         'What’s new': '更新说明', 'Schedule is unavailable in this Runtime version or disabled in plugin settings.': '当前 Runtime 版本不支持日程，或已在插件设置中禁用。',
         'Review changes': '审阅改动', 'Export conversation': '导出对话',
+        'Headless tasks': 'Headless 任务',
         'Changes and worktrees': '改动与 Worktree', 'Recurrence': '重复规则',
         'Open chat in editor tab': '在编辑器标签页打开聊天',
         'Enter to send; Shift+Enter for a new line.': 'Enter 发送，Shift+Enter 换行。',

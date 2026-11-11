@@ -779,6 +779,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
             }
             case "searchSession" -> sessionActions.search();
             case "openSessionCenter" -> sessionActions.openSessionCenter();
+            case "openHeadlessTasks" -> DshHeadlessTasks.open(project);
             case "reviewChanges" -> openToolDiff(new JsonObject());
             case "manageSessions" -> sessionActions.manageSessions();
             case "exportConversation" -> sessionActions.exportConversation();

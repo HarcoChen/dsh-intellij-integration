@@ -56,6 +56,7 @@
                     factoryClass="top.harcochen.dsh.DshToolWindowFactory"
                     canCloseContent="false"/>
         <projectService serviceImplementation="top.harcochen.dsh.DshRuntimeService"/>
+        <projectService serviceImplementation="top.harcochen.dsh.DshHeadlessTasks"/>
         <projectService serviceImplementation="top.harcochen.dsh.remote.DshRemoteService"/>
         <projectService serviceImplementation="top.harcochen.dsh.DshSettingsState"/>
         <projectService serviceImplementation="top.harcochen.dsh.DshChatDraftState"/>
@@ -73,6 +74,9 @@
                 icon="/icons/dsh.svg">
             <add-to-group group-id="ToolsMenu" anchor="last" />
             <keyboard-shortcut keymap="$default" first-keystroke="ctrl shift alt D" />
+        </action>
+        <action id="Dsh.HeadlessTasks" class="top.harcochen.dsh.action.DshHeadlessTaskAction">
+            <add-to-group group-id="ToolsMenu" anchor="last" />
         </action>
         <action id="Dsh.Start" class="top.harcochen.dsh.action.DshStartAction" />
         <action id="Dsh.Stop" class="top.harcochen.dsh.action.DshStopAction" />

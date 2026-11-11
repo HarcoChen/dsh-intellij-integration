@@ -583,6 +583,45 @@ public final class DshRuntimeService implements Disposable {
         return result;
     }
 
+    /** Local CLI invocations for a one-shot task, without Web-app flags or lifecycle changes. */
+    List<List<String>> headlessCommands() {
+        DshSettingsState copy = new DshSettingsState();
+        copy.loadState(DshSettingsState.getInstance(project));
+        List<List<String>> commands = new ArrayList<>();
+        Map<String, String> environment = executionEnvironment();
+        for (List<String> candidate : launcherCandidates(copy)) {
+            int profile = webProfileIndex(candidate);
+            int end = profile;
+            if (profile > 0 && candidate.get(profile - 1).equals("--profile")) end--;
+            if (end < 0) {
+                end = 1;
+                for (int index = 1; index < candidate.size(); index++)
+                    if (candidate.get(index).startsWith(RUNTIME_PACKAGE)) {
+                        end = index + 1;
+                        break;
+                    }
+            }
+            List<String> command = new ArrayList<>(candidate.subList(0, Math.max(1, end)));
+            command.set(0, resolveExecutable(command.get(0), environment));
+            command.addAll(List.of("--profile", "headless", "--json"));
+            commands.add(List.copyOf(command));
+        }
+        return List.copyOf(commands);
+    }
+
+    Map<String, String> headlessEnvironment() {
+        Map<String, String> environment = executionEnvironment();
+        DshSettingsState settings = DshSettingsState.getInstance(project);
+        if (settings.npmRegistry != null && !settings.npmRegistry.isBlank())
+            environment.putIfAbsent("npm_config_registry", settings.npmRegistry.trim());
+        String keyName = settings.apiKeyEnv == null ? "" : settings.apiKeyEnv.strip();
+        if (keyName.matches("[A-Za-z_][A-Za-z0-9_]*")) {
+            String key = DshCredentials.read(project);
+            if (key != null && !key.isBlank()) environment.put(keyName, key);
+        }
+        return environment;
+    }
+
     private String npmGlobalDsh() {
         Process probe = null;
         try {

@@ -49,6 +49,7 @@ final class DshActionAccess {
                         "insertCode",
                         "applyCode",
                         "openInEditor",
+                        "openHeadlessTasks",
                         "showWhatsNew")
                 .contains(type)) return true;
         if (type.equals("switchSession"))
