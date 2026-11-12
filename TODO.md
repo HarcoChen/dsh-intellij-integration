@@ -7,6 +7,9 @@ Status: `[x]` implemented, `[-]` usable but not yet at VS Code parity, `[ ]` not
 
 ## PR #29 review fixes — 2026-11-12
 
+- [x] Coordinate Forge writes across panels by Runtime/Session/URL and compare the acknowledged
+  uncertainty before reserving a write. Isolated IDE acceptance covers simultaneous writers,
+  stale confirmations, cancellation and pre-dispatch failure. Release version prepared as 0.5.0.
 - [x] Follow-up review locks drafts during submission, gates block rollback by file capability,
   rejects incomplete review history, and retains Forge uncertainty when final confirmation is canceled.
 - [x] Schedule reads wait for connection readiness and recover from failed reads with a five-second

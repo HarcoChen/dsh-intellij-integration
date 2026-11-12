@@ -32,8 +32,30 @@ import top.harcochen.dsh.remote.DshRemoteState;
 final class DshForgeController {
     private record UncertainWrite(String runtime, String session, String url) {}
 
-    private static final com.intellij.openapi.util.Key<Set<UncertainWrite>> UNCERTAIN_WRITES =
-            com.intellij.openapi.util.Key.create("dsh.forge.uncertainWrites");
+    private static final class WriteState {
+        private final Set<UncertainWrite> active = new java.util.HashSet<>();
+        private final java.util.Map<UncertainWrite, Object> uncertain = new java.util.HashMap<>();
+
+        synchronized Object uncertain(UncertainWrite key) {
+            return uncertain.get(key);
+        }
+
+        synchronized boolean acquire(UncertainWrite key, Object acknowledged) {
+            return uncertain.get(key) == acknowledged && active.add(key);
+        }
+
+        synchronized void submitted(UncertainWrite key) {
+            uncertain.remove(key);
+        }
+
+        synchronized void complete(UncertainWrite key, boolean unknown) {
+            if (unknown) uncertain.put(key, new Object());
+            active.remove(key);
+        }
+    }
+
+    private static final com.intellij.openapi.util.Key<WriteState> WRITES =
+            com.intellij.openapi.util.Key.create("dsh.forge.writes");
     private final Project project;
     private final DshRemoteService remote;
     private final ExecutorService operations;
@@ -75,7 +97,7 @@ final class DshForgeController {
         private volatile JsonObject latest;
         private boolean mutating;
         private final List<JButton> writeButtons = new ArrayList<>();
-        private final Set<UncertainWrite> uncertain;
+        private final WriteState writes;
         private final Consumer<DshRemoteState.Snapshot> listener =
                 ignored -> {
                     if (!current())
@@ -91,12 +113,12 @@ final class DshForgeController {
             this.session = session;
             this.generation = remote.snapshot().generation;
             this.runtime = DshRuntimeService.getInstance(project).getUrl();
-            Set<UncertainWrite> saved = project.getUserData(UNCERTAIN_WRITES);
+            WriteState saved = project.getUserData(WRITES);
             if (saved == null) {
-                saved = java.util.concurrent.ConcurrentHashMap.newKeySet();
-                project.putUserData(UNCERTAIN_WRITES, saved);
+                saved = new WriteState();
+                project.putUserData(WRITES, saved);
             }
-            this.uncertain = saved;
+            this.writes = saved;
             setTitle(DshBundle.message("dsh.forge.title"));
             setModal(false);
             overview.setEditable(false);
@@ -902,7 +924,8 @@ final class DshForgeController {
             }
             String url = DshJson.string(row, "url");
             UncertainWrite key = new UncertainWrite(runtime, session, url);
-            if (uncertain.contains(key)) {
+            Object acknowledged = writes.uncertain(key);
+            if (acknowledged != null) {
                 if (Messages.showYesNoDialog(
                                 project,
                                 DshBundle.message("dsh.forge.unknown.confirm", url),
@@ -917,72 +940,84 @@ final class DshForgeController {
                             DshBundle.message("dsh.forge.confirm"),
                             Messages.getWarningIcon())
                     != Messages.YES) return;
+            if (!writes.acquire(key, acknowledged)) {
+                notify.accept(DshBundle.message("dsh.forge.write.changed"));
+                return;
+            }
             mutating = true;
             updateWriteActions();
-            operations.execute(
-                    () -> {
-                        String message;
-                        boolean unknown = false;
-                        boolean submitted = false;
-                        try {
-                            assertRequest(row);
-                            uncertain.remove(key);
-                            submitted = true;
-                            JsonElement value = remote.callFeature("forgePanel/" + method, args);
-                            if (method.equals("submitReview")
-                                    || method.equals("changeRequestReviewWrite")) {
-                                if (!value.isJsonObject()
-                                        || !value.getAsJsonObject().has("ok")
-                                        || !value.getAsJsonObject().get("ok").isJsonPrimitive()
-                                        || !value.getAsJsonObject()
-                                                .getAsJsonPrimitive("ok")
-                                                .isBoolean()) {
-                                    unknown = true;
-                                    message = DshBundle.message("dsh.forge.unknown");
-                                } else if (!value.getAsJsonObject().get("ok").getAsBoolean()) {
-                                    JsonObject failure = value.getAsJsonObject();
-                                    unknown = "unknown".equals(DshJson.string(failure, "code"));
-                                    message =
-                                            DshJson.stringOr(
-                                                    failure,
-                                                    "message",
-                                                    DshBundle.message("dsh.forge.unavailable"));
+            try {
+                operations.execute(
+                        () -> {
+                            String message;
+                            boolean unknown = false;
+                            boolean submitted = false;
+                            try {
+                                assertRequest(row);
+                                writes.submitted(key);
+                                submitted = true;
+                                JsonElement value =
+                                        remote.callFeature("forgePanel/" + method, args);
+                                if (method.equals("submitReview")
+                                        || method.equals("changeRequestReviewWrite")) {
+                                    if (!value.isJsonObject()
+                                            || !value.getAsJsonObject().has("ok")
+                                            || !value.getAsJsonObject().get("ok").isJsonPrimitive()
+                                            || !value.getAsJsonObject()
+                                                    .getAsJsonPrimitive("ok")
+                                                    .isBoolean()) {
+                                        unknown = true;
+                                        message = DshBundle.message("dsh.forge.unknown");
+                                    } else if (!value.getAsJsonObject().get("ok").getAsBoolean()) {
+                                        JsonObject failure = value.getAsJsonObject();
+                                        unknown = "unknown".equals(DshJson.string(failure, "code"));
+                                        message =
+                                                DshJson.stringOr(
+                                                        failure,
+                                                        "message",
+                                                        DshBundle.message("dsh.forge.unavailable"));
+                                    } else message = DshBundle.message("dsh.forge.saved");
                                 } else message = DshBundle.message("dsh.forge.saved");
-                            } else message = DshBundle.message("dsh.forge.saved");
-                        } catch (Exception error) {
-                            unknown =
-                                    submitted
-                                            && (!(error
-                                                            instanceof
-                                                            top.harcochen.dsh.remote
-                                                                            .DshRemoteException
-                                                                    remoteError)
-                                                    || remoteError.layer()
-                                                            == top.harcochen.dsh.remote
-                                                                    .DshRemoteException.Layer
-                                                                    .CARRIER
-                                                    || remoteError.layer()
-                                                            == top.harcochen.dsh.remote
-                                                                    .DshRemoteException.Layer
-                                                                    .PROTOCOL
-                                                    || remoteError.httpStatus() >= 500
-                                                    || "forgePanel/action-unknown"
-                                                            .equals(remoteError.code()));
-                            message = DshJson.message(error);
-                        }
-                        if (unknown && !message.equals(DshBundle.message("dsh.forge.unknown")))
-                            message = DshBundle.message("dsh.forge.unknown") + "\n" + message;
-                        String notice = message;
-                        if (unknown) uncertain.add(key);
-                        ApplicationManager.getApplication()
-                                .invokeLater(
-                                        () -> {
-                                            mutating = false;
-                                            if (!current()) return;
-                                            updateWriteActions();
-                                            notify.accept(notice);
-                                        });
-                    });
+                            } catch (Exception error) {
+                                unknown =
+                                        submitted
+                                                && (!(error
+                                                                instanceof
+                                                                top.harcochen.dsh.remote
+                                                                                .DshRemoteException
+                                                                        remoteError)
+                                                        || remoteError.layer()
+                                                                == top.harcochen.dsh.remote
+                                                                        .DshRemoteException.Layer
+                                                                        .CARRIER
+                                                        || remoteError.layer()
+                                                                == top.harcochen.dsh.remote
+                                                                        .DshRemoteException.Layer
+                                                                        .PROTOCOL
+                                                        || remoteError.httpStatus() >= 500
+                                                        || "forgePanel/action-unknown"
+                                                                .equals(remoteError.code()));
+                                message = DshJson.message(error);
+                            }
+                            if (unknown && !message.equals(DshBundle.message("dsh.forge.unknown")))
+                                message = DshBundle.message("dsh.forge.unknown") + "\n" + message;
+                            String notice = message;
+                            writes.complete(key, unknown);
+                            ApplicationManager.getApplication()
+                                    .invokeLater(
+                                            () -> {
+                                                mutating = false;
+                                                if (!current()) return;
+                                                updateWriteActions();
+                                                notify.accept(notice);
+                                            });
+                        });
+            } catch (RuntimeException error) {
+                writes.complete(key, false);
+                mutating = false;
+                updateWriteActions();
+                notify.accept(DshJson.message(error));
+            }
         }
 
         private void updateWriteActions() {
