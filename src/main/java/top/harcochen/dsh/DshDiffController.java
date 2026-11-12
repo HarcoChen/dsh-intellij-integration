@@ -75,6 +75,7 @@ final class DshDiffController {
                     try {
                         List<DshReviewDialog.File> files = new ArrayList<>();
                         JsonObject history = remote.traceHistory(current, 160);
+                        assertCompleteReviewHistory(history);
                         var callStates = DshToolDiff.callDiffStates(history);
                         java.util.Set<String> callIds =
                                 new java.util.LinkedHashSet<>(approvals.keySet());
@@ -100,6 +101,7 @@ final class DshDiffController {
                                                     assertGeneration(generation);
                                                     JsonObject latest =
                                                             remote.traceHistory(current, 160);
+                                                    assertCompleteReviewHistory(latest);
                                                     DshToolDiff.CallDiffState fresh =
                                                             DshToolDiff.callDiffState(
                                                                     latest, callId);
@@ -241,12 +243,18 @@ final class DshDiffController {
                                 DshJson.bool(file, "restorable", false)
                                         ? hunk ->
                                                 rollback(current, turn, id, path, generation, hunk)
-                                        : null));
+                                        : null,
+                                DshJson.bool(file, "hunkRestorable", false)));
             }
         }
     }
 
     private record RollbackSelection(Integer block, String revision) {}
+
+    private static void assertCompleteReviewHistory(JsonObject history) {
+        if (DshJson.bool(history, "hasMore", false))
+            throw new IllegalStateException(DshBundle.message("dsh.review.history.large"));
+    }
 
     private java.util.concurrent.CompletionStage<DshReviewDialog.RollbackResult> rollback(
             String current, int turn, String id, String path, long generation, boolean hunk) {

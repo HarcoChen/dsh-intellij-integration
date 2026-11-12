@@ -84,10 +84,9 @@ final class DshScheduleController implements AutoCloseable {
                 () -> {
                     try {
                         JsonElement value = remote.listSchedules(selected);
-                        if (!value.isJsonArray()
-                                || !selected.equals(sessionId.get())
-                                || token != refreshGeneration.get()
-                                || remote.snapshot().generation != connectionGeneration) return;
+                        if (!isCurrentRefresh(selected, token, connectionGeneration)) return;
+                        if (!value.isJsonArray())
+                            throw new IllegalStateException("Invalid Schedule list");
                         JsonArray normalized = DshSessionStateStore.schedule(value);
                         if (normalized == null)
                             throw new IllegalStateException("Invalid Schedule list");
@@ -96,15 +95,39 @@ final class DshScheduleController implements AutoCloseable {
                                         selected, normalized, snapshot, connectionGeneration);
                         stateChanged.run();
                     } catch (DshRemoteException missing) {
-                        if (missing.isCapabilityMissing() && token == refreshGeneration.get()) {
+                        if (!isCurrentRefresh(selected, token, connectionGeneration)) return;
+                        if (missing.isCapabilityMissing()) {
                             unavailableSession = selected;
                             currentSchedules = null;
                             stateChanged.run();
-                        } else errorSink.accept(DshJson.message(missing));
+                        } else {
+                            errorSink.accept(DshJson.message(missing));
+                            retryRefresh(selected, token, connectionGeneration);
+                        }
                     } catch (Exception error) {
+                        if (!isCurrentRefresh(selected, token, connectionGeneration)) return;
                         errorSink.accept(DshJson.message(error));
+                        retryRefresh(selected, token, connectionGeneration);
                     }
                 });
+    }
+
+    private boolean isCurrentRefresh(String selected, long token, long connectionGeneration) {
+        return !closed
+                && selected.equals(sessionId.get())
+                && token == refreshGeneration.get()
+                && remote.snapshot().generation == connectionGeneration;
+    }
+
+    private void retryRefresh(String selected, long token, long connectionGeneration) {
+        java.util.concurrent.CompletableFuture.delayedExecutor(
+                        5, java.util.concurrent.TimeUnit.SECONDS, operations)
+                .execute(
+                        () -> {
+                            if (isCurrentRefresh(selected, token, connectionGeneration)
+                                    && "connected".equals(remote.snapshot().phase))
+                                refreshCurrent(selected);
+                        });
     }
 
     JsonArray current(String selected, DshRemoteState.ProjectionCell cell) {
@@ -241,6 +264,13 @@ final class DshScheduleController implements AutoCloseable {
             if (target == null) return;
             patch.add("target", target);
         } else if (choice == 5) {
+            if ("ended".equals(DshJson.string(record, "status"))
+                    && java.util.Set.of("at", "after")
+                            .contains(DshJson.stringOr(record, "kind", ""))) {
+                JsonObject timing = chooseRule();
+                if (timing == null) return;
+                patch.add("timing", timing);
+            }
             patch.addProperty("active", !"active".equals(DshJson.string(record, "status")));
         }
         JsonObject request = new JsonObject();
@@ -365,6 +395,9 @@ final class DshScheduleController implements AutoCloseable {
                                 submitted
                                         && !knownRefusal
                                         && (action.equals("create") || action.equals("run"))
+                                        && !(error instanceof DshRemoteException rejected
+                                                && "gateway/arguments-invalid"
+                                                        .equals(rejected.code()))
                                         && (!(error instanceof DshRemoteException remoteError)
                                                 || remoteError.layer()
                                                         == DshRemoteException.Layer.CARRIER

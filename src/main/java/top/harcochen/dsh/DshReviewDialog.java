@@ -46,14 +46,15 @@ final class DshReviewDialog extends DialogWrapper {
             String approvalKey,
             Callable<Content> load,
             Function<String, CompletionStage<String>> decide,
-            Function<Boolean, CompletionStage<RollbackResult>> rollback) {
+            Function<Boolean, CompletionStage<RollbackResult>> rollback,
+            boolean hunkRestorable) {
         File(
                 String label,
                 String path,
                 String approvalKey,
                 Callable<Content> load,
                 Function<String, CompletionStage<String>> decide) {
-            this(label, path, approvalKey, load, decide, null);
+            this(label, path, approvalKey, load, decide, null, false);
         }
     }
 
@@ -367,6 +368,13 @@ final class DshReviewDialog extends DialogWrapper {
 
     private void updateActions() {
         if (approve == null) return;
+        for (var entry : drafts.entrySet())
+            entry.getValue()
+                    .getDocument()
+                    .setReadOnly(
+                            busy
+                                    || entry.getKey().decide() == null
+                                    || settled.contains(entry.getKey().approvalKey()));
         File file = selected();
         boolean pending =
                 !busy
@@ -386,14 +394,18 @@ final class DshReviewDialog extends DialogWrapper {
                         && file.rollback() != null
                         && !reverted.contains(file);
         revertFile.setEnabled(canRevert);
-        revertHunk.setEnabled(canRevert && contents.containsKey(file));
+        revertHunk.setEnabled(canRevert && file.hunkRestorable() && contents.containsKey(file));
         list.setEnabled(!busy);
         getCancelAction().setEnabled(!busy);
     }
 
     private void rollback(boolean hunk) {
         File file = selected();
-        if (busy || file == null || file.rollback() == null || reverted.contains(file)) return;
+        if (busy
+                || file == null
+                || file.rollback() == null
+                || reverted.contains(file)
+                || (hunk && !file.hunkRestorable())) return;
         busy = true;
         status.setText(DshBundle.message("dsh.review.submitting"));
         updateActions();

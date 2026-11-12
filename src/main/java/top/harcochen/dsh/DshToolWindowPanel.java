@@ -497,9 +497,10 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
             if (team != null) subagents.observeTeam(selected, team);
             subagents.observeCatalog(selected, cellValue(selected, "subagentCatalog"));
             long scheduleEpoch = remote.settingsEpoch();
-            if (!selected.equals(lastScheduleSession)
-                    || scheduleEpoch != lastScheduleEpoch
-                    || current.generation != lastScheduleGeneration) {
+            if ("connected".equals(current.phase)
+                    && (!selected.equals(lastScheduleSession)
+                            || scheduleEpoch != lastScheduleEpoch
+                            || current.generation != lastScheduleGeneration)) {
                 lastScheduleSession = selected;
                 lastScheduleEpoch = scheduleEpoch;
                 lastScheduleGeneration = current.generation;

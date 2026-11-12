@@ -268,6 +268,12 @@ final class DshChangeReviewStore {
                 if (file.oldPath != null) entry.addProperty("oldPath", file.oldPath);
                 entry.addProperty(
                         "restorable", file.restorable && !file.restored && !review.restored);
+                entry.addProperty(
+                        "hunkRestorable",
+                        file.restorable
+                                && !file.restored
+                                && !review.restored
+                                && supportsHunks(file));
                 entry.addProperty("restored", file.restored);
                 files.add(entry);
             }
@@ -289,6 +295,7 @@ final class DshChangeReviewStore {
                     item.remove("beforeText");
                     item.remove("afterText");
                     item.addProperty("restorable", false);
+                    item.addProperty("hunkRestorable", false);
                 }
                 result.add(copy);
             }
@@ -629,9 +636,7 @@ final class DshChangeReviewStore {
     }
 
     private DshReviewHunks.Plan hunkPlan(ChangeReview review, ChangeFile file) throws Exception {
-        if (!"modified".equals(file.status)
-                || !REGULAR_MODES.contains(file.oldMode)
-                || !java.util.Objects.equals(file.oldMode, file.newMode))
+        if (!supportsHunks(file))
             throw new IllegalStateException(DshBundle.message("dsh.review.hunks.unsupported"));
         List<String> conflicts = conflicts(subset(review, List.of(file)));
         if (!conflicts.isEmpty()) throw new IllegalStateException(conflictMessage(conflicts));
@@ -648,6 +653,12 @@ final class DshChangeReviewStore {
         if (!file.newWorkingHash.equals(workingHash(plan.content(file.revertedHunks))))
             throw new IllegalStateException(DshBundle.message("dsh.files.changed"));
         return plan;
+    }
+
+    private static boolean supportsHunks(ChangeFile file) {
+        return "modified".equals(file.status)
+                && REGULAR_MODES.contains(file.oldMode)
+                && java.util.Objects.equals(file.oldMode, file.newMode);
     }
 
     private void restoreFiles(ChangeReview review, Runnable assertWritable) throws Exception {

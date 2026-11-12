@@ -909,7 +909,6 @@ final class DshForgeController {
                                 DshBundle.message("dsh.forge.title"),
                                 Messages.getWarningIcon())
                         != Messages.YES) return;
-                uncertain.remove(key);
             }
             String head = DshJson.string(row.getAsJsonObject("snapshot"), "headSha");
             if (Messages.showYesNoDialog(
@@ -927,6 +926,7 @@ final class DshForgeController {
                         boolean submitted = false;
                         try {
                             assertRequest(row);
+                            uncertain.remove(key);
                             submitted = true;
                             JsonElement value = remote.callFeature("forgePanel/" + method, args);
                             if (method.equals("submitReview")

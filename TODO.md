@@ -7,6 +7,14 @@ Status: `[x]` implemented, `[-]` usable but not yet at VS Code parity, `[ ]` not
 
 ## PR #29 review fixes — 2026-11-12
 
+- [x] Follow-up review locks drafts during submission, gates block rollback by file capability,
+  rejects incomplete review history, and retains Forge uncertainty when final confirmation is canceled.
+- [x] Schedule reads wait for connection readiness and recover from failed reads with a five-second
+  retry fenced by Session, connection and controller lifetime. Parameter refusals remain definite;
+  resuming ended one-shot tasks collects a future timing rule.
+- [x] Isolated native IDE acceptance covers pending draft locks and recovery, block-action availability,
+  and loopback HTTP failure injection for same-generation Schedule recovery, error classification
+  and cancellation after controller close. External Forge confirmations remain manual acceptance.
 - [x] Preserve editable review drafts when revision attachment fails; retry against the original
   Session without submitting the rejection twice. Disabling review uses draft-discard confirmation.
 - [x] Prepare Headless continuation explicitly, retain custom launcher entry arguments and report
