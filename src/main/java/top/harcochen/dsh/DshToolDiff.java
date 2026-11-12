@@ -357,7 +357,7 @@ final class DshToolDiff {
                 : new JsonObject();
     }
 
-    private static String callIdOf(JsonObject entry) {
+    static String callIdOf(JsonObject entry) {
         JsonObject data = eventData(entry);
         JsonElement callId = data.get("callId");
         if (callId != null && callId.isJsonPrimitive()) return callId.getAsString();
@@ -380,7 +380,7 @@ final class DshToolDiff {
         return nested != null && nested.isJsonPrimitive() ? nested.getAsString() : null;
     }
 
-    private static List<JsonObject> entries(JsonObject history) {
+    static List<JsonObject> entries(JsonObject history) {
         List<JsonObject> result = new ArrayList<>();
         JsonArray source =
                 history != null && history.has("events") && history.get("events").isJsonArray()
@@ -447,5 +447,31 @@ final class DshToolDiff {
         return view == null
                 ? null
                 : new CallDiffState(view, result != null, eventSeq(call == null ? result : call));
+    }
+
+    /** Build the review catalog in one pass over the ledger, retaining the latest call/result. */
+    static Map<String, CallDiffState> callDiffStates(JsonObject history) {
+        Map<String, JsonObject> calls = new LinkedHashMap<>();
+        Map<String, JsonObject> results = new LinkedHashMap<>();
+        Set<String> ids = new LinkedHashSet<>();
+        for (JsonObject entry : entries(history)) {
+            String id = callIdOf(entry);
+            if (id == null) continue;
+            ids.add(id);
+            if ("tool/call".equals(eventType(entry))) calls.put(id, entry);
+            else if ("tool/result".equals(eventType(entry))) results.put(id, entry);
+        }
+        Map<String, CallDiffState> states = new LinkedHashMap<>();
+        for (String id : ids) {
+            JsonObject call = calls.get(id);
+            JsonObject result = results.get(id);
+            DiffView view = storedDiffView(call, result);
+            if (view != null)
+                states.put(
+                        id,
+                        new CallDiffState(
+                                view, result != null, eventSeq(call == null ? result : call)));
+        }
+        return states;
     }
 }

@@ -76,6 +76,11 @@ final class DshSessionActionsController {
         this.errorSink = errorSink;
     }
 
+    void exportConversation() {
+        new DshConversationExporter(project, remote, operations, this::notifyUser, this::report)
+                .export(sessionId.get());
+    }
+
     void refreshModelCatalog(String session) {
         if (session == null || session.equals(modelCatalogSession)) {
             return;
@@ -216,13 +221,29 @@ final class DshSessionActionsController {
         private final List<String> ids = new ArrayList<>();
         private final Consumer<DshRemoteState.Snapshot> listener =
                 ignored -> ApplicationManager.getApplication().invokeLater(this::render);
-        private boolean closed;
+        private volatile boolean closed;
+        private final javax.swing.JCheckBox showArchived =
+                new javax.swing.JCheckBox(DshBundle.message("dsh.session.center.show.archived"));
+        private final javax.swing.JTextArea preview = new javax.swing.JTextArea();
+        private final javax.swing.JLabel result = new javax.swing.JLabel(" ");
+        private volatile int previewEpoch;
+        private boolean rendering;
+        private String previewSession;
+        private final long generation = remote.snapshot().generation;
 
         SessionCenter() {
             super(project, false);
             setModal(false);
             setTitle(DshBundle.message("dsh.session.center.title"));
             list.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+            preview.setEditable(false);
+            preview.setLineWrap(true);
+            preview.setWrapStyleWord(true);
+            list.addListSelectionListener(
+                    event -> {
+                        if (!event.getValueIsAdjusting()) loadPreview();
+                    });
+            showArchived.addActionListener(event -> render());
             search.getDocument()
                     .addDocumentListener(
                             new javax.swing.event.DocumentListener() {
@@ -260,9 +281,33 @@ final class DshSessionActionsController {
                     new JLabel(DshBundle.message("dsh.session.center.hint")), BorderLayout.NORTH);
             JPanel body = new JPanel(new BorderLayout(0, 8));
             body.add(search, BorderLayout.NORTH);
-            body.add(new JScrollPane(list), BorderLayout.CENTER);
+            javax.swing.JSplitPane split =
+                    new javax.swing.JSplitPane(
+                            javax.swing.JSplitPane.HORIZONTAL_SPLIT,
+                            new JScrollPane(list),
+                            new JScrollPane(preview));
+            split.setResizeWeight(0.55);
+            body.add(split, BorderLayout.CENTER);
+            JPanel controls = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.LEADING));
+            controls.add(showArchived);
+            addButton(
+                    controls,
+                    "dsh.review.refresh",
+                    () -> {
+                        previewSession = null;
+                        loadPreview();
+                    });
+            addButton(controls, "dsh.session.rename.title", this::renameSelected);
+            addButton(controls, "dsh.session.center.pin", () -> mutateSelected("pin"));
+            addButton(controls, "dsh.session.center.archive", () -> mutateSelected("archive"));
+            addButton(controls, "dsh.workspace.action.move.up", () -> moveSelected(-1));
+            addButton(controls, "dsh.workspace.action.move.down", () -> moveSelected(1));
+            JPanel bottom = new JPanel(new BorderLayout());
+            bottom.add(controls, BorderLayout.CENTER);
+            bottom.add(result, BorderLayout.SOUTH);
+            body.add(bottom, BorderLayout.SOUTH);
             content.add(body, BorderLayout.CENTER);
-            content.setPreferredSize(new Dimension(850, 460));
+            content.setPreferredSize(new Dimension(1100, 560));
             return content;
         }
 
@@ -273,27 +318,71 @@ final class DshSessionActionsController {
 
         private void render() {
             if (closed) return;
+            if (remote.snapshot().generation != generation) {
+                preview.setText("");
+                result.setText(DshBundle.message("dsh.runtime.changed"));
+                return;
+            }
             String selected =
                     list.getSelectedIndex() < 0 || list.getSelectedIndex() >= ids.size()
                             ? null
                             : ids.get(list.getSelectedIndex());
+            if (previewSession != null
+                    && !remote.access().allows("session/follow", "session", previewSession)) {
+                preview.setText("");
+                previewSession = null;
+                ++previewEpoch;
+            }
             String query = search.getText().strip().toLowerCase(Locale.ROOT);
             List<JsonObject> rows = new ArrayList<>();
-            for (JsonElement raw : sessions.get()) {
+            JsonArray catalog = sessions.get().deepCopy();
+            java.util.Set<String> known = new java.util.HashSet<>();
+            for (JsonElement raw : catalog)
+                if (raw.isJsonObject())
+                    known.add(DshJson.string(raw.getAsJsonObject(), "sessionId"));
+            if (showArchived.isSelected())
+                for (String id : remote.snapshot().archivedSessionIds) {
+                    if (known.contains(id)) continue;
+                    JsonObject row = new JsonObject();
+                    row.addProperty("sessionId", id);
+                    row.addProperty("archived", true);
+                    catalog.add(row);
+                }
+            for (JsonElement raw : catalog) {
                 if (!raw.isJsonObject()) continue;
                 JsonObject row = raw.getAsJsonObject();
-                if (DshJson.bool(row, "archived", false)
+                boolean archived =
+                        DshJson.bool(row, "archived", false)
+                                || remote.snapshot()
+                                        .archivedSessionIds
+                                        .contains(DshJson.string(row, "sessionId"));
+                if ((archived && !showArchived.isSelected())
                         || "subagent".equals(DshJson.string(row, "origin"))) continue;
                 if (row.toString().toLowerCase(Locale.ROOT).contains(query)) rows.add(row);
             }
+            java.util.Map<String, Integer> workspaceOrder = new java.util.HashMap<>();
+            int ordinal = 0;
+            for (JsonObject workspace : remote.snapshot().workspaces) {
+                JsonArray members = workspace.getAsJsonArray("sessionIds");
+                if (members != null)
+                    for (JsonElement member : members)
+                        if (member.isJsonPrimitive())
+                            workspaceOrder.put(member.getAsString(), ordinal++);
+            }
             rows.sort(
                     java.util.Comparator.comparingInt(this::priority)
+                            .thenComparingInt(
+                                    row ->
+                                            workspaceOrder.getOrDefault(
+                                                    DshJson.string(row, "sessionId"),
+                                                    Integer.MAX_VALUE))
                             .thenComparing(
                                     java.util.Comparator.comparingLong(
                                                     (JsonObject row) ->
                                                             DshJson.longValue(
                                                                     row.get("updatedAt"), 0))
                                             .reversed()));
+            rendering = true;
             ids.clear();
             model.clear();
             for (JsonObject row : rows) {
@@ -317,6 +406,12 @@ final class DshSessionActionsController {
                                         DshBundle.message("dsh.session.center.ungrouped"))
                                 + " · "
                                 + status
+                                + (remote.snapshot().archivedSessionIds.contains(id)
+                                        ? " · " + DshBundle.message("dsh.session.manage.archived")
+                                        : "")
+                                + (remote.snapshot().pinnedSessionIds.contains(id)
+                                        ? " · " + DshBundle.message("dsh.session.manage.pinned")
+                                        : "")
                                 + ("migration-required".equals(DshJson.string(row, "formatStatus"))
                                         ? " · " + DshBundle.message("dsh.session.center.migration")
                                         : "")
@@ -326,6 +421,202 @@ final class DshSessionActionsController {
             int index = selected == null ? -1 : ids.indexOf(selected);
             if (index >= 0) list.setSelectedIndex(index);
             else if (!ids.isEmpty()) list.setSelectedIndex(0);
+            rendering = false;
+            loadPreview();
+        }
+
+        private void addButton(JPanel panel, String label, Runnable action) {
+            javax.swing.JButton button = new javax.swing.JButton(DshBundle.message(label));
+            button.addActionListener(event -> action.run());
+            panel.add(button);
+        }
+
+        private String selectedId() {
+            int index = list.getSelectedIndex();
+            return index < 0 || index >= ids.size() ? null : ids.get(index);
+        }
+
+        private void runMutation(Runnable mutation) {
+            if (closed || remote.snapshot().generation != generation) {
+                result.setText(DshBundle.message("dsh.runtime.changed"));
+                return;
+            }
+            result.setText(DshBundle.message("dsh.review.submitting"));
+            operations.execute(
+                    () -> {
+                        try {
+                            if (remote.snapshot().generation != generation)
+                                throw new IllegalStateException(
+                                        DshBundle.message("dsh.runtime.changed"));
+                            mutation.run();
+                            refreshState.run();
+                            ApplicationManager.getApplication()
+                                    .invokeLater(
+                                            () -> {
+                                                if (!closed) {
+                                                    result.setText(
+                                                            DshBundle.message(
+                                                                    "dsh.session.center.saved"));
+                                                    render();
+                                                }
+                                            });
+                        } catch (Exception error) {
+                            ApplicationManager.getApplication()
+                                    .invokeLater(
+                                            () -> {
+                                                if (!closed) result.setText(DshJson.message(error));
+                                            });
+                        }
+                    });
+        }
+
+        private void renameSelected() {
+            String id = selectedId();
+            if (id == null) return;
+            String title =
+                    Messages.showInputDialog(
+                            project,
+                            DshBundle.message("dsh.session.rename.message"),
+                            DshBundle.message("dsh.session.rename.title"),
+                            Messages.getQuestionIcon());
+            if (title != null && !title.isBlank())
+                runMutation(() -> remote.renameSession(id, title.strip()));
+        }
+
+        private void mutateSelected(String action) {
+            String id = selectedId();
+            if (id == null) return;
+            boolean archived = remote.snapshot().archivedSessionIds.contains(id);
+            boolean pinned = remote.snapshot().pinnedSessionIds.contains(id);
+            if ("archive".equals(action)
+                    && !archived
+                    && Messages.showYesNoDialog(
+                                    project,
+                                    DshBundle.message("dsh.session.archive.message"),
+                                    DshBundle.message("dsh.session.archive.title"),
+                                    Messages.getQuestionIcon())
+                            != Messages.YES) return;
+            runMutation(
+                    () -> {
+                        if ("pin".equals(action)) {
+                            if (archived)
+                                throw new IllegalStateException(
+                                        DshBundle.message("dsh.session.center.restore.first"));
+                            if (pinned) remote.unpinSession(id);
+                            else remote.pinSession(id);
+                        } else {
+                            if (archived) remote.unarchiveSession(id);
+                            else {
+                                remote.archiveSession(id);
+                                if (id.equals(sessionId.get())) clearSession.run();
+                            }
+                        }
+                    });
+        }
+
+        private void moveSelected(int direction) {
+            String id = selectedId();
+            if (id == null) return;
+            for (JsonObject workspace : remote.snapshot().workspaces) {
+                JsonArray values = workspace.getAsJsonArray("sessionIds");
+                if (values == null) continue;
+                List<String> order = new ArrayList<>();
+                for (JsonElement value : values)
+                    if (value.isJsonPrimitive()) order.add(value.getAsString());
+                int index = order.indexOf(id);
+                if (index < 0 || index + direction < 0 || index + direction >= order.size())
+                    continue;
+                int anchor = direction < 0 ? index - 1 : index + 2;
+                String before = anchor < order.size() ? order.get(anchor) : null;
+                String workspaceId = DshJson.string(workspace, "workspaceId");
+                runMutation(() -> remote.insertWorkspaceSessionBefore(workspaceId, id, before));
+                return;
+            }
+            result.setText(DshBundle.message("dsh.session.center.move.unavailable"));
+        }
+
+        private void loadPreview() {
+            if (rendering) return;
+            String id = selectedId();
+            if (java.util.Objects.equals(id, previewSession)) return;
+            previewSession = id;
+            int epoch = ++previewEpoch;
+            if (id == null) {
+                preview.setText("");
+                return;
+            }
+            preview.setText(DshBundle.message("dsh.review.loading"));
+            operations.execute(
+                    () -> {
+                        String text;
+                        try {
+                            if (remote.snapshot().generation != generation)
+                                throw new IllegalStateException(
+                                        DshBundle.message("dsh.runtime.changed"));
+                            if (!remote.access().allows("session/follow", "session", id))
+                                throw new IllegalStateException(
+                                        DshBundle.message("dsh.remote.access.denied"));
+                            JsonObject history =
+                                    remote.traceHistory(
+                                            id,
+                                            80,
+                                            160,
+                                            () ->
+                                                    closed
+                                                            || epoch != previewEpoch
+                                                            || remote.snapshot().generation
+                                                                    != generation
+                                                            || !remote.access()
+                                                                    .allows(
+                                                                            "session/follow",
+                                                                            "session",
+                                                                            id));
+                            StringBuilder buffer = new StringBuilder(id + "\n\n");
+                            for (JsonObject entry : DshToolDiff.entries(history)) {
+                                JsonObject event = DshWorkingDirectory.event(entry);
+                                JsonObject data =
+                                        event.has("data") && event.get("data").isJsonObject()
+                                                ? event.getAsJsonObject("data")
+                                                : null;
+                                if (data == null
+                                        || !data.has("message")
+                                        || !data.get("message").isJsonObject()) continue;
+                                JsonObject message = data.getAsJsonObject("message");
+                                buffer.append(DshJson.stringOr(message, "role", "message"))
+                                        .append(":\n");
+                                appendPreviewText(message.get("content"), buffer);
+                                buffer.append("\n\n");
+                                if (buffer.length() > 32000) break;
+                            }
+                            text = buffer.substring(0, Math.min(buffer.length(), 32000));
+                        } catch (Exception error) {
+                            text = DshJson.message(error);
+                        }
+                        String rendered = text;
+                        ApplicationManager.getApplication()
+                                .invokeLater(
+                                        () -> {
+                                            if (!closed
+                                                    && epoch == previewEpoch
+                                                    && remote.snapshot().generation == generation) {
+                                                preview.setText(rendered);
+                                                preview.setCaretPosition(0);
+                                            }
+                                        });
+                    });
+        }
+
+        private void appendPreviewText(JsonElement value, StringBuilder text) {
+            if (value == null || text.length() >= 32000) return;
+            if (value.isJsonPrimitive() && value.getAsJsonPrimitive().isString())
+                text.append(
+                        value.getAsString(),
+                        0,
+                        Math.min(value.getAsString().length(), 32000 - text.length()));
+            else if (value.isJsonArray())
+                for (JsonElement item : value.getAsJsonArray()) appendPreviewText(item, text);
+            else if (value.isJsonObject() && value.getAsJsonObject().has("text"))
+                appendPreviewText(value.getAsJsonObject().get("text"), text);
         }
 
         private int priority(JsonObject row) {
@@ -341,6 +632,14 @@ final class DshSessionActionsController {
             String id = ids.get(index);
             if (!remote.access().allows("session/follow", "session", id)) {
                 notifyUser(DshBundle.message("dsh.remote.access.denied"));
+                return;
+            }
+            if (remote.snapshot().generation != generation) {
+                result.setText(DshBundle.message("dsh.runtime.changed"));
+                return;
+            }
+            if (remote.snapshot().archivedSessionIds.contains(id)) {
+                result.setText(DshBundle.message("dsh.session.center.restore.first"));
                 return;
             }
             selectSession.accept(id);
@@ -588,7 +887,7 @@ final class DshSessionActionsController {
     private void archive(String session) {
         try {
             remote.archiveSession(session);
-            clearSession.run();
+            if (session.equals(sessionId.get())) clearSession.run();
             refreshState.run();
         } catch (DshRemoteException active) {
             if (!"workspace/session-active".equals(active.code())) {
@@ -610,7 +909,8 @@ final class DshSessionActionsController {
                                             () -> {
                                                 try {
                                                     remote.archiveSession(session, true);
-                                                    clearSession.run();
+                                                    if (session.equals(sessionId.get()))
+                                                        clearSession.run();
                                                     refreshState.run();
                                                 } catch (Exception error) {
                                                     report(error);

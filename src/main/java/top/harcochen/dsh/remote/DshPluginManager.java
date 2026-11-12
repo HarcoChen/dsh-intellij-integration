@@ -48,6 +48,10 @@ final class DshPluginManager {
                             .contains(reason == null ? "" : reason)) throw invalid();
             if (!bundles && reason == null && DshJson.strictString(raw, "patchId") == null)
                 throw invalid();
+            if (bundles
+                    && raw.has("update")
+                    && !Set.of("registry", "git").contains(DshJson.stringOr(raw, "update", "")))
+                throw invalid();
             JsonObject row = raw.deepCopy();
             if (raw.has("error")) {
                 if (!raw.get("error").isJsonObject()

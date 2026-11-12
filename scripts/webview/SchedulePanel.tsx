@@ -5,6 +5,8 @@ import { t } from '../../i18n';
 
 // Editing/history use IntelliJ's native management dialog; the dock remains a read-only summary.
 function timing(item: DshScheduleItem): string {
+    const recurrence = item as unknown as { kind: string; rrule?: string };
+    if (recurrence.kind === 'rrule') return recurrence.rrule ?? t('Recurrence');
     if (item.kind === 'after') return t('After {duration}', { duration: `${item.afterSeconds}s` });
     if (item.kind === 'every') return t('Every {duration}', { duration: `${item.everySeconds}s` });
     if (item.kind === 'daily') return t('Daily at {time} ({timeZone})', { time: item.time, timeZone: item.timeZone });

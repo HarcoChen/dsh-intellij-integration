@@ -517,8 +517,13 @@ final class DshWebviewActionSanitizer {
         }
         if (java.util.Set.of("cancelRecovery", "restoreRecovery", "exportRecoveryDiagnostics")
                 .contains(type)) return hasOnly(input, "type") ? input : null;
-        if (Set.of("browseRuntimeFiles", "showWhatsNew", "restartRuntime").contains(type))
-            return hasOnly(input, "type") ? input : null;
+        if (Set.of(
+                        "browseRuntimeFiles",
+                        "showWhatsNew",
+                        "restartRuntime",
+                        "reviewChanges",
+                        "exportConversation")
+                .contains(type)) return hasOnly(input, "type") ? input : null;
         if (type.startsWith("switch")
                 || type.startsWith("open")
                 || type.startsWith("remove")

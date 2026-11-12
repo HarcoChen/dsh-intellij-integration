@@ -50,6 +50,23 @@ Review file edits in the IDE's own diff viewer. For supported tool diff cards, D
 
 Before an approval can release a structured file edit, DSH checks IntelliJ's unsaved editor buffers against the proposed paths. Overlapping edits keep the approval pending until you save or revert the document.
 
+#### How do I review the agent's changes in JetBrains?
+
+Native change review is enabled by default. In the **DSH** tool window:
+
+1. Choose **Review changes** from the chat menu, or **DSH: Review Changes** from Find Action, to browse supported pending tool edits, completed tool edits, and captured turns in one native dialog. Tool-card and **Changes** file links open the same review surface.
+2. For an edit awaiting approval, use **Approve tool call** or **Reject tool call**. Each decision applies to the entire tool call, including its other files. **Close** leaves approval pending. Loaded previews are checked again before approval; save or revert overlapping unsaved editor documents first.
+3. Edit the right side of a pending preview to draft a correction. **Request revision** rejects the original call and attaches your edited contents to chat. Send a message to ask the Agent for a revised edit and a new approval. The draft does not write files or change the original tool arguments; ordinary approval is disabled while that call has edited drafts.
+4. Turn snapshots require Git and a local Runtime managed by this IDE. Keep the session selected before starting the turn. Captured text comparisons are saved in the IDE system directory, scoped to this project and Runtime endpoint, for up to 30 days within bounded storage. Reopened snapshots are read-only and cannot restore files. Older turns that were never captured cannot be reconstructed as turn snapshots.
+
+For a captured local Git turn, **Revert file** restores one file, including captured creation, deletion or rename. **Revert block…** selects one remaining line block in a modified UTF-8 file of up to 1 MiB. Rollback preserves line endings and POSIX read/write permissions and rechecks disk contents, unsaved editor documents, Runtime identity and active-turn state. Partially reverted turns still support whole-turn restore. Saved history from a previous window stays read-only.
+
+Uncheck **Enable native change review** in **Settings → Tools → DeepSeek Harness** to disable the review center, revision drafts and snapshot capture. Changes take effect immediately; tool-card links still open ordinary read-only diffs. The Runtime's own approval policy remains separately configurable.
+
+Tool-card diffs use the connected Host's file preview API and can work without Git or a matching local file. They require supported structured edit data; shell edits may have no tool-card diff. A missing capability, binary or oversized file, or content that cannot be reconstructed reliably produces an error instead of a guessed comparison.
+
+If these entries are missing, report the plugin version, Harness version, whether the session uses a local or remote Runtime, and the edit tool name (or the displayed error) in [issue #28](https://github.com/HarcoChen/dsh-intellij-integration/issues/28).
+
 ### Put the right context into the conversation
 
 Use **DSH: Ask About Selection** for an open-ended question, or the **DSH** context menu for explain / fix / review / documentation tasks. The context picker also supports attaching the current unstaged Git diff. Editor context is bounded by the configurable byte limit.
@@ -87,6 +104,8 @@ not collected; attach any values needed for analysis manually.
 The endpoint cannot create arbitrary launch configurations or evaluate expressions.
 Externally managed Runtimes retain their own integrations.
 
+`debug_control` can list bridge-owned `executions` and stop or restart one by its `executionId`, or by the debug `sessionId` returned from `debug_start`. These actions cover configurations launched through this bridge, including `noDebug` runs. Restart waits for the exact prior process to exit and reuses the existing configuration. A timeout reports failure before a replacement is started.
+
 Product-specific debugger options and terminal context on the 2024.3 baseline are
 listed with API evidence in [TODO](TODO.md#platform-exceptions--deliberately-not-implemented).
 
@@ -96,7 +115,7 @@ The plugin manages local Runtime startup, shutdown, and restart. Automatic start
 
 Runtime 0.1.5 support includes transient assistant streaming across reconnects, V3 history and compaction records, submitted attachments, queued subagent prompts, and explicit Goal resume after reconnect. Mode selection follows Runtime policy, and skill menus show source paths on hover. The context ring still shows statistics on hover; click the model name to switch models.
 
-The default Runtime is now `0.2.1-rc.2`. The chat menu opens native **Manage sessions**, **Manage DeepSeek account**, and **Manage schedules** dialogs. Session management supports pinning and restoring archived sessions. Account management uses the Runtime's browser sign-in flow and shows profile, wallet balances, and bonus notices. Schedule management shows reminders across sessions; reminders owned by the current session can be edited or deleted, and delivery history can be inspected. In projects without a folder, the first explicit session can initialize the Runtime's default Workspace.
+The default Runtime is now `0.2.2-rc.1`. The chat menu opens native **Manage sessions**, **Manage DeepSeek account**, and **Manage schedules** dialogs. Session management supports pinning and restoring archived sessions. Account management uses the Runtime's browser sign-in flow and shows profile and wallet balances. It reads generic account notices when the Host exposes them and supports legacy bonus notices. Schedule management creates and edits Host tasks, pauses or resumes them, runs a task after confirmation, and shows delivery history. Timing includes one-time, interval, daily, weekly, Cron and RRULE rules. Delivery can use the current session, one reusable new session, or a fresh session each time. In projects without a folder, the first explicit session can initialize the Runtime's default Workspace.
 
 The IDE also bundles the shared Laya/Jev Runtime integration and mounts it into local Runtimes it starts. It is disabled by default. Enable it and selected decision features under **Settings → Tools → DeepSeek Harness**, configure a System One API key from the chat menu, then restart the Runtime. The key is stored in IntelliJ Password Safe. The endpoint accepts HTTPS or localhost/127.0.0.1 HTTP for local Laya; externally managed Runtimes are not modified.
 
@@ -106,17 +125,27 @@ Only a compatible Runtime advertised by an editor is reused automatically. The p
 
 Optional Agent Teams show members, tasks, dependencies, and write-scope warnings in the Activity Dock. Team members use the existing subagent history, follow-up, and interrupt controls. Enable the official Team profile bundle in the Runtime to use this feature; the plugin reads its Session projection.
 
-The **Session center** offers live search with requests needing attention first, grouped by Harness Workspace. The chat header shows the current working directory; historical file links and tool diffs resolve against the directory at the time of the operation. Current-file Problems can be selected from the attachment menu or `@diagnostics`, and Jobs include read-only execution history.
+The **Session center** offers live search with requests needing attention first, grouped by Harness Workspace. It also previews conversation text and supports rename, pin/unpin, archive/restore, and ordering within a Harness Workspace. The chat header shows the current working directory; historical file links and tool diffs resolve against the directory at the time of the operation. Current-file Problems can be selected from the attachment menu or `@diagnostics`, and Jobs include read-only execution history.
 
 Native choice dialogs for models, providers, presets, plugins, schedules, Workspaces and templates support keyword filtering. Use the arrow keys to select a result and Enter to confirm; Escape cancels.
 
-Use **Open Runtime terminal** in the chat menu to create or reattach a Host PTY. It retains its identity across session switching, restores its screen after reconnecting, and closes the Host process when its view is closed. Pending input is discarded on disconnect. This terminal is separate from the IDE terminal context feature.
+Use **Open Runtime terminal** in the chat menu to create or reattach a Host PTY. It retains its identity across session switching, restores its screen after reconnecting, and closes the Host process when its view is closed. Pending input is discarded on disconnect. Use **Attach selection to chat** or **Attach screen to chat** for an explicit one-shot context attachment of up to 64 KiB. This terminal is separate from the IDE terminal context feature.
 
-**Install or remove plugins** uses the Runtime's official package manager, with package inspection, explicit install/removal confirmation, build-script approval, progress and cancellation. Settings now offer guided Web search/fetch configuration, and custom providers expose schema-defined model reasoning levels. Runtime access grants govern available actions; readers cannot submit prompts or answer interactive requests without the corresponding permissions.
+**Install, update or remove plugins** uses the Runtime's official package manager, with package inspection, explicit install/removal confirmation, build-script approval, progress and cancellation. Settings now offer guided Web search/fetch configuration, and custom providers expose schema-defined model reasoning levels. Registry updates offer compatible newer versions. Git updates accept an explicit commit-pinned spec and version. Updates show progress, support cancellation, and report any recovery of the prior version. Runtime access grants govern available actions; readers cannot submit prompts or answer interactive requests without the corresponding permissions.
 
-Timed questions show the Host countdown and preserve answer drafts through reconnects and view recreation. Questions that continue after timeout can still be answered in the next turn. Jobs expose live output and cancellation, with bounded output tails and reconnect cursors. Plugin settings show Bundle selections and plugin switches, including read-only reasons and whether a change needs a restart. Schedule reminders require the optional Schedule bundle; enable it in plugin settings.
+Timed questions show the Host countdown and preserve answer drafts through reconnects and view recreation. Questions that continue after timeout can still be answered in the next turn. Jobs expose live output and cancellation, with bounded output tails and reconnect cursors. Plugin settings show Bundle selections and plugin switches, including read-only reasons and whether a change needs a restart. Current Runtimes include the Host Schedule service. Older deployments may require enabling the Schedule bundle in plugin settings.
+
+Use **DSH: Headless Tasks** from Find Action or Tools, or **Headless tasks** from the chat menu, to run a local one-shot task. Choose its local directory, optional permission preset and timeout. Tasks use the configured CLI and the `headless` profile. The prompt goes through stdin. The window shows answers, run events, diagnostics and explicit truncation notices, and supports cancellation, running again in a fresh Session, continuing an ended Session, copying answers and exporting a retained JSON snapshot.
+
+Closing the task window keeps its tasks running. Closing the project cancels active tasks. Up to four tasks and twenty recent runs are retained in the project service during this IDE session. The Harness Session itself persists in its configured home. An optional Session id lets you continue it later, subject to the CLI's directory and profile checks. Headless permissions and interaction outcomes follow its noninteractive profile policy. API-key credentials come from the plugin's Password Safe entry or the launch environment and `.env` configuration. The shipped headless profile's credential rules are documented upstream. [Headless profile reference](https://github.com/deepseek-ai/deepseek-harness/tree/master/packages/bundle/headless#credentials)
+
+Choose **Export conversation** from the chat menu or **DSH: Export Conversation** from Find Action to save Markdown or JSON through the IDE's save dialog. Markdown contains conversation text and attachment markers. JSON retains the bounded event history and projections. Exports report incomplete history when the Session exceeds the history limit.
+
+Enable the Runtime's **Change requests & worktrees** bundle, then use **Changes and worktrees** in the chat menu or **DSH: Changes and Worktrees** in Find Action. The native panel shows the Host checkout, bound change requests, checks and review threads. It reads local Git changes by scope and change request patches, and can track a change request URL. Before the first turn, request a worktree from HEAD or a chosen base branch. Pending requests can be cancelled and failed creation can be retried. The Host applies its sandbox and validates each operation.
 
 Use **DSH: Browse Runtime Workspace Files** from Find Action or `/ide` to browse the selected Session’s Host files. Native previews are read-only UTF-8 text up to 1 MiB, refresh on Host file changes, and remain bound to their Runtime. **DSH: Refresh Runtime File Previews** provides manual refresh.
+
+In the Forge panel, **Review and merge actions** publishes reviews and line comments, replies to or resolves discussions, submits or discards pending reviews, marks drafts ready, and merges with a repository-supported method. Available Host capabilities also offer failed-check reruns, reviewer selection and branch updates. Each write shows the URL, reviewed head and action for confirmation. Head changes reject stale actions. An unconfirmed outcome asks you to check the code host before another attempt.
 
 API keys are stored in IntelliJ **Password Safe** and passed to a newly started local Runtime. The UI includes English and Simplified Chinese resources.
 
@@ -131,7 +160,8 @@ Open **Settings | Tools | DeepSeek Harness**.
 | Server URL / Port | `""` / `0` | Prefer an already running DSH Runtime; port `0` selects an available port for local startup. |
 | Auto start | `true` | Start or connect to the Runtime when the project opens. |
 | Send with Enter | Disabled | Enable Enter to send and Shift+Enter to insert a new line. Ctrl/Cmd+Enter sends in either mode; changes apply immediately. |
-| Runtime version | `0.2.1-rc.2` | Version for explicit package-manager launch commands; the minimum supported local Runtime is `0.1.5-rc.1`. |
+| Native change review | Enabled | Review pending edits, draft corrections and capture local Git turns. Disable without restarting the Runtime. |
+| Runtime version | `0.2.2-rc.1` | Version for explicit package-manager launch commands; the minimum supported local Runtime is `0.1.5-rc.1`. |
 | Autonomous debugger | Disabled | Local MCP access to existing IDE configurations and public debugger controls; restart an owned Runtime after enabling. |
 | Laya/Jev integration | Disabled | Bundled System One integration for locally started Runtimes; the endpoint, model, and optional policies are configurable. |
 | npm registry | `https://registry.npmmirror.com` | Registry mirror used as a download fallback. |

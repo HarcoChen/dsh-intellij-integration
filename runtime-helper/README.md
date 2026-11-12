@@ -18,7 +18,7 @@ only at runtime. The TypeScript entry point can also be checked with TypeScript 
 Node type definitions, `--noEmit --strict --target ES2022 --module commonjs
 --moduleResolution node --esModuleInterop --skipLibCheck`.
 
-The current Remote/default-version pin is `dsh-v0.2.1-rc.2`; local-upgrade prompts
+The current default version is `dsh-v0.2.2-rc.1`; local-upgrade prompts
 now direct fallback to official Desktop installation. Recovery algorithms retain
 the vendor baseline below. See `../RPC_0.2.0_RC2_ADAPTATION.md` for the Java and
 Webview migration and its integration validation.

@@ -5,6 +5,127 @@ An item is complete only after the host action, runtime protocol, projected stat
 
 Status: `[x]` implemented, `[-]` usable but not yet at VS Code parity, `[ ]` not implemented.
 
+## PR #29 review fixes — 2026-11-12
+
+- [x] Coordinate Forge writes across panels by Runtime/Session/URL and compare the acknowledged
+  uncertainty before reserving a write. Isolated IDE acceptance covers simultaneous writers,
+  stale confirmations, cancellation and pre-dispatch failure. Release version prepared as 0.5.0.
+- [x] Follow-up review locks drafts during submission, gates block rollback by file capability,
+  rejects incomplete review history, and retains Forge uncertainty when final confirmation is canceled.
+- [x] Schedule reads wait for connection readiness and recover from failed reads with a five-second
+  retry fenced by Session, connection and controller lifetime. Parameter refusals remain definite;
+  resuming ended one-shot tasks collects a future timing rule.
+- [x] Isolated native IDE acceptance covers pending draft locks and recovery, block-action availability,
+  and loopback HTTP failure injection for same-generation Schedule recovery, error classification
+  and cancellation after controller close. External Forge confirmations remain manual acceptance.
+- [x] Preserve editable review drafts when revision attachment fails; retry against the original
+  Session without submitting the rejection twice. Disabling review uses draft-discard confirmation.
+- [x] Prepare Headless continuation explicitly, retain custom launcher entry arguments and report
+  diagnostic-line truncation. Check Run configuration availability before stopping for restart.
+- [x] Build the tool review catalog with a single ledger index. Session previews read at most 160
+  records and stop subsequent pagination when selection, authorization or connection changes.
+- [x] Refresh Schedule and subagent caches after reconnect; fence closed Schedule controllers.
+  Unconfirmed create/run outcomes require checking the catalog/history before another attempt.
+- [x] Keep Forge uncertain outcomes across windows, scoped to Runtime/Session/URL, and retain
+  the selected change request by URL. Capture terminal context after queued parsing completes.
+- [x] Report account notices when actually shown; finish the notice flow before opening the
+  account menu once. Reject oversized file-count archives before replacing saved history.
+- [x] Real isolated IntelliJ acceptance covers revision attachment failure/retry with editable
+  documents and one rejection, rejected restart retaining the process, archive limits preserving
+  previous history, and the existing rollback/lifecycle paths. Official CLI Headless acceptance
+  covers custom scripts without Web flags, diagnostic truncation, resume, cancellation and timeout.
+  Formatting, lint, compilation, plugin packaging, IC/PC compatibility and terminal TypeScript pass.
+- [ ] Full window interaction, signed-in account notices and external Forge outcomes still need
+  manual acceptance. No unit tests or temporary acceptance classes were added to the repository.
+
+## Headless tasks — 2026-11-12
+
+- [x] Native Headless tasks window from Find Action, Tools and the chat menu.
+- [x] Reuse local CLI discovery, configured launcher prefixes and API-key environment injection.
+  Web-app flags are removed when selecting the headless profile.
+- [x] Send task bodies through stdin, decode bounded JSONL events, retain final answers,
+  event tails and diagnostics, and report truncation and CLI failures.
+- [x] Run again in a fresh Session, continue a completed task's Session, or supply an existing
+  Session id with the matching local working directory. Concurrent adoption of a tracked
+  active Session is rejected and mismatched CLI identities stop the affected task.
+- [x] Per-task cancellation, forced cleanup, deadlines and project disposal use the IDE's
+  owned process handlers. Closing the task window leaves its runs available in the project service.
+- [x] Export a retained task snapshot as JSON or copy its answer. The service keeps up to
+  twenty recent runs and four active runs for this project session.
+- [x] Real IntelliJ 2024.3.6 acceptance covers stdin isolation, UTF-8 event framing, directories
+  containing spaces, resume, active-session rejection, mismatched receipts, CLI failure,
+  oversized output, forced cancellation, a one-minute deadline, disposal and atomic JSON export.
+  An unrelated sentinel process survives task cancellation.
+- [x] The official installed `0.2.2-rc.1` CLI completes a task and adopts its persisted Session
+  against a loopback model provider. The Web Runtime remains unstarted during these runs.
+- [ ] Native window interaction and Windows/Linux process execution need platform acceptance.
+  Headless permissions and interaction outcomes follow that profile's noninteractive policy.
+
+## Maintenance — 2026-11-11
+
+Audited current Harness master `e8f7b93a344964de3dca1ace9e72b6e4d6de87cb`
+(`0.2.2-rc.2`). The default Runtime is the published and exercised `0.2.2-rc.1`.
+The companion Webview uses the audited `96d3aaf` source plus the IntelliJ adapters.
+
+- [x] Accept atomic per-event `changes: [{key, val}]` projection frames and legacy key/value frames.
+- [x] Prefer durable Inbox projections for queued/steering messages; retain the legacy queue fallback.
+- [x] Explicitly activate persistent chat follows; keep one-shot history/preview follows passive.
+- [x] Issue #28: centralized native review, editable correction drafts via reject-and-resubmit,
+  whole-call approval, drift/dirty-document guards, and an immediately effective settings switch.
+- [x] Bounded project/endpoint-scoped persisted text snapshots; reopened history is read-only.
+- [x] Runtime terminal selection/screen context and Session center preview/management.
+- [x] Java compilation, formatting, Checkstyle, plugin ZIP build and IC/PC 2024.3.6
+  Plugin Verifier. Terminal TypeScript strict checking and both browser bundle rebuilds pass.
+- [x] Isolated installed Runtime `0.2.2-rc.1` with a temporary DSH_HOME: Java authentication,
+  Mux, both follow activation modes, real batched projection reduction matching a fresh Host
+  read, and multipart UTF-8 file preview pass. No model requests or unit tests were added.
+- [x] Host-wide Schedule create/edit/delete, pause/resume, explicit run, revision conflicts,
+  delivery history, seven timing kinds including RRULE, destination selection and change-event refresh.
+- [x] Registry/Git bundle updates, compatible version choices, confirmation, progress,
+  cancellation and presentation of the Host's previous-version restoration result.
+- [x] Latest Team tasks and owner names, legacy roster support and live subagent-catalog refresh.
+- [x] Generic account notices with legacy fallback, credential/connection fencing,
+  expiry, ordered display and action receipts. Live signed-in notification delivery still needs acceptance.
+- [x] Native Forge panel with checkout and change request overview, scoped Host Git patches,
+  change request patches, checks, review-thread reads, tracking and worktree request/cancel/retry.
+- [x] Conversation export to Markdown or JSON through native save, with bounded-history reporting.
+- [x] Isolated real published `0.2.2-rc.1` integration covers task creation, pause, stale-revision
+  conflict, delivery history and deletion, RRULE normalization into the Activity Dock,
+  Team normalization, Forge stream and Git diff,
+  worktree request/cancel, and package install/version-list/update through a loopback registry.
+  The published Runtime exposes the legacy account API, whose fallback was verified.
+- [ ] Source `0.2.2-rc.2` generic notification delivery, real signed-in Forge checks/reviews,
+  and Git-host package updates require their corresponding account or remote-host acceptance.
+- [x] Per-file and line-block rollback of captured local turns, partial-turn tracking, disk drift
+  and unsaved-document guards, exact Runtime ownership checks, and CRLF/EOF handling.
+- [x] Forge review and inline comment publication, thread reply/resolve, pending-review submit/discard,
+  ready/merge controls and optional check/reviewer/branch operations, with head and outcome checks.
+- [x] Debugger execution inventory and bridge-owned stop/restart, including noDebug runs,
+  exact launch attribution, process-exit waiting and listener cleanup.
+- [x] Isolated IntelliJ 2024.3.6 acceptance exercises real Git captures, partial and whole-turn
+  rollback, stale previews, disk conflicts, add/delete/rename restoration, actual unsaved IDE
+  documents, missing final newlines, empty files, POSIX read/write permissions, and real IDE
+  execution listing/launch/restart/stop. Git index and HEAD remain intact.
+- [x] A local provider inside the real Runtime exercises review/inline-comment publication,
+  stale and unknown outcomes, marking ready and head-bound merge. No external review was published.
+- [ ] Source-only Forge discussion writes and check/reviewer/branch controls still need acceptance
+  against a Host that exposes those newer optional methods, followed by signed-in UI acceptance.
+- [ ] Installed IntelliJ/PyCharm interaction: multi-file review, correction submission, settings
+  toggling, restart history, terminal capture, Session center, the save dialog and the native
+  Schedule/Forge panels remain manual acceptance.
+
+### Same-category plugin comparison
+
+Reviewed project READMEs on 2026-11-11. The comparison covers DSH IntelliJ/JetBrains plugins.
+These are the projects' published feature claims.
+
+| Plugin | Relevant features | This plugin's coverage |
+| --- | --- | --- |
+| [DSH Studio](https://github.com/skansgai/dsh-studio) | Embedded Host WebUI, Runtime lifecycle, selection context, recent sessions, headless tasks | Native chat, lifecycle, editor context, Session center and headless task UI are implemented. |
+| [DSH Lite](https://github.com/EPCN-fla/dsh-lite-idea) | ACP chat, model/preset/permission controls, skills, Session export | Chat controls, skills and Markdown/JSON export are implemented. |
+| [DSH ⇄ JetBrains](https://github.com/abadiegie/dsh-jetbrains) | Shared IDE context, turn diffs, persisted reviews and per-file/hunk revert | Context, native turn/tool diffs, saved reviews, whole-turn restore and per-file/line-block rollback are implemented. |
+| [DeepSeek Harness WebUI](https://github.com/Chocomintopia/dsh-jetbrains-plugin) | Embedded official WebUI, fixed DeepSeek Chat tab and reload action | Native integrated chat, Runtime reconnect and browser entry are implemented. |
+
 ## Current parity — dsh-ide v0.11.0（2026-10-19）
 
 Target: companion `96d3aaff973879617b82f9187d4b2d344a12f5ed` and Harness
@@ -41,11 +162,11 @@ The bundled Jev gitlink remains `e5d74c5`. Scope and validation boundaries are t
 
 These are feasible extensions, not implemented feature paths or current parity claims:
 
-- [ ] Attach selected text or the current screen from the Runtime-owned terminal as bounded,
+- [x] Attach selected text or the current screen from the Runtime-owned terminal as bounded,
   explicit one-shot context. This does not require the newer IDE terminal API.
-- [ ] Add stop/restart controls to the optional debugger tools for existing IDE-launched
+- [x] Add stop/restart controls to the optional debugger tools for bridge-launched
   sessions, with process ownership and session identity checks.
-- [ ] Add preview and management actions directly to Session center, reusing the existing
+- [x] Add preview and management actions directly to Session center, reusing the existing
   rename/archive/pin/move flows rather than opening a separate session manager.
 
 ### Completed differences

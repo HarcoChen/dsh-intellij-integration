@@ -49,6 +49,7 @@ final class DshActionAccess {
                         "insertCode",
                         "applyCode",
                         "openInEditor",
+                        "openHeadlessTasks",
                         "showWhatsNew")
                 .contains(type)) return true;
         if (type.equals("switchSession"))
@@ -78,6 +79,7 @@ final class DshActionAccess {
                     case "archiveSession" -> "workspace/archiveSession";
                     case "killJob" -> "job/kill";
                     case "openRuntimeTerminal" -> "terminal/attach";
+                    case "openForge" -> "forgePanel/follow";
                     case "goalCreate" -> "goal/create";
                     case "goalEdit" -> "goal/edit";
                     case "goalPause" -> "goal/pause";
@@ -99,6 +101,8 @@ final class DshActionAccess {
                             "openFileLocation",
                             "openChangeDiff",
                             "openToolDiff",
+                            "reviewChanges",
+                            "exportConversation",
                             "browseRuntimeFiles",
                             "refreshRuntimeFile",
                             "openTeamMember" ->
