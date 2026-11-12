@@ -221,12 +221,12 @@ final class DshSessionActionsController {
         private final List<String> ids = new ArrayList<>();
         private final Consumer<DshRemoteState.Snapshot> listener =
                 ignored -> ApplicationManager.getApplication().invokeLater(this::render);
-        private boolean closed;
+        private volatile boolean closed;
         private final javax.swing.JCheckBox showArchived =
                 new javax.swing.JCheckBox(DshBundle.message("dsh.session.center.show.archived"));
         private final javax.swing.JTextArea preview = new javax.swing.JTextArea();
         private final javax.swing.JLabel result = new javax.swing.JLabel(" ");
-        private int previewEpoch;
+        private volatile int previewEpoch;
         private boolean rendering;
         private String previewSession;
         private final long generation = remote.snapshot().generation;
@@ -556,7 +556,21 @@ final class DshSessionActionsController {
                             if (!remote.access().allows("session/follow", "session", id))
                                 throw new IllegalStateException(
                                         DshBundle.message("dsh.remote.access.denied"));
-                            JsonObject history = remote.traceHistory(id, 80);
+                            JsonObject history =
+                                    remote.traceHistory(
+                                            id,
+                                            80,
+                                            160,
+                                            () ->
+                                                    closed
+                                                            || epoch != previewEpoch
+                                                            || remote.snapshot().generation
+                                                                    != generation
+                                                            || !remote.access()
+                                                                    .allows(
+                                                                            "session/follow",
+                                                                            "session",
+                                                                            id));
                             StringBuilder buffer = new StringBuilder(id + "\n\n");
                             for (JsonObject entry : DshToolDiff.entries(history)) {
                                 JsonObject event = DshWorkingDirectory.event(entry);
@@ -595,7 +609,10 @@ final class DshSessionActionsController {
         private void appendPreviewText(JsonElement value, StringBuilder text) {
             if (value == null || text.length() >= 32000) return;
             if (value.isJsonPrimitive() && value.getAsJsonPrimitive().isString())
-                text.append(value.getAsString());
+                text.append(
+                        value.getAsString(),
+                        0,
+                        Math.min(value.getAsString().length(), 32000 - text.length()));
             else if (value.isJsonArray())
                 for (JsonElement item : value.getAsJsonArray()) appendPreviewText(item, text);
             else if (value.isJsonObject() && value.getAsJsonObject().has("text"))

@@ -69,6 +69,7 @@ final class DshReviewDialog extends DialogWrapper {
     private final Map<File, DocumentContent> drafts = new HashMap<>();
     private final Map<File, Content> contents = new HashMap<>();
     private final Set<String> settled = new HashSet<>();
+    private final Set<String> revisionRejected = new HashSet<>();
     private Action approve;
     private Action reject;
     private Action revise;
@@ -86,8 +87,10 @@ final class DshReviewDialog extends DialogWrapper {
                 .invokeLater(
                         () -> {
                             if (!closed
-                                    && !DshSettingsState.getInstance(project).enableChangeReview)
-                                close(CANCEL_EXIT_CODE);
+                                    && !DshSettingsState.getInstance(project).enableChangeReview) {
+                                updateActions();
+                                doCancelAction();
+                            }
                         });
     }
 
@@ -163,12 +166,14 @@ final class DshReviewDialog extends DialogWrapper {
                                                     if (file.approvalKey() != null) {
                                                         String state =
                                                                 states.get(file.approvalKey());
-                                                        if (state == null
-                                                                || java.util.Set.of(
-                                                                                "resolved",
-                                                                                "unavailable",
-                                                                                "cancelled")
-                                                                        .contains(state))
+                                                        if (!revisionRejected.contains(
+                                                                        file.approvalKey())
+                                                                && (state == null
+                                                                        || java.util.Set.of(
+                                                                                        "resolved",
+                                                                                        "unavailable",
+                                                                                        "cancelled")
+                                                                                .contains(state)))
                                                             settled.add(file.approvalKey());
                                                         if (settled.contains(file.approvalKey())
                                                                 && drafts.containsKey(file))
@@ -365,15 +370,21 @@ final class DshReviewDialog extends DialogWrapper {
         File file = selected();
         boolean pending =
                 !busy
+                        && DshSettingsState.getInstance(project).enableChangeReview
                         && file != null
                         && file.decide() != null
                         && contents.containsKey(file)
                         && !settled.contains(file.approvalKey());
-        approve.setEnabled(pending && !groupChanged(file));
-        reject.setEnabled(pending);
+        boolean rejected = file != null && revisionRejected.contains(file.approvalKey());
+        approve.setEnabled(pending && !rejected && !groupChanged(file));
+        reject.setEnabled(pending && !rejected);
         revise.setEnabled(pending && groupChanged(file));
         boolean canRevert =
-                !busy && file != null && file.rollback() != null && !reverted.contains(file);
+                !busy
+                        && DshSettingsState.getInstance(project).enableChangeReview
+                        && file != null
+                        && file.rollback() != null
+                        && !reverted.contains(file);
         revertFile.setEnabled(canRevert);
         revertHunk.setEnabled(canRevert && contents.containsKey(file));
         list.setEnabled(!busy);
@@ -412,6 +423,7 @@ final class DshReviewDialog extends DialogWrapper {
                 || file == null
                 || file.decide() == null
                 || settled.contains(file.approvalKey())
+                || (!revision && revisionRejected.contains(file.approvalKey()))
                 || !DshSettingsState.getInstance(project).enableChangeReview) return;
         JsonObject item = new JsonObject();
         if (revision) {
@@ -461,7 +473,9 @@ final class DshReviewDialog extends DialogWrapper {
                 .thenCompose(
                         failure ->
                                 failure == null
-                                        ? file.decide().apply(outcome)
+                                        ? revisionRejected.contains(file.approvalKey())
+                                                ? CompletableFuture.completedFuture(null)
+                                                : file.decide().apply(outcome)
                                         : CompletableFuture.completedFuture(failure))
                 .whenComplete(
                         (failure, error) ->
@@ -475,16 +489,29 @@ final class DshReviewDialog extends DialogWrapper {
                                                     else if (failure != null)
                                                         status.setText(failure);
                                                     else {
-                                                        settled.add(file.approvalKey());
                                                         if (revision) {
-                                                            String attachError =
-                                                                    attachRevision.apply(item);
+                                                            revisionRejected.add(
+                                                                    file.approvalKey());
+                                                            String attachError;
+                                                            try {
+                                                                attachError =
+                                                                        attachRevision.apply(item);
+                                                            } catch (
+                                                                    RuntimeException
+                                                                            attachmentFailure) {
+                                                                attachError =
+                                                                        DshJson.message(
+                                                                                attachmentFailure);
+                                                            }
+                                                            if (attachError == null) {
+                                                                revisionRejected.remove(
+                                                                        file.approvalKey());
+                                                                settled.add(file.approvalKey());
+                                                            }
                                                             status.setText(
-                                                                    attachError == null
-                                                                            ? DshBundle.message(
-                                                                                    "dsh.review.revision.ready")
-                                                                            : attachError);
-                                                        } else
+                                                                    revisionStatus(attachError));
+                                                        } else {
+                                                            settled.add(file.approvalKey());
                                                             status.setText(
                                                                     DshBundle.message(
                                                                             "allowed-once"
@@ -492,11 +519,14 @@ final class DshReviewDialog extends DialogWrapper {
                                                                                                     outcome)
                                                                                     ? "dsh.review.approved"
                                                                                     : "dsh.review.rejected"));
+                                                        }
                                                         for (File other : files)
                                                             if (file.approvalKey()
                                                                             .equals(
                                                                                     other
                                                                                             .approvalKey())
+                                                                    && settled.contains(
+                                                                            file.approvalKey())
                                                                     && drafts.containsKey(other))
                                                                 drafts.get(other)
                                                                         .getDocument()
@@ -504,6 +534,12 @@ final class DshReviewDialog extends DialogWrapper {
                                                     }
                                                     updateActions();
                                                 }));
+    }
+
+    private static String revisionStatus(String failure) {
+        return failure == null
+                ? DshBundle.message("dsh.review.revision.ready")
+                : failure + "\n" + DshBundle.message("dsh.review.revision.retry");
     }
 
     private static String errorMessage(Throwable error) {

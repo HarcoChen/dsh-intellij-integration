@@ -97,9 +97,11 @@ public final class DshRuntimeService implements Disposable {
 
     /** Local working-tree capture is only valid for a Runtime launched by this IDE. */
     boolean hasLocalProcess() {
+        Process localProcess = process;
+        Process localHelper = managedHelper;
         return DshRuntimeEndpoint.parse(baseUrl, true) != null
-                && ((process != null && process.isAlive())
-                        || (managedHelper != null && managedHelper.isAlive()));
+                && ((localProcess != null && localProcess.isAlive())
+                        || (localHelper != null && localHelper.isAlive()));
     }
 
     public String runtimeVersion() {
@@ -594,12 +596,16 @@ public final class DshRuntimeService implements Disposable {
             int end = profile;
             if (profile > 0 && candidate.get(profile - 1).equals("--profile")) end--;
             if (end < 0) {
-                end = 1;
+                end = -1;
                 for (int index = 1; index < candidate.size(); index++)
                     if (candidate.get(index).startsWith(RUNTIME_PACKAGE)) {
                         end = index + 1;
                         break;
                     }
+                if (end < 0) {
+                    end = candidate.lastIndexOf("--port");
+                    if (end < 0) end = candidate.size();
+                }
             }
             List<String> command = new ArrayList<>(candidate.subList(0, Math.max(1, end)));
             command.set(0, resolveExecutable(command.get(0), environment));

@@ -161,6 +161,7 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
     private volatile String followedSession;
     private volatile String lastScheduleSession;
     private volatile long lastScheduleEpoch = Long.MIN_VALUE;
+    private volatile long lastScheduleGeneration = Long.MIN_VALUE;
     private volatile String featureCatalogEpoch;
     private volatile long projectedCursor = Long.MIN_VALUE;
     private volatile JsonArray projectedEvents;
@@ -496,9 +497,12 @@ public final class DshToolWindowPanel extends JPanel implements com.intellij.ope
             if (team != null) subagents.observeTeam(selected, team);
             subagents.observeCatalog(selected, cellValue(selected, "subagentCatalog"));
             long scheduleEpoch = remote.settingsEpoch();
-            if (!selected.equals(lastScheduleSession) || scheduleEpoch != lastScheduleEpoch) {
+            if (!selected.equals(lastScheduleSession)
+                    || scheduleEpoch != lastScheduleEpoch
+                    || current.generation != lastScheduleGeneration) {
                 lastScheduleSession = selected;
                 lastScheduleEpoch = scheduleEpoch;
+                lastScheduleGeneration = current.generation;
                 sessionActions.invalidateModelCatalog();
                 schedules.refreshCurrent(selected);
                 operations.execute(

@@ -75,16 +75,13 @@ final class DshDiffController {
                     try {
                         List<DshReviewDialog.File> files = new ArrayList<>();
                         JsonObject history = remote.traceHistory(current, 160);
+                        var callStates = DshToolDiff.callDiffStates(history);
                         java.util.Set<String> callIds =
                                 new java.util.LinkedHashSet<>(approvals.keySet());
-                        for (JsonObject entry : DshToolDiff.entries(history)) {
-                            String id = DshToolDiff.callIdOf(entry);
-                            if (id != null) callIds.add(id);
-                        }
+                        callIds.addAll(callStates.keySet());
                         for (String callId : callIds) {
                             if (selectedCall != null && !selectedCall.equals(callId)) continue;
-                            DshToolDiff.CallDiffState state =
-                                    DshToolDiff.callDiffState(history, callId);
+                            DshToolDiff.CallDiffState state = callStates.get(callId);
                             if (state == null) continue;
                             String key = state.settled ? null : approvals.get(callId);
                             for (String path : DshToolDiff.diffViewPaths(state.view)) {
@@ -194,7 +191,13 @@ final class DshDiffController {
                                                             files,
                                                             selected,
                                                             operations,
-                                                            attachRevision);
+                                                            item ->
+                                                                    remote.snapshot().generation
+                                                                                    != generation
+                                                                            ? DshBundle.message(
+                                                                                    "dsh.runtime.changed")
+                                                                            : attachRevision.apply(
+                                                                                    item));
                                             dialog.bind(remote, current, generation);
                                             dialog.show();
                                         });

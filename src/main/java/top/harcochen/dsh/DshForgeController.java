@@ -30,6 +30,10 @@ import top.harcochen.dsh.remote.DshRemoteState;
 
 /** Optional Forge reads and worktree requests through the Host's sandbox-aware API. */
 final class DshForgeController {
+    private record UncertainWrite(String runtime, String session, String url) {}
+
+    private static final com.intellij.openapi.util.Key<Set<UncertainWrite>> UNCERTAIN_WRITES =
+            com.intellij.openapi.util.Key.create("dsh.forge.uncertainWrites");
     private final Project project;
     private final DshRemoteService remote;
     private final ExecutorService operations;
@@ -61,6 +65,7 @@ final class DshForgeController {
     private final class Panel extends DialogWrapper {
         private final String session;
         private final long generation;
+        private final String runtime;
         private final JTextArea overview = new JTextArea();
         private final DefaultListModel<String> labels = new DefaultListModel<>();
         private final JList<String> requests = new JList<>(labels);
@@ -70,7 +75,7 @@ final class DshForgeController {
         private volatile JsonObject latest;
         private boolean mutating;
         private final List<JButton> writeButtons = new ArrayList<>();
-        private final Set<String> uncertain = new java.util.HashSet<>();
+        private final Set<UncertainWrite> uncertain;
         private final Consumer<DshRemoteState.Snapshot> listener =
                 ignored -> {
                     if (!current())
@@ -85,6 +90,13 @@ final class DshForgeController {
             super(project, false);
             this.session = session;
             this.generation = remote.snapshot().generation;
+            this.runtime = DshRuntimeService.getInstance(project).getUrl();
+            Set<UncertainWrite> saved = project.getUserData(UNCERTAIN_WRITES);
+            if (saved == null) {
+                saved = java.util.concurrent.ConcurrentHashMap.newKeySet();
+                project.putUserData(UNCERTAIN_WRITES, saved);
+            }
+            this.uncertain = saved;
             setTitle(DshBundle.message("dsh.forge.title"));
             setModal(false);
             overview.setEditable(false);
@@ -197,7 +209,12 @@ final class DshForgeController {
                 return;
             }
             latest = state.deepCopy();
-            int selected = requests.getSelectedIndex();
+            int selectedIndex = requests.getSelectedIndex();
+            JsonObject selected =
+                    selectedIndex >= 0 && selectedIndex < rows.size()
+                            ? rows.get(selectedIndex)
+                            : null;
+            String selectedUrl = selected == null ? null : DshJson.string(selected, "url");
             labels.clear();
             rows.clear();
             StringBuilder summary = new StringBuilder(DshJson.string(state, "directory"));
@@ -239,8 +256,13 @@ final class DshForgeController {
             }
             overview.setText(summary.substring(0, Math.min(summary.length(), 150000)));
             overview.setCaretPosition(0);
-            if (!rows.isEmpty())
-                requests.setSelectedIndex(Math.max(0, Math.min(selected, rows.size() - 1)));
+            if (selectedUrl != null) {
+                for (int i = 0; i < rows.size(); i++)
+                    if (selectedUrl.equals(DshJson.string(rows.get(i), "url"))) {
+                        requests.setSelectedIndex(i);
+                        break;
+                    }
+            } else if (!rows.isEmpty()) requests.setSelectedIndex(0);
         }
 
         private JsonObject selectedRequest() {
@@ -879,14 +901,15 @@ final class DshForgeController {
                 return;
             }
             String url = DshJson.string(row, "url");
-            if (uncertain.contains(url)) {
+            UncertainWrite key = new UncertainWrite(runtime, session, url);
+            if (uncertain.contains(key)) {
                 if (Messages.showYesNoDialog(
                                 project,
                                 DshBundle.message("dsh.forge.unknown.confirm", url),
                                 DshBundle.message("dsh.forge.title"),
                                 Messages.getWarningIcon())
                         != Messages.YES) return;
-                uncertain.remove(url);
+                uncertain.remove(key);
             }
             String head = DshJson.string(row.getAsJsonObject("snapshot"), "headSha");
             if (Messages.showYesNoDialog(
@@ -950,13 +973,12 @@ final class DshForgeController {
                         if (unknown && !message.equals(DshBundle.message("dsh.forge.unknown")))
                             message = DshBundle.message("dsh.forge.unknown") + "\n" + message;
                         String notice = message;
-                        boolean uncertainOutcome = unknown;
+                        if (unknown) uncertain.add(key);
                         ApplicationManager.getApplication()
                                 .invokeLater(
                                         () -> {
                                             mutating = false;
                                             if (!current()) return;
-                                            if (uncertainOutcome) uncertain.add(url);
                                             updateWriteActions();
                                             notify.accept(notice);
                                         });

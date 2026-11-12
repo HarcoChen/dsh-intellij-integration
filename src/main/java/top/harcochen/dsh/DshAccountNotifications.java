@@ -27,7 +27,6 @@ final class DshAccountNotifications {
     private final Project project;
     private final DshRemoteService remote;
     private final ExecutorService operations;
-    private final Runnable openAccount;
     private final Consumer<String> errorSink;
     private final AtomicBoolean draining = new AtomicBoolean();
 
@@ -35,12 +34,10 @@ final class DshAccountNotifications {
             Project project,
             DshRemoteService remote,
             ExecutorService operations,
-            Runnable openAccount,
             Consumer<String> errorSink) {
         this.project = project;
         this.remote = remote;
         this.operations = operations;
-        this.openAccount = openAccount;
         this.errorSink = errorSink;
     }
 
@@ -116,6 +113,7 @@ final class DshAccountNotifications {
                                     return dialog;
                                 });
                 if (shown != null) shown.reporting.get(10, TimeUnit.SECONDS);
+                if (shown != null && shown.accountRequested) break;
             }
             return true;
         } catch (DshRemoteException missing) {
@@ -179,6 +177,7 @@ final class DshAccountNotifications {
         private boolean disposed;
         private javax.swing.Timer expiry;
         private CompletableFuture<Void> reporting = CompletableFuture.completedFuture(null);
+        private boolean accountRequested;
 
         NoticeDialog(
                 JsonObject notice,
@@ -203,6 +202,14 @@ final class DshAccountNotifications {
             text.setEditable(false);
             text.setLineWrap(true);
             text.setWrapStyleWord(true);
+            text.addHierarchyListener(
+                    event -> {
+                        if ((event.getChangeFlags() & java.awt.event.HierarchyEvent.SHOWING_CHANGED)
+                                        != 0
+                                && text.isShowing()
+                                && !disposed
+                                && current()) report("displayed");
+                    });
             return new JScrollPane(text);
         }
 
@@ -226,7 +233,8 @@ final class DshAccountNotifications {
                                     doCancelAction();
                                 else {
                                     report("cta_clicked");
-                                    openAccount.run();
+                                    accountRequested = true;
+                                    close(OK_EXIT_CODE);
                                 }
                             }
                         });
@@ -249,11 +257,6 @@ final class DshAccountNotifications {
                                                         .isAfter(Instant.now()))) expire();
                             });
             expiry.start();
-            ApplicationManager.getApplication()
-                    .invokeLater(
-                            () -> {
-                                if (!disposed && current()) report("displayed");
-                            });
             super.show();
         }
 

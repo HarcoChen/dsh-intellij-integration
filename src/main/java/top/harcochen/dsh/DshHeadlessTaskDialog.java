@@ -188,10 +188,10 @@ final class DshHeadlessTaskDialog extends DialogWrapper {
                             if (selected == null
                                     || selected.active()
                                     || selected.row().sessionId().isEmpty()) return;
-                            directory.setText(selected.request().directory());
+                            load(selected.request());
+                            prompt.setText("");
                             session.setText(selected.row().sessionId());
                             prompt.requestFocusInWindow();
-                            if (!prompt.getText().isBlank()) start();
                         });
         copy =
                 action(

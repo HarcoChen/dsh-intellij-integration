@@ -12,6 +12,7 @@ final class DshHeadlessOutput {
     private final StringBuilder pending = new StringBuilder();
     private boolean dropping;
     private boolean oversized;
+    private boolean diagnosticTruncated;
 
     static final class Tail {
         private final StringBuilder text = new StringBuilder();
@@ -75,7 +76,11 @@ final class DshHeadlessOutput {
         return oversized;
     }
 
-    private static void line(String line, Consumer<JsonObject> event, Consumer<String> diagnostic) {
+    boolean diagnosticTruncated() {
+        return diagnosticTruncated;
+    }
+
+    private void line(String line, Consumer<JsonObject> event, Consumer<String> diagnostic) {
         if (line.isBlank()) return;
         try {
             JsonElement value = JsonParser.parseString(line);
@@ -90,6 +95,11 @@ final class DshHeadlessOutput {
         } catch (RuntimeException invalid) {
             // CLI startup diagnostics can precede the event stream.
         }
-        diagnostic.accept(line.substring(0, Math.min(line.length(), 8192)) + "\n");
+        int end = Math.min(line.length(), 8192);
+        if (end < line.length()) {
+            if (Character.isHighSurrogate(line.charAt(end - 1))) end--;
+            diagnosticTruncated = true;
+        }
+        diagnostic.accept(line.substring(0, end) + (end < line.length() ? " [truncated]\n" : "\n"));
     }
 }

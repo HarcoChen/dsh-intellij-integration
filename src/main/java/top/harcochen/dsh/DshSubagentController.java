@@ -29,12 +29,17 @@ final class DshSubagentController {
     private volatile SubagentPreview preview;
     private String catalogRoot;
     private JsonElement observedCatalog;
+    private long observedConnectionGeneration = -1;
 
     synchronized void observeCatalog(String root, JsonElement catalog) {
         if (catalog == null) return;
-        if (java.util.Objects.equals(root, catalogRoot) && catalog.equals(observedCatalog)) return;
+        long connectionGeneration = remote.snapshot().generation;
+        if (java.util.Objects.equals(root, catalogRoot)
+                && catalog.equals(observedCatalog)
+                && connectionGeneration == observedConnectionGeneration) return;
         catalogRoot = root;
         observedCatalog = catalog.deepCopy();
+        observedConnectionGeneration = connectionGeneration;
         refresh(root);
     }
 
@@ -61,6 +66,7 @@ final class DshSubagentController {
         preview = null;
         catalogRoot = null;
         observedCatalog = null;
+        observedConnectionGeneration = -1;
     }
 
     void observeTeam(String root, JsonObject team) {

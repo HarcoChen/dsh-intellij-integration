@@ -119,6 +119,7 @@ final class DshScheduleController implements AutoCloseable {
     }
 
     void manage() {
+        if (closed) return;
         operations.execute(
                 () -> {
                     try {
@@ -152,7 +153,8 @@ final class DshScheduleController implements AutoCloseable {
                         ApplicationManager.getApplication()
                                 .invokeLater(
                                         () -> {
-                                            if (!project.isDisposed()
+                                            if (!closed
+                                                    && !project.isDisposed()
                                                     && remote.snapshot().generation == generation)
                                                 chooseRecord(records, generation);
                                         });
@@ -163,6 +165,7 @@ final class DshScheduleController implements AutoCloseable {
     }
 
     private void chooseRecord(List<JsonObject> records, long generation) {
+        if (closed || project.isDisposed() || remote.snapshot().generation != generation) return;
         List<String> labels = new ArrayList<>();
         labels.add(DshBundle.message("dsh.schedule.create"));
         for (JsonObject record : records) {
@@ -331,27 +334,50 @@ final class DshScheduleController implements AutoCloseable {
     }
 
     private void modernMutation(String action, JsonObject request, long generation) {
+        if (closed) return;
         operations.execute(
                 () -> {
+                    boolean submitted = false;
+                    boolean knownRefusal = false;
                     try {
+                        if (closed) return;
                         if (remote.snapshot().generation != generation)
                             throw new IllegalStateException(
                                     DshBundle.message("dsh.runtime.changed"));
+                        submitted = true;
                         JsonElement raw = remote.scheduleRequest(action, request);
                         if (!raw.isJsonObject())
                             throw new IllegalStateException("Invalid Schedule result");
                         JsonObject result = raw.getAsJsonObject();
-                        if (result.has("code"))
+                        if (result.has("code")) {
+                            knownRefusal = true;
                             throw new IllegalStateException(
                                     DshBundle.message(
                                             "dsh.schedule.refused",
                                             DshJson.string(result, "code")));
+                        }
                         if (remote.snapshot().generation != generation) return;
                         stateChanged.run();
                         refreshCurrent(sessionId.get());
                         manage();
                     } catch (Exception error) {
-                        report(error);
+                        boolean unknown =
+                                submitted
+                                        && !knownRefusal
+                                        && (action.equals("create") || action.equals("run"))
+                                        && (!(error instanceof DshRemoteException remoteError)
+                                                || remoteError.layer()
+                                                        == DshRemoteException.Layer.CARRIER
+                                                || remoteError.layer()
+                                                        == DshRemoteException.Layer.PROTOCOL
+                                                || remoteError.httpStatus() >= 500);
+                        report(
+                                unknown
+                                        ? new IllegalStateException(
+                                                DshBundle.message("dsh.schedule.unknown")
+                                                        + "\n"
+                                                        + DshJson.message(error))
+                                        : error);
                     }
                 });
     }
@@ -448,6 +474,7 @@ final class DshScheduleController implements AutoCloseable {
                 operations.execute(
                         () -> {
                             try {
+                                if (closed) return;
                                 JsonElement result = remote.deleteSchedule(owner, id);
                                 if (!result.isJsonObject()
                                         || !id.equals(
@@ -587,6 +614,7 @@ final class DshScheduleController implements AutoCloseable {
         operations.execute(
                 () -> {
                     try {
+                        if (closed) return;
                         JsonElement result = remote.updateSchedule(request);
                         if (!result.isJsonObject()
                                 || !DshJson.bool(result.getAsJsonObject(), "updated", false)) {

@@ -5,6 +5,28 @@ An item is complete only after the host action, runtime protocol, projected stat
 
 Status: `[x]` implemented, `[-]` usable but not yet at VS Code parity, `[ ]` not implemented.
 
+## PR #29 review fixes — 2026-11-12
+
+- [x] Preserve editable review drafts when revision attachment fails; retry against the original
+  Session without submitting the rejection twice. Disabling review uses draft-discard confirmation.
+- [x] Prepare Headless continuation explicitly, retain custom launcher entry arguments and report
+  diagnostic-line truncation. Check Run configuration availability before stopping for restart.
+- [x] Build the tool review catalog with a single ledger index. Session previews read at most 160
+  records and stop subsequent pagination when selection, authorization or connection changes.
+- [x] Refresh Schedule and subagent caches after reconnect; fence closed Schedule controllers.
+  Unconfirmed create/run outcomes require checking the catalog/history before another attempt.
+- [x] Keep Forge uncertain outcomes across windows, scoped to Runtime/Session/URL, and retain
+  the selected change request by URL. Capture terminal context after queued parsing completes.
+- [x] Report account notices when actually shown; finish the notice flow before opening the
+  account menu once. Reject oversized file-count archives before replacing saved history.
+- [x] Real isolated IntelliJ acceptance covers revision attachment failure/retry with editable
+  documents and one rejection, rejected restart retaining the process, archive limits preserving
+  previous history, and the existing rollback/lifecycle paths. Official CLI Headless acceptance
+  covers custom scripts without Web flags, diagnostic truncation, resume, cancellation and timeout.
+  Formatting, lint, compilation, plugin packaging, IC/PC compatibility and terminal TypeScript pass.
+- [ ] Full window interaction, signed-in account notices and external Forge outcomes still need
+  manual acceptance. No unit tests or temporary acceptance classes were added to the repository.
+
 ## Headless tasks — 2026-11-12
 
 - [x] Native Headless tasks window from Find Action, Tools and the chat menu.

@@ -17,19 +17,23 @@ let writable = false;
 let epoch = -1;
 window.dshTerminalReceive = frame => {
     if (frame.type === 'capture') {
-        let text = terminal.getSelection();
-        if (frame.mode === 'screen') {
-            const buffer = terminal.buffer.active;
-            text = Array.from({ length: terminal.rows }, (_, i) =>
-                buffer.getLine(buffer.viewportY + i)?.translateToString(true) ?? '').join('\n');
-        }
-        const encoder = new TextEncoder();
-        let truncated = false;
-        while (encoder.encode(text).byteLength > 65536) {
-            text = text.slice(0, Math.floor(text.length * 0.9));
-            truncated = true;
-        }
-        window.dshTerminalPost({ type: 'context', text, mode: frame.mode, epoch, truncated });
+        // The empty write is a parser barrier: capture only the preceding snapshot/output.
+        const captureEpoch = epoch;
+        terminal.write('', () => {
+            let text = terminal.getSelection();
+            if (frame.mode === 'screen') {
+                const buffer = terminal.buffer.active;
+                text = Array.from({ length: terminal.rows }, (_, i) =>
+                    buffer.getLine(buffer.viewportY + i)?.translateToString(true) ?? '').join('\n');
+            }
+            const encoder = new TextEncoder();
+            let truncated = false;
+            while (encoder.encode(text).byteLength > 65536) {
+                text = text.slice(0, Math.floor(text.length * 0.9));
+                truncated = true;
+            }
+            window.dshTerminalPost({ type: 'context', text, mode: frame.mode, epoch: captureEpoch, truncated });
+        });
         return;
     }
     if (frame.viewEpoch !== undefined) epoch = frame.viewEpoch;

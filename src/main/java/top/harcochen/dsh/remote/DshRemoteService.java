@@ -1300,23 +1300,47 @@ public final class DshRemoteService implements Disposable {
      * backwards pages merged by sequence.
      */
     public JsonObject traceHistory(String sessionId, int pageSize) throws DshRemoteException {
+        return traceHistory(sessionId, pageSize, 100_000, () -> false);
+    }
+
+    /** Bounded history for previews; cancellation prevents any subsequent page request. */
+    public JsonObject traceHistory(
+            String sessionId,
+            int pageSize,
+            int maxRecords,
+            java.util.function.BooleanSupplier cancelled)
+            throws DshRemoteException {
+        if (maxRecords < 1 || pageSize < 1)
+            throw new IllegalArgumentException("Positive history limits required");
+        if (cancelled.getAsBoolean()) throw new java.util.concurrent.CancellationException();
         JsonObject address = DshRemoteContracts.sessionAddress(sessionId);
-        JsonObject tail = followSnapshotOnce(address, pageSize);
+        JsonObject tail = followSnapshotOnce(address, Math.min(pageSize, maxRecords));
         long throughSeq = longOf(tail, "cursor", -1L);
         TreeMap<Long, JsonElement> merged = new TreeMap<>();
         addHistoryRecords(merged, tail);
         boolean hasMore = boolOf(tail, "hasMore");
         int pages = 0;
-        while (hasMore && pages < 400 && merged.size() < 100_000) {
+        while (hasMore && pages < 400 && merged.size() < maxRecords) {
+            if (cancelled.getAsBoolean()) throw new java.util.concurrent.CancellationException();
             Long beforeSeq = merged.isEmpty() ? null : merged.firstKey();
             if (beforeSeq == null || beforeSeq <= 0 || throughSeq < 0) break;
-            JsonObject page = pageHistory(address, throughSeq, beforeSeq, pageSize);
+            JsonObject page =
+                    pageHistory(
+                            address,
+                            throughSeq,
+                            beforeSeq,
+                            Math.min(pageSize, maxRecords - merged.size()));
             int previous = merged.size();
             addHistoryRecords(merged, page);
             hasMore = boolOf(page, "hasMore");
             Long next = merged.isEmpty() ? null : merged.firstKey();
             if (merged.size() == previous || (next != null && next >= beforeSeq)) break;
             pages++;
+        }
+        if (cancelled.getAsBoolean()) throw new java.util.concurrent.CancellationException();
+        while (merged.size() > maxRecords) {
+            merged.pollFirstEntry();
+            hasMore = true;
         }
         JsonObject result = new JsonObject();
         JsonArray events = new JsonArray();

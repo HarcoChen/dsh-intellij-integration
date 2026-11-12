@@ -200,6 +200,7 @@ public final class DshHeadlessTasks implements Disposable {
                             || events.truncated()
                             || diagnostics.truncated()
                             || output.oversized()
+                            || output.diagnosticTruncated()
                             || finalTruncated,
                     active());
         }

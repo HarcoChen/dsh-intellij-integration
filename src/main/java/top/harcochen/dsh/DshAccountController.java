@@ -40,8 +40,7 @@ final class DshAccountController {
         this.operations = operations;
         this.notifier = notifier;
         this.errorSink = errorSink;
-        this.notifications =
-                new DshAccountNotifications(project, remote, operations, this::manage, errorSink);
+        this.notifications = new DshAccountNotifications(project, remote, operations, errorSink);
     }
 
     void manage() {

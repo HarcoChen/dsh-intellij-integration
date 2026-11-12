@@ -20,6 +20,7 @@ import java.util.function.Supplier;
 /** Bounded, atomic, read-only review history scoped to project and Runtime endpoint. */
 final class DshReviewArchive {
     private static final int MAX_FILE_BYTES = 8 * 1024 * 1024;
+    private static final int MAX_FILES = 1000;
     private static final long MAX_BYTES = 100L * 1024 * 1024;
     private static final long MAX_AGE = java.time.Duration.ofDays(30).toMillis();
     private final Path root;
@@ -41,6 +42,10 @@ final class DshReviewArchive {
     }
 
     void save(String scope, String session, JsonObject review) throws Exception {
+        if (!review.has("files")
+                || !review.get("files").isJsonArray()
+                || review.getAsJsonArray("files").size() > MAX_FILES)
+            throw new java.io.IOException("Review exceeds archive file limit (1000)");
         JsonArray rows = load(scope, session);
         JsonArray next = new JsonArray();
         next.add(review);
@@ -98,7 +103,7 @@ final class DshReviewArchive {
                 if (DshJson.integer(row, "turn", -1) <= 0
                         || !row.has("files")
                         || !row.get("files").isJsonArray()
-                        || row.getAsJsonArray("files").size() > 1000) return new JsonArray();
+                        || row.getAsJsonArray("files").size() > MAX_FILES) return new JsonArray();
                 for (JsonElement raw : row.getAsJsonArray("files")) {
                     if (!raw.isJsonObject()) return new JsonArray();
                     JsonObject file = raw.getAsJsonObject();

@@ -492,16 +492,22 @@ final class DshDebugTools implements AutoCloseable {
         if (!stopping.add(launch.handler()))
             throw new IllegalStateException("This execution is already stopping or restarting.");
         Launch target = launch;
+        CompletableFuture<Void> stopped =
+                restart
+                        ? onEdt(
+                                        () -> {
+                                            assertRestartAvailable(target);
+                                            return stopProcess(target);
+                                        })
+                                .thenCompose(value -> value)
+                        : stopProcess(target);
         CompletableFuture<String> result =
-                stopProcess(target)
-                        .thenCompose(
-                                ignored ->
-                                        restart
-                                                ? restartLaunch(target)
-                                                : CompletableFuture.completedFuture(
-                                                        "Stopped execution "
-                                                                + target.executionId()
-                                                                + "."));
+                stopped.thenCompose(
+                        ignored ->
+                                restart
+                                        ? restartLaunch(target)
+                                        : CompletableFuture.completedFuture(
+                                                "Stopped execution " + target.executionId() + "."));
         result.whenComplete((value, error) -> stopping.remove(target.handler()));
         return result;
     }
@@ -509,14 +515,16 @@ final class DshDebugTools implements AutoCloseable {
     private CompletableFuture<String> restartLaunch(Launch target) {
         return onEdt(
                         () -> {
-                            if (!RunManager.getInstance(project)
-                                    .getAllSettings()
-                                    .contains(target.settings()))
-                                throw new IllegalStateException(
-                                        "Run configuration removed. Choose another with debug_start.");
+                            assertRestartAvailable(target);
                             return start(target.settings(), target.noDebug());
                         })
                 .thenCompose(value -> value);
+    }
+
+    private void assertRestartAvailable(Launch target) {
+        if (!RunManager.getInstance(project).getAllSettings().contains(target.settings()))
+            throw new IllegalStateException(
+                    "Run configuration removed. Choose another with debug_start.");
     }
 
     private CompletableFuture<Void> stopProcess(Launch launch) {
