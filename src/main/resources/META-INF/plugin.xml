@@ -61,6 +61,8 @@
         <projectService serviceImplementation="top.harcochen.dsh.DshSettingsState"/>
         <projectService serviceImplementation="top.harcochen.dsh.DshChatDraftState"/>
         <fileEditorProvider implementation="top.harcochen.dsh.DshChatEditorProvider"/>
+        <fileEditorProvider implementation="top.harcochen.dsh.DshReviewEditorProvider"/>
+        <virtualFilePreCloseCheck implementation="top.harcochen.dsh.DshReviewEditorProvider$CloseCheck"/>
         <projectConfigurable parentId="tools" id="top.harcochen.dsh.settings"
                              displayName="DeepSeek Harness"
                              instance="top.harcochen.dsh.DshSettingsConfigurable"/>

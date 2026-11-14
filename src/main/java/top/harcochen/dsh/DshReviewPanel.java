@@ -6,14 +6,19 @@ import com.intellij.diff.DiffManager;
 import com.intellij.diff.DiffRequestPanel;
 import com.intellij.diff.contents.DocumentContent;
 import com.intellij.diff.requests.SimpleDiffRequest;
+import com.intellij.openapi.Disposable;
+import com.intellij.openapi.actionSystem.ActionManager;
+import com.intellij.openapi.actionSystem.ActionToolbar;
+import com.intellij.openapi.actionSystem.ActionUpdateThread;
+import com.intellij.openapi.actionSystem.AnActionEvent;
+import com.intellij.openapi.actionSystem.DefaultActionGroup;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.editor.event.DocumentEvent;
 import com.intellij.openapi.editor.event.DocumentListener;
 import com.intellij.openapi.fileTypes.FileTypeManager;
+import com.intellij.openapi.project.DumbAwareAction;
 import com.intellij.openapi.project.Project;
-import com.intellij.openapi.ui.DialogWrapper;
 import java.awt.BorderLayout;
-import java.awt.Dimension;
 import java.awt.event.ActionEvent;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
@@ -26,18 +31,17 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Function;
+import javax.swing.AbstractAction;
 import javax.swing.Action;
 import javax.swing.DefaultListModel;
 import javax.swing.JComponent;
 import javax.swing.JList;
 import javax.swing.JPanel;
-import javax.swing.JScrollPane;
-import javax.swing.JSplitPane;
 import javax.swing.JTextArea;
 import javax.swing.ListSelectionModel;
 
 /** One review surface for pending tool calls, settled tool edits, and saved turn snapshots. */
-final class DshReviewDialog extends DialogWrapper {
+final class DshReviewPanel implements Disposable {
     record Content(String before, String after) {}
 
     record File(
@@ -61,11 +65,21 @@ final class DshReviewDialog extends DialogWrapper {
     record RollbackResult(boolean complete, String message) {}
 
     private final Project project;
-    private final List<File> files;
+    private List<File> files;
     private final ExecutorService operations;
     private final Function<JsonObject, String> attachRevision;
     private final DiffRequestPanel diff;
-    private final JList<String> list = new JList<>(new DefaultListModel<>());
+    private final JPanel component;
+    private final Runnable requestClose;
+    private Runnable modifiedListener = () -> {};
+    private boolean replacing;
+    private final JList<String> list =
+            new com.intellij.ui.components.JBList<>(new DefaultListModel<>());
+    private final com.intellij.ui.OnePixelSplitter split =
+            new com.intellij.ui.OnePixelSplitter("DSH.Review.Split", 0.2f);
+    private Action previous;
+    private Action next;
+    private Action refresh;
     private final JTextArea status = new JTextArea();
     private final Map<File, DocumentContent> drafts = new HashMap<>();
     private final Map<File, Content> contents = new HashMap<>();
@@ -90,44 +104,44 @@ final class DshReviewDialog extends DialogWrapper {
                             if (!closed
                                     && !DshSettingsState.getInstance(project).enableChangeReview) {
                                 updateActions();
-                                doCancelAction();
+                                if (canClose()) requestClose.run();
                             }
                         });
     }
 
-    DshReviewDialog(
+    DshReviewPanel(
             Project project,
             List<File> files,
             int selected,
             ExecutorService operations,
-            Function<JsonObject, String> attachRevision) {
-        super(project, false);
+            Function<JsonObject, String> attachRevision,
+            Runnable requestClose) {
         this.project = project;
         this.files = List.copyOf(files);
         this.operations = operations;
         this.attachRevision = attachRevision;
+        this.requestClose = requestClose;
         DshRuntimeService runtime = DshRuntimeService.getInstance(project);
         runtime.addStatusListener(settingsListener);
         com.intellij.openapi.util.Disposer.register(
-                getDisposable(), () -> runtime.removeStatusListener(settingsListener));
-        diff = DiffManager.getInstance().createRequestPanel(project, getDisposable(), null);
-        setTitle(DshBundle.message("dsh.review.title"));
-        setModal(false);
-        setCancelButtonText(DshBundle.message("dsh.diff.approval.close"));
+                this, () -> runtime.removeStatusListener(settingsListener));
+        diff = DiffManager.getInstance().createRequestPanel(project, this, null);
         status.setEditable(false);
         status.setLineWrap(true);
         status.setWrapStyleWord(true);
         status.setOpaque(false);
-        status.setRows(3);
+        status.setRows(2);
+        status.setFont(javax.swing.UIManager.getFont("Label.font"));
+        status.setVisible(false);
         DefaultListModel<String> model = (DefaultListModel<String>) list.getModel();
         for (File file : files) model.addElement(file.label());
         list.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         list.addListSelectionListener(
                 event -> {
-                    if (!event.getValueIsAdjusting()) select();
+                    if (!replacing && !event.getValueIsAdjusting()) select();
                 });
-        init();
-        if (files.isEmpty()) status.setText(DshBundle.message("dsh.review.empty"));
+        component = createComponent();
+        if (files.isEmpty()) setStatus(DshBundle.message("dsh.review.empty"));
         else list.setSelectedIndex(Math.max(0, Math.min(selected, files.size() - 1)));
         updateActions();
     }
@@ -142,7 +156,7 @@ final class DshReviewDialog extends DialogWrapper {
                         ApplicationManager.getApplication()
                                 .invokeLater(
                                         () -> {
-                                            if (!closed) close(CANCEL_EXIT_CODE);
+                                            if (!closed) requestClose.run();
                                         });
                 };
         java.util.function.Consumer<top.harcochen.dsh.remote.DshRemoteState.Snapshot>
@@ -185,7 +199,7 @@ final class DshReviewDialog extends DialogWrapper {
                                                 if (active != null
                                                         && active.approvalKey() != null
                                                         && settled.contains(active.approvalKey()))
-                                                    status.setText(
+                                                    setStatus(
                                                             DshBundle.message(
                                                                     "dsh.review.settled"));
                                                 updateActions();
@@ -193,51 +207,136 @@ final class DshReviewDialog extends DialogWrapper {
                         };
         remote.addListener(stateListener);
         com.intellij.openapi.util.Disposer.register(
-                getDisposable(), () -> remote.removeListener(stateListener));
+                this, () -> remote.removeListener(stateListener));
         remote.addListener(listener);
-        com.intellij.openapi.util.Disposer.register(
-                getDisposable(), () -> remote.removeListener(listener));
+        com.intellij.openapi.util.Disposer.register(this, () -> remote.removeListener(listener));
         stateListener.accept(remote.snapshot());
         listener.accept(remote.snapshot());
     }
 
-    @Override
-    protected JComponent createCenterPanel() {
+    private JPanel createComponent() {
         JPanel panel = new JPanel(new BorderLayout(0, 8));
-        JSplitPane split =
-                new JSplitPane(
-                        JSplitPane.HORIZONTAL_SPLIT, new JScrollPane(list), diff.getComponent());
-        split.setResizeWeight(0.25);
-        split.setDividerLocation(280);
-        JPanel navigation = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.LEADING));
-        navigation.add(new javax.swing.JButton(action("dsh.review.previous", () -> navigate(-1))));
-        navigation.add(new javax.swing.JButton(action("dsh.review.next", () -> navigate(1))));
-        navigation.add(
-                new javax.swing.JButton(action("dsh.review.refresh", this::refreshSelected)));
-        panel.add(navigation, BorderLayout.NORTH);
+        split.setFirstComponent(
+                files.size() > 1 ? new com.intellij.ui.components.JBScrollPane(list) : null);
+        split.setSecondComponent(diff.getComponent());
+        DefaultActionGroup actions = new DefaultActionGroup();
+        previous = action("dsh.review.previous", () -> navigate(-1));
+        next = action("dsh.review.next", () -> navigate(1));
+        refresh = action("dsh.review.refresh", this::refreshSelected);
+        actions.add(toolbarAction(previous, com.intellij.icons.AllIcons.Actions.Back));
+        actions.add(toolbarAction(next, com.intellij.icons.AllIcons.Actions.Forward));
+        actions.add(toolbarAction(refresh, com.intellij.icons.AllIcons.Actions.Refresh));
+        actions.addSeparator();
+        for (Action action : createActions()) actions.add(toolbarAction(action, null));
+        ActionToolbar toolbar =
+                ActionManager.getInstance().createActionToolbar("DSH.Review", actions, true);
+        toolbar.setTargetComponent(panel);
+        panel.add(toolbar.getComponent(), BorderLayout.NORTH);
         panel.add(split, BorderLayout.CENTER);
         panel.add(status, BorderLayout.SOUTH);
-        panel.setPreferredSize(new Dimension(1100, 700));
         return panel;
     }
 
-    @Override
-    protected Action[] createActions() {
+    private Action[] createActions() {
         approve = action("dsh.diff.approval.approve", () -> decide("allowed-once", false));
         reject = action("dsh.diff.approval.reject", () -> decide("rejected", false));
         revise = action("dsh.review.revise", () -> decide("rejected", true));
         revertFile = action("dsh.review.revert.file", () -> rollback(false));
         revertHunk = action("dsh.review.revert.hunk", () -> rollback(true));
-        return new Action[] {approve, reject, revise, revertFile, revertHunk, getCancelAction()};
+        return new Action[] {approve, reject, revise, revertFile, revertHunk};
     }
 
     private Action action(String key, Runnable run) {
-        return new DialogWrapperAction(DshBundle.message(key)) {
+        return new AbstractAction(DshBundle.message(key)) {
             @Override
-            protected void doAction(ActionEvent event) {
-                run.run();
+            public void actionPerformed(ActionEvent event) {
+                if (!closed && isEnabled()) run.run();
             }
         };
+    }
+
+    private com.intellij.openapi.actionSystem.AnAction toolbarAction(
+            Action action, javax.swing.Icon icon) {
+        DumbAwareAction result =
+                new DumbAwareAction((String) action.getValue(Action.NAME), null, icon) {
+                    @Override
+                    public ActionUpdateThread getActionUpdateThread() {
+                        return ActionUpdateThread.EDT;
+                    }
+
+                    @Override
+                    public void update(AnActionEvent event) {
+                        event.getPresentation().setEnabled(!closed && action.isEnabled());
+                    }
+
+                    @Override
+                    public void actionPerformed(AnActionEvent event) {
+                        action.actionPerformed(
+                                new ActionEvent(component, ActionEvent.ACTION_PERFORMED, "review"));
+                    }
+                };
+        result.getTemplatePresentation()
+                .putClientProperty(
+                        com.intellij.openapi.actionSystem.ex.ActionUtil.SHOW_TEXT_IN_TOOLBAR,
+                        icon == null);
+        return result;
+    }
+
+    JComponent component() {
+        return component;
+    }
+
+    JComponent preferredFocus() {
+        return files.size() > 1 ? list : diff.getPreferredFocusedComponent();
+    }
+
+    void onModified(Runnable listener) {
+        modifiedListener = listener;
+    }
+
+    boolean hasDrafts() {
+        return drafts.keySet().stream()
+                .anyMatch(file -> !settled.contains(file.approvalKey()) && changed(file));
+    }
+
+    void reopen(List<File> latest, int selected) {
+        if (busy) {
+            setStatus(DshBundle.message("dsh.review.submitting"));
+            return;
+        }
+        if (hasDrafts()) {
+            if (selected >= 0 && selected < latest.size()) {
+                File target = latest.get(selected);
+                for (int index = 0; index < files.size(); index++)
+                    if (files.get(index).label().equals(target.label())
+                            && java.util.Objects.equals(
+                                    files.get(index).approvalKey(), target.approvalKey())) {
+                        list.setSelectedIndex(index);
+                        return;
+                    }
+            }
+            setStatus(DshBundle.message("dsh.review.tab.pending"));
+            return;
+        }
+        ++loadEpoch;
+        replacing = true;
+        files = List.copyOf(latest);
+        drafts.clear();
+        contents.clear();
+        settled.clear();
+        revisionRejected.clear();
+        reverted.clear();
+        DefaultListModel<String> model = (DefaultListModel<String>) list.getModel();
+        model.clear();
+        for (File file : files) model.addElement(file.label());
+        split.setFirstComponent(
+                files.size() > 1 ? new com.intellij.ui.components.JBScrollPane(list) : null);
+        replacing = false;
+        if (files.isEmpty()) {
+            diff.setRequest(null);
+            setStatus(DshBundle.message("dsh.review.empty"));
+            updateActions();
+        } else list.setSelectedIndex(Math.max(0, Math.min(selected, files.size() - 1)));
     }
 
     private void refreshSelected() {
@@ -279,7 +378,7 @@ final class DshReviewDialog extends DialogWrapper {
             show(file);
             return;
         }
-        status.setText(DshBundle.message("dsh.review.loading"));
+        setStatus(DshBundle.message("dsh.review.loading"));
         updateActions();
         CompletableFuture.supplyAsync(
                         () -> {
@@ -299,7 +398,7 @@ final class DshReviewDialog extends DialogWrapper {
                                                             || project.isDisposed()
                                                             || epoch != loadEpoch) return;
                                                     if (error != null)
-                                                        status.setText(errorMessage(error));
+                                                        setStatus(errorMessage(error));
                                                     else {
                                                         contents.put(file, content);
                                                         show(file);
@@ -333,7 +432,7 @@ final class DshReviewDialog extends DialogWrapper {
                                                     updateActions();
                                                 }
                                             },
-                                            getDisposable());
+                                            DshReviewPanel.this);
                             return created;
                         });
         SimpleDiffRequest request =
@@ -344,12 +443,10 @@ final class DshReviewDialog extends DialogWrapper {
                         DshBundle.message("dsh.diff.before"),
                         DshBundle.message("dsh.diff.proposed"));
         diff.setRequest(request);
-        status.setText(
+        setStatus(
                 settled.contains(file.approvalKey())
                         ? DshBundle.message("dsh.review.settled")
-                        : file.decide() == null
-                                ? DshBundle.message("dsh.review.history.hint")
-                                : DshBundle.message("dsh.review.edit.hint"));
+                        : "");
         updateActions();
     }
 
@@ -395,8 +492,14 @@ final class DshReviewDialog extends DialogWrapper {
                         && !reverted.contains(file);
         revertFile.setEnabled(canRevert);
         revertHunk.setEnabled(canRevert && file.hunkRestorable() && contents.containsKey(file));
+        previous.setEnabled(!busy && list.getSelectedIndex() > 0);
+        next.setEnabled(
+                !busy
+                        && list.getSelectedIndex() >= 0
+                        && list.getSelectedIndex() + 1 < files.size());
+        refresh.setEnabled(!busy && file != null);
         list.setEnabled(!busy);
-        getCancelAction().setEnabled(!busy);
+        modifiedListener.run();
     }
 
     private void rollback(boolean hunk) {
@@ -407,7 +510,7 @@ final class DshReviewDialog extends DialogWrapper {
                 || reverted.contains(file)
                 || (hunk && !file.hunkRestorable())) return;
         busy = true;
-        status.setText(DshBundle.message("dsh.review.submitting"));
+        setStatus(DshBundle.message("dsh.review.submitting"));
         updateActions();
         file.rollback()
                 .apply(hunk)
@@ -419,11 +522,11 @@ final class DshReviewDialog extends DialogWrapper {
                                                     if (closed || project.isDisposed()) return;
                                                     busy = false;
                                                     if (error != null)
-                                                        status.setText(errorMessage(error));
+                                                        setStatus(errorMessage(error));
                                                     else if (result != null) {
                                                         if (result.complete()) reverted.add(file);
                                                         if (result.message() != null)
-                                                            status.setText(result.message());
+                                                            setStatus(result.message());
                                                     }
                                                     updateActions();
                                                 }));
@@ -452,7 +555,7 @@ final class DshReviewDialog extends DialogWrapper {
                             .append('\n');
                 }
             if (text.toString().getBytes(StandardCharsets.UTF_8).length > 65536) {
-                status.setText(DshBundle.message("dsh.review.revision.large"));
+                setStatus(DshBundle.message("dsh.review.revision.large"));
                 return;
             }
             item.addProperty("id", "review:" + file.approvalKey());
@@ -463,7 +566,7 @@ final class DshReviewDialog extends DialogWrapper {
             item.addProperty("byteLength", text.toString().getBytes(StandardCharsets.UTF_8).length);
         }
         busy = true;
-        status.setText(DshBundle.message("dsh.review.submitting"));
+        setStatus(DshBundle.message("dsh.review.submitting"));
         updateActions();
         // Recheck every loaded file in this tool call before granting it. Preview drift requires
         // reopening.
@@ -497,9 +600,8 @@ final class DshReviewDialog extends DialogWrapper {
                                                     if (closed || project.isDisposed()) return;
                                                     busy = false;
                                                     if (error != null)
-                                                        status.setText(errorMessage(error));
-                                                    else if (failure != null)
-                                                        status.setText(failure);
+                                                        setStatus(errorMessage(error));
+                                                    else if (failure != null) setStatus(failure);
                                                     else {
                                                         if (revision) {
                                                             revisionRejected.add(
@@ -520,11 +622,10 @@ final class DshReviewDialog extends DialogWrapper {
                                                                         file.approvalKey());
                                                                 settled.add(file.approvalKey());
                                                             }
-                                                            status.setText(
-                                                                    revisionStatus(attachError));
+                                                            setStatus(revisionStatus(attachError));
                                                         } else {
                                                             settled.add(file.approvalKey());
-                                                            status.setText(
+                                                            setStatus(
                                                                     DshBundle.message(
                                                                             "allowed-once"
                                                                                             .equals(
@@ -548,6 +649,11 @@ final class DshReviewDialog extends DialogWrapper {
                                                 }));
     }
 
+    private void setStatus(String message) {
+        status.setText(message);
+        status.setVisible(message != null && !message.isBlank());
+    }
+
     private static String revisionStatus(String failure) {
         return failure == null
                 ? DshBundle.message("dsh.review.revision.ready")
@@ -559,24 +665,24 @@ final class DshReviewDialog extends DialogWrapper {
         return error.getMessage() == null ? error.toString() : error.getMessage();
     }
 
-    @Override
-    public void doCancelAction() {
-        if (busy) return;
-        if (drafts.keySet().stream()
-                        .anyMatch(file -> !settled.contains(file.approvalKey()) && changed(file))
+    boolean canClose() {
+        if (busy) {
+            setStatus(DshBundle.message("dsh.review.submitting"));
+            return false;
+        }
+        if (hasDrafts()
                 && com.intellij.openapi.ui.Messages.showYesNoDialog(
                                 project,
                                 DshBundle.message("dsh.review.discard"),
                                 DshBundle.message("dsh.review.title"),
                                 com.intellij.openapi.ui.Messages.getQuestionIcon())
-                        != com.intellij.openapi.ui.Messages.YES) return;
-        super.doCancelAction();
+                        != com.intellij.openapi.ui.Messages.YES) return false;
+        return true;
     }
 
     @Override
-    protected void dispose() {
+    public void dispose() {
         closed = true;
         ++loadEpoch;
-        super.dispose();
     }
 }

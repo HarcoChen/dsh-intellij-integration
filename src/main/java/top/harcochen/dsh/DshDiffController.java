@@ -3,7 +3,9 @@ package top.harcochen.dsh;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import com.intellij.diff.editor.SimpleDiffVirtualFile;
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.fileTypes.FileType;
 import com.intellij.openapi.fileTypes.FileTypeManager;
 import com.intellij.openapi.project.Project;
@@ -73,7 +75,7 @@ final class DshDiffController {
         operations.execute(
                 () -> {
                     try {
-                        List<DshReviewDialog.File> files = new ArrayList<>();
+                        List<DshReviewPanel.File> files = new ArrayList<>();
                         JsonObject history = remote.traceHistory(current, 160);
                         assertCompleteReviewHistory(history);
                         var callStates = DshToolDiff.callDiffStates(history);
@@ -93,7 +95,7 @@ final class DshDiffController {
                                                 + " · "
                                                 + path;
                                 files.add(
-                                        new DshReviewDialog.File(
+                                        new DshReviewPanel.File(
                                                 label,
                                                 path,
                                                 key,
@@ -135,7 +137,7 @@ final class DshDiffController {
                                                                     latest, callId, path, fresh,
                                                                     content, hunks, original);
                                                     assertGeneration(generation);
-                                                    return new DshReviewDialog.Content(
+                                                    return new DshReviewPanel.Content(
                                                             sides.before(), sides.after());
                                                 },
                                                 key == null
@@ -169,8 +171,8 @@ final class DshDiffController {
                             if (files.isEmpty())
                                 throw new IllegalStateException(
                                         DshBundle.message("dsh.review.empty"));
-                            DshReviewDialog.File file = files.get(selected);
-                            DshReviewDialog.Content content = file.load().call();
+                            DshReviewPanel.File file = files.get(selected);
+                            DshReviewPanel.Content content = file.load().call();
                             assertGeneration(generation);
                             showTextDiff(
                                     file.label(),
@@ -187,21 +189,15 @@ final class DshDiffController {
                                             if (project.isDisposed()
                                                     || remote.snapshot().generation != generation)
                                                 return;
-                                            DshReviewDialog dialog =
-                                                    new DshReviewDialog(
-                                                            project,
-                                                            files,
-                                                            selected,
-                                                            operations,
-                                                            item ->
-                                                                    remote.snapshot().generation
-                                                                                    != generation
-                                                                            ? DshBundle.message(
-                                                                                    "dsh.runtime.changed")
-                                                                            : attachRevision.apply(
-                                                                                    item));
-                                            dialog.bind(remote, current, generation);
-                                            dialog.show();
+                                            openReviewTab(
+                                                    current,
+                                                    generation,
+                                                    selectedCall == null
+                                                            ? "changes"
+                                                            : "call:" + selectedCall,
+                                                    files,
+                                                    selected,
+                                                    attachRevision);
                                         });
                     } catch (Exception error) {
                         report(error);
@@ -209,7 +205,42 @@ final class DshDiffController {
                 });
     }
 
-    private void appendTurnFiles(String current, List<DshReviewDialog.File> files) {
+    private void openReviewTab(
+            String current,
+            long generation,
+            String scope,
+            List<DshReviewPanel.File> files,
+            int selected,
+            java.util.function.Function<JsonObject, String> attachRevision) {
+        String label = current.substring(0, Math.min(current.length(), 12));
+        if (files.size() == 1) {
+            String path = files.get(0).path().replace('\\', '/');
+            label = path.substring(path.lastIndexOf('/') + 1);
+        }
+        DshReviewEditorProvider.open(
+                project,
+                generation + ":" + current + ":" + scope,
+                DshBundle.message("dsh.review.tab.title", label),
+                files,
+                selected,
+                close -> {
+                    DshReviewPanel panel =
+                            new DshReviewPanel(
+                                    project,
+                                    files,
+                                    selected,
+                                    operations,
+                                    item ->
+                                            remote.snapshot().generation != generation
+                                                    ? DshBundle.message("dsh.runtime.changed")
+                                                    : attachRevision.apply(item),
+                                    close);
+                    panel.bind(remote, current, generation);
+                    return panel;
+                });
+    }
+
+    private void appendTurnFiles(String current, List<DshReviewPanel.File> files) {
         if (!remote.access().owner()) return;
         long generation = remote.snapshot().generation;
         for (JsonElement value : changeReviews.view(current)) {
@@ -221,7 +252,7 @@ final class DshDiffController {
                 String path = DshJson.string(file, "path");
                 String id = DshJson.string(file, "id");
                 files.add(
-                        new DshReviewDialog.File(
+                        new DshReviewPanel.File(
                                 DshBundle.message("dsh.change.review.turn.prefix", turn)
                                         + (DshJson.bool(review, "archived", false)
                                                 ? " · " + DshBundle.message("dsh.review.saved")
@@ -236,7 +267,7 @@ final class DshDiffController {
                                     if (sides.binary())
                                         throw new IllegalStateException(
                                                 DshBundle.message("dsh.files.binary"));
-                                    return new DshReviewDialog.Content(
+                                    return new DshReviewPanel.Content(
                                             sides.beforeText(), sides.afterText());
                                 },
                                 null,
@@ -256,7 +287,7 @@ final class DshDiffController {
             throw new IllegalStateException(DshBundle.message("dsh.review.history.large"));
     }
 
-    private java.util.concurrent.CompletionStage<DshReviewDialog.RollbackResult> rollback(
+    private java.util.concurrent.CompletionStage<DshReviewPanel.RollbackResult> rollback(
             String current, int turn, String id, String path, long generation, boolean hunk) {
         return java.util.concurrent.CompletableFuture.supplyAsync(
                 () -> {
@@ -266,13 +297,13 @@ final class DshDiffController {
                         DshChangeReviewStore.HunkPreview preview =
                                 hunk ? changeReviews.revertHunks(current, turn, id) : null;
                         if (preview != null && preview.blocks().isEmpty())
-                            return new DshReviewDialog.RollbackResult(
+                            return new DshReviewPanel.RollbackResult(
                                     false, DshBundle.message("dsh.review.hunks.empty"));
                         RollbackSelection selection =
                                 DshPluginManagementController.ui(
                                         () -> confirmRollback(path, preview));
                         if (selection == null)
-                            return new DshReviewDialog.RollbackResult(
+                            return new DshReviewPanel.RollbackResult(
                                     false, DshBundle.message("dsh.review.revert.cancelled"));
                         boolean complete =
                                 changeReviews.revert(
@@ -284,7 +315,7 @@ final class DshDiffController {
                                         () -> assertWritable(current, generation, paths));
                         com.intellij.openapi.vfs.VirtualFileManager.getInstance()
                                 .asyncRefresh(null);
-                        return new DshReviewDialog.RollbackResult(
+                        return new DshReviewPanel.RollbackResult(
                                 complete, DshBundle.message("dsh.review.reverted", path));
                     } catch (Exception error) {
                         throw new java.util.concurrent.CompletionException(error);
@@ -443,7 +474,7 @@ final class DshDiffController {
                         changeReviews.readSavedHistory(current);
                         DshChangeReviewStore.FileSides selected =
                                 changeReviews.sides(current, turn, fileId);
-                        List<DshReviewDialog.File> files = new ArrayList<>();
+                        List<DshReviewPanel.File> files = new ArrayList<>();
                         appendTurnFiles(current, files);
                         String prefix =
                                 DshBundle.message("dsh.change.review.turn.prefix", turn) + " · ";
@@ -461,17 +492,15 @@ final class DshDiffController {
                                             if (project.isDisposed()
                                                     || remote.snapshot().generation != generation)
                                                 return;
-                                            DshReviewDialog dialog =
-                                                    new DshReviewDialog(
-                                                            project,
-                                                            files,
-                                                            initial,
-                                                            operations,
-                                                            ignored ->
-                                                                    DshBundle.message(
-                                                                            "dsh.review.history.hint"));
-                                            dialog.bind(remote, current, generation);
-                                            dialog.show();
+                                            openReviewTab(
+                                                    current,
+                                                    generation,
+                                                    "changes",
+                                                    files,
+                                                    initial,
+                                                    ignored ->
+                                                            DshBundle.message(
+                                                                    "dsh.review.history.hint"));
                                         });
                     } catch (Exception error) {
                         report(error);
@@ -579,7 +608,8 @@ final class DshDiffController {
                                             afterTitle);
                             request.putUserData(
                                     com.intellij.diff.util.DiffUserDataKeys.FORCE_READ_ONLY, true);
-                            com.intellij.diff.DiffManager.getInstance().showDiff(project, request);
+                            FileEditorManager.getInstance(project)
+                                    .openFile(new SimpleDiffVirtualFile(request), true);
                         });
     }
 
